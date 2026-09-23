@@ -7,6 +7,9 @@
 # Командный процессор Windows принимает только CRLF.
 *.bat text eol=crlf
 
+# Сценарии PowerShell исполняются только в Windows PowerShell.
+*.ps1 text eol=crlf
+
 # Сценарий обёртки Gradle исполняется интерпретатором sh.
 gradlew text eol=lf
 

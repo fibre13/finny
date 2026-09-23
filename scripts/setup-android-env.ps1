@@ -82,14 +82,23 @@ Write-Host "Установка platform-tools, platform 37.0, build-tools 37.0.0
 # Уровень API соответствует compileSdk проекта (см. docs/01-проектные-решения.md).
 & $sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0"
 
-# --- Сохраняем переменные окружения для последующих сессий ---
+# --- Проверяем скрипт подключения окружения ---
+# Файл scripts/env.ps1 входит в репозиторий и вычисляет пути от своего
+# расположения, поэтому работает в любом каталоге, куда склонирован проект.
+# Перезаписывать его абсолютными путями этой машины нельзя: отслеживаемый
+# файл изменялся бы при каждой установке, а рабочее дерево становилось
+# грязным. Создаётся он только если отсутствует.
 $envScript = Join-Path $PSScriptRoot "env.ps1"
-@"
+if (-not (Test-Path $envScript)) {
+    @'
 # Подключить перед сборкой: . scripts/env.ps1
-`$env:JAVA_HOME = "$jdkDir"
-`$env:ANDROID_HOME = "$sdkDir"
-`$env:Path = "`$env:JAVA_HOME\bin;`$env:ANDROID_HOME\platform-tools;`$env:Path"
-"@ | Set-Content -Path $envScript -Encoding utf8
+$root = Split-Path -Parent $PSScriptRoot
+$env:JAVA_HOME = Join-Path $root "tools\jdk17"
+$env:ANDROID_HOME = Join-Path $root "tools\android-sdk"
+$env:Path = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:Path"
+'@ | Set-Content -Path $envScript -Encoding utf8
+    Write-Host "Создан scripts/env.ps1"
+}
 
 Write-Host ""
 Write-Host "Готово. Перед сборкой в новой сессии выполните:"
