@@ -1,0 +1,47 @@
+{
+  "species": [
+    {
+      "id": "cat",
+      "title": "Котёнок"
+    },
+    {
+      "id": "dog",
+      "title": "Щенок"
+    },
+    {
+      "id": "rabbit",
+      "title": "Крольчонок"
+    }
+  ],
+  "colors": [
+    {
+      "id": "ginger",
+      "title": "Рыжий",
+      "hex": "#E8913A"
+    },
+    {
+      "id": "grey",
+      "title": "Серый",
+      "hex": "#9AA5B1"
+    },
+    {
+      "id": "white",
+      "title": "Белый",
+      "hex": "#EDE4D6"
+    }
+  ],
+  "accessories": [
+    {
+      "id": "none",
+      "title": "Без украшения"
+    },
+    {
+      "id": "bow",
+      "title": "Бантик"
+    },
+    {
+      "id": "scarf",
+      "title": "Шарфик"
+    }
+  ]
+}

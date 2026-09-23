@@ -1,0 +1,268 @@
+/*
+  Дизайн-система «Питомец Финни».
+
+  Единственный источник значений для макетов. Все цвета, размеры, радиусы
+  и отступы берутся отсюда переменными; вписывать значения прямо в разметку
+  нельзя — расхождение с приложением обнаружится только при переносе.
+
+  Значения совпадают с app/src/main/kotlin/ru/onefortwo/finny/ui/theme/Theme.kt.
+  При правке менять оба места вместе.
+*/
+
+:root {
+  /* --- Роли цвета, светлая пара ------------------------------------- */
+  --c-primary: #3D7C47;
+  --c-on-primary: #FFFFFF;
+  --c-secondary: #F2B705;
+  --c-on-secondary: #2B2B2B;
+  --c-background: #FFFBF2;
+  --c-on-background: #2B2B2B;
+  --c-surface: #FFFFFF;
+  --c-on-surface: #2B2B2B;
+  --c-outline: #8A8578;
+  --c-outline-variant: #DAD4C4;
+  --c-error: #B3261E;
+
+  /* --- Направления плана бюджета ------------------------------------ */
+  --c-needs: #2E6B4F;
+  --c-wants: #B4552A;
+  --c-savings: #35558A;
+
+  /* --- Направление 1b «Аппликация» ---------------------------------- */
+  --c-ink: #23201A;
+  --c-paper: #FFF1D6;
+  --c-disabled-bg: #EFE9DA;
+  --c-disabled-text: #6A655A;
+  --c-disabled-outline: #8A8578;
+  --stroke-1b: 2.5px;
+  /*
+    Обводка пиктограммы. Совпадает с контуром 1b, чтобы пиктограмма не
+    выглядела ни легче, ни тяжелее рамки рядом.
+
+    Задаётся в dp, а не в единицах сетки построения: пиктограммы
+    выводятся в двух размерах, и постоянная в единицах сетки давала бы
+    на крупной вдвое более толстую линию. В SVG на сетке 24 × 24 это
+    `vector-effect: non-scaling-stroke`, в Compose — перевод в единицы
+    сетки обратным масштабом при отрисовке.
+  */
+  --stroke-pictogram: 2.5px;
+  --offset-1b: 4px;
+
+  /*
+    Цвет копилки. Единственная пиктограмма в собственном цвете предмета,
+    а не в цвете направления: синяя свинка читается как ошибка. У миски
+    и звезды узнаваемого цвета нет, они остаются в цвете направления.
+
+    Порог 3:1 к заливке не применяется: границу фигуры задаёт контур
+    чернилами, как у окраса питомца «белый».
+  */
+  --c-piggy: #E07B96;
+
+  /* --- Окрасы питомца ----------------------------------------------- */
+  --c-pet-ginger: #E8913A;
+  --c-pet-grey: #9AA5B1;
+  --c-pet-white: #EDE4D6;
+
+  /* --- Типографика --------------------------------------------------- */
+  --font: Roboto, "Helvetica Neue", system-ui, sans-serif;
+  --t-title-size: 24px;
+  --t-title-line: 32px;
+  --t-card-size: 16px;
+  --t-card-line: 24px;
+  --t-body-size: 16px;
+  --t-body-line: 24px;
+  --t-body-lg-size: 18px;
+  --t-body-lg-line: 26px;
+  --t-button-size: 18px;
+  --t-button-line: 24px;
+  --t-caption-size: 14px;
+  --t-caption-line: 20px;
+
+  /* --- Отступы ------------------------------------------------------- */
+  --s-1: 4px;
+  --s-2: 6px;
+  --s-3: 8px;
+  --s-4: 10px;
+  --s-5: 12px;
+  --s-6: 14px;
+  --s-7: 16px;
+  --s-8: 18px;
+  --s-9: 24px;
+
+  /* --- Радиусы ------------------------------------------------------- */
+  --r-tag: 10px;
+  --r-button: 16px;
+  --r-card: 24px;
+  --r-pet: 28px;
+
+  /* --- Размеры ------------------------------------------------------- */
+  --touch-min: 48px;
+  --content-max: 640px;
+  --pet-size: 140px;
+  --screen-pad: 16px;
+}
+
+/*
+  Тёмная пара. Роли те же, переопределяются только значения.
+  В приложении включена и следует системной настройке.
+
+  Чернила и бумага переопределяются наравне с ролями: на них держится
+  направление 1b, и без этого контур карточки на тёмном фоне пропадал.
+  Значения неактивного состояния подняты против первоначальных ради
+  порога контраста: #8F9686 давало 4,49:1 при нужных 4,5:1, а #6D7566 —
+  2,87:1 при нужных 3:1.
+*/
+[data-theme="dark"] {
+  --c-ink: #F0EDE2;
+  --c-paper: #14170F;
+  --c-disabled-bg: #2A2F24;
+  --c-disabled-text: #909787;
+  --c-disabled-outline: #71796A;
+  --c-primary: #8CCB96;
+  --c-on-primary: #10230F;
+  --c-secondary: #D8A82E;
+  --c-on-secondary: #221A00;
+  --c-background: #14170F;
+  --c-on-background: #F0EDE2;
+  --c-surface: #1F241A;
+  --c-on-surface: #F0EDE2;
+  --c-outline: #7C8473;
+  --c-outline-variant: #4A5142;
+  --c-error: #F2B8B5;
+  --c-needs: #7FC9A0;
+  --c-wants: #E6A377;
+  --c-savings: #9DB6E8;
+}
+
+/* --- База ------------------------------------------------------------ */
+
+body {
+  margin: 0;
+  padding: var(--s-9);
+  background: var(--c-background);
+  color: var(--c-on-background);
+  font-family: var(--font);
+  font-size: var(--t-body-size);
+  line-height: var(--t-body-line);
+}
+
+h1 {
+  font-size: var(--t-title-size);
+  line-height: var(--t-title-line);
+  font-weight: 700;
+  margin: 0 0 var(--s-5);
+}
+
+h2 {
+  font-size: var(--t-card-size);
+  line-height: var(--t-card-line);
+  font-weight: 700;
+  margin: var(--s-9) 0 var(--s-3);
+}
+
+.note {
+  font-size: var(--t-caption-size);
+  line-height: var(--t-caption-line);
+  color: var(--c-disabled-text);
+  margin: 0 0 var(--s-5);
+}
+
+/* --- Компоненты ------------------------------------------------------ */
+
+/* Карточка раздела. */
+.card {
+  background: var(--c-surface);
+  color: var(--c-on-surface);
+  border-radius: var(--r-card);
+  padding: var(--s-7);
+  margin-bottom: var(--s-5);
+}
+
+.card-title {
+  font-size: var(--t-card-size);
+  line-height: var(--t-card-line);
+  font-weight: 700;
+  margin: 0 0 var(--s-3);
+}
+
+/* Карточка сообщения. Проблемная отличается фоном и словом, не только цветом. */
+.feedback { background: var(--c-surface); }
+.feedback.problem { background: var(--c-secondary); color: var(--c-on-secondary); }
+.feedback .kicker { font-weight: 700; margin: 0 0 var(--s-1); }
+.feedback .next { margin: var(--s-3) 0 0; }
+
+/* Кнопки. Высота не ниже зоны нажатия, надпись полужирная. */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: var(--s-4) var(--s-7);
+  border-radius: var(--r-button);
+  font-family: var(--font);
+  font-size: var(--t-button-size);
+  line-height: var(--t-button-line);
+  font-weight: 700;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.btn-primary {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  border: none;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--c-on-surface);
+  border: 1px solid var(--c-outline);
+}
+
+.btn[disabled],
+.btn.is-disabled {
+  background: var(--c-disabled-bg);
+  color: var(--c-disabled-text);
+  border: 1px dashed var(--c-disabled-outline);
+  cursor: default;
+}
+
+.btn.is-selected {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  border: none;
+}
+
+/* Строка «подпись — значение». Значение не слипается с подписью при
+   увеличении шрифта. */
+.kv { display: flex; align-items: baseline; gap: var(--s-5); }
+.kv .k { flex: 1; }
+.kv .v { font-weight: 700; white-space: nowrap; }
+
+/* Показатель питомца: пиктограмма, метка, число, полоса. */
+.stat { margin: var(--s-2) 0; }
+.stat .row { display: flex; align-items: baseline; gap: var(--s-5); }
+.stat .label { flex: 1; }
+.stat .value { font-weight: 700; white-space: nowrap; }
+
+.bar {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--c-outline-variant);
+  overflow: hidden;
+  margin-top: var(--s-1);
+}
+
+.bar > span { display: block; height: 100%; background: var(--c-primary); }
+.bar.needs > span { background: var(--c-needs); }
+.bar.wants > span { background: var(--c-wants); }
+.bar.savings > span { background: var(--c-savings); }
+
+/* Плитка окраса рядом с кнопкой выбора. */
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--s-3);
+  flex: none;
+}

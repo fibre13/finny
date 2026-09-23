@@ -1,0 +1,56 @@
+<!-- @dsCard group="Компоненты" name="Показатели" subtitle="Пиктограмма, метка, число и полоса; цвет только дополняет" viewport="700x620" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Показатели</title>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<h1>Показатели</h1>
+
+<h2>Состояние питомца</h2>
+<div class="card">
+  <div class="stat">
+    <div class="row"><span class="label">Забота: Голодный</span><span class="value">20 из 100</span></div>
+    <div class="bar"><span style="width:20%"></span></div>
+  </div>
+  <div class="stat">
+    <div class="row"><span class="label">Радость: Спокойный</span><span class="value">60 из 100</span></div>
+    <div class="bar"><span style="width:60%"></span></div>
+  </div>
+  <div class="stat">
+    <div class="row"><span class="label">Забота: Довольный</span><span class="value">90 из 100</span></div>
+    <div class="bar"><span style="width:90%"></span></div>
+  </div>
+</div>
+<p class="note">Показатель собран из четырёх частей: пиктограмма уровня, текстовая метка,
+число и полоса. Программа чтения с экрана озвучивает его одной фразой: «Забота: Довольный, 90 из 100».</p>
+
+<h2>Направления плана бюджета</h2>
+<div class="card">
+  <div class="stat">
+    <div class="row"><span class="label">Нужное</span><span class="value">23 монеты</span></div>
+    <div class="bar needs"><span style="width:46%"></span></div>
+  </div>
+  <div class="stat">
+    <div class="row"><span class="label">Хочу</span><span class="value">11 монет</span></div>
+    <div class="bar wants"><span style="width:22%"></span></div>
+  </div>
+  <div class="stat">
+    <div class="row"><span class="label">Копилка</span><span class="value">15 монет</span></div>
+    <div class="bar savings"><span style="width:30%"></span></div>
+  </div>
+</div>
+<p class="note">Цвет направления только дополняет название и пиктограмму. Различать «Нужное»
+и «Хочу» по одному цвету ребёнок не обязан.</p>
+
+<h2>Обводка пиктограммы</h2>
+<p class="note">Пиктограммы строятся на сетке 24 × 24 и выводятся в двух размерах: 28 dp
+в строке показателя и 48 dp рядом с заголовком направления. Толщина обводки задаётся
+в dp — <code>--stroke-pictogram</code>, те же 2,5 dp, что и контур 1b, — и переводится
+в единицы сетки при отрисовке. Постоянная в единицах сетки давала на крупной пиктограмме
+вдвое более толстую линию: звезда и копилка расплывались в пятно.</p>
+</body>
+</html>

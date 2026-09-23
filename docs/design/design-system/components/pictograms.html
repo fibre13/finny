@@ -1,0 +1,232 @@
+<!-- @dsCard group="Компоненты" name="Пиктограммы" subtitle="Уровень показателя, направления плана, итог задания, монета" viewport="700x620" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пиктограммы</title>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<h1>Пиктограммы</h1>
+<p class="note">Сетка построения 24 × 24, координаты те же, что в приложении
+(<code>ui/common/Pictograms.kt</code>). Толщина обводки берётся токеном
+<code>--stroke-pictogram</code> и от размера не зависит: в SVG это
+<code>vector-effect: non-scaling-stroke</code>, в Compose — перевод в единицы
+сетки обратным масштабом при отрисовке.</p>
+
+<p class="note"><strong>Пиктограмма ничего не заменяет.</strong> Рядом всегда стоит
+подпись: «Забота: В порядке», «Нужное», «Верно». Состояние обязано читаться текстом,
+а рисунок только помогает его узнать. Поэтому пиктограммы не озвучиваются программой
+чтения с экрана отдельно — она произносит подпись.</p>
+
+<h2>Уровень показателя, 28 dp</h2>
+<p class="note">Выводится в строке показателя рядом с подписью. Различается формой рта
+и размером глаз, цвет не участвует.</p>
+<div style="display:flex;align-items:flex-end;gap:var(--s-9);flex-wrap:wrap;margin-bottom:var(--s-8)">
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:28px;height:28px;display:block">
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="10" vector-effect="non-scaling-stroke"></circle>
+  <path d="M7.80 17 Q12 11.80 16.20 17" vector-effect="non-scaling-stroke"></path>
+</g>
+<circle cx="8.60" cy="10" r="1.5" fill="var(--c-ink)"></circle>
+<circle cx="15.40" cy="10" r="1.5" fill="var(--c-ink)"></circle>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Низкий</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:28px;height:28px;display:block">
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="10" vector-effect="non-scaling-stroke"></circle>
+  <path d="M7.80 15.60 Q12 17 16.20 15.60" vector-effect="non-scaling-stroke"></path>
+</g>
+<circle cx="8.60" cy="10" r="1.5" fill="var(--c-ink)"></circle>
+<circle cx="15.40" cy="10" r="1.5" fill="var(--c-ink)"></circle>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Средний</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:28px;height:28px;display:block">
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="10" vector-effect="non-scaling-stroke"></circle>
+  <path d="M7 14.60 Q12 21 17 14.60" vector-effect="non-scaling-stroke"></path>
+</g>
+<circle cx="8.60" cy="10" r="1.9" fill="var(--c-ink)"></circle>
+<circle cx="15.40" cy="10" r="1.9" fill="var(--c-ink)"></circle>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Высокий</figcaption>
+</figure>
+</div>
+
+<h2>Направления плана бюджета, 48 dp</h2>
+<p class="note">Выводятся рядом с заголовком направления. Крупнее строчных: миска,
+звезда и копилка состоят из нескольких частей и при 28 dp сливаются в пятно —
+проверено на устройстве. Миска и звезда заливаются цветом направления, копилка —
+собственным, см. примечание ниже.</p>
+<div style="display:flex;align-items:flex-end;gap:var(--s-9);flex-wrap:wrap;margin-bottom:var(--s-8)">
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:48px;height:48px;display:block">
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 9.60 Q6.60 6.60 9 3.40" vector-effect="non-scaling-stroke"></path>
+  <path d="M15 9.60 Q12.60 6.60 15 3.40" vector-effect="non-scaling-stroke"></path>
+  <path d="M4.40 13 Q12 22.40 19.60 13 Z" fill="var(--c-needs)" vector-effect="non-scaling-stroke"></path>
+  <path d="M2.80 13 H21.20" vector-effect="non-scaling-stroke"></path>
+</g>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Нужное</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:48px;height:48px;display:block">
+<g stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12.00 3.20 L14.41 9.28 L20.94 9.70 L15.90 13.87 L17.53 20.20 L12.00 16.70 L6.47 20.20 L8.10 13.87 L3.06 9.70 L9.59 9.28 Z" fill="var(--c-wants)" vector-effect="non-scaling-stroke"></path>
+</g>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Хочу</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:48px;height:48px;display:block">
+<path d="M4.2 12.6 Q0.8 11.8 2.0 9.8 Q3.0 8.6 4.2 10.4" fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+<!--
+  Силуэт получается двойной прорисовкой: сначала все части чернилами
+  с обводкой — они сливаются в общее пятно, затем те же части заливкой
+  без обводки. Остаётся кольцо чернил по внешнему краю, то есть контур
+  объединения. В Compose то же делается объединением путей: SVG такой
+  операции не имеет.
+-->
+<g fill="var(--c-ink)" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linejoin="round" vector-effect="non-scaling-stroke">
+  <ellipse cx="11.2" cy="13.4" rx="8.2" ry="6.6"></ellipse>
+  <path d="M14.4 8.2 Q15.6 4.4 18.2 5.6 Q18.8 7.6 18.2 9.2 Z"></path>
+  <rect x="17.0" y="10.6" width="5.2" height="5.6" rx="2.4"></rect>
+  <rect x="6.0" y="17.2" width="3.4" height="4.0" rx="1.7"></rect>
+  <rect x="13.4" y="17.2" width="3.4" height="4.0" rx="1.7"></rect>
+</g>
+<g fill="var(--c-piggy)" stroke="none">
+  <ellipse cx="11.2" cy="13.4" rx="8.2" ry="6.6"></ellipse>
+  <path d="M14.4 8.2 Q15.6 4.4 18.2 5.6 Q18.8 7.6 18.2 9.2 Z"></path>
+  <rect x="17.0" y="10.6" width="5.2" height="5.6" rx="2.4"></rect>
+  <rect x="6.0" y="17.2" width="3.4" height="4.0" rx="1.7"></rect>
+  <rect x="13.4" y="17.2" width="3.4" height="4.0" rx="1.7"></rect>
+</g>
+<path d="M6.2 9.9 Q10.6 8.5 15.0 9.9" fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+<circle cx="10.6" cy="3.9" r="2.7" fill="#F2B705" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" vector-effect="non-scaling-stroke"></circle>
+<circle cx="16.4" cy="11.8" r="1.1" fill="var(--c-ink)"></circle>
+<circle cx="20.7" cy="13.3" r="0.95" fill="var(--c-ink)"></circle>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Копилка</figcaption>
+</figure>
+</div>
+<p class="note">Копилка собрана одним силуэтом: туловище, ухо, пятачок и две ножки
+объединены в общий контур. Частями поверх друг друга фигура распадается на слепленные
+куски — на стыке остаётся линия.</p>
+
+<p class="note"><strong>Копилка — единственная пиктограмма в собственном цвете предмета</strong>
+(<code>--c-piggy</code>), а не в цвете направления: синяя свинка читается как ошибка.
+У миски и звезды узнаваемого цвета нет, они остаются в цвете направления. Монета взята
+цветом монеты — это тот же предмет, что и в счётчике баланса. Направление «Копилка» при
+этом никуда не девается: синим окрашены кромка карточки, полоса и ползунок, а рядом стоит
+подпись.</p>
+
+<h2>Итог задания и монета, 28 dp</h2>
+<div style="display:flex;align-items:flex-end;gap:var(--s-9);flex-wrap:wrap;margin-bottom:var(--s-8)">
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:28px;height:28px;display:block">
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 12.60 L10 17.40 L19 7" vector-effect="non-scaling-stroke"></path>
+</g>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Верно</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:28px;height:28px;display:block">
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="9.40" vector-effect="non-scaling-stroke"></circle>
+  <path d="M12 6.80 V13.40" vector-effect="non-scaling-stroke"></path>
+</g>
+<circle cx="12" cy="17" r="1.50" fill="var(--c-ink)"></circle>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Ошибка</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:28px;height:28px;display:block">
+<circle cx="12" cy="12" r="9.40" fill="#F2B705"></circle>
+<g fill="none" stroke="var(--c-ink)" style="stroke-width:var(--stroke-pictogram)" stroke-linecap="round">
+  <circle cx="12" cy="12" r="9.40" vector-effect="non-scaling-stroke"></circle>
+  <circle cx="12" cy="12" r="4.60" vector-effect="non-scaling-stroke"></circle>
+</g>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Монета</figcaption>
+</figure>
+</div>
+<h2>Направления в чёрно-белом режиме, 48 dp</h2>
+<p class="note">Цвет направления в этом режиме не различает: все три чёрные. Вместо рисунка
+выводится квадрат со штриховкой — своим наклоном для каждого направления. Вместо, а не
+поверх: при предельном контуре и одном цвете миска, звезда и копилка перестают
+различаться силуэтом. Подпись рядом остаётся, как всегда.</p>
+<div style="display:flex;align-items:flex-end;gap:var(--s-9);flex-wrap:wrap;margin-bottom:var(--s-8)">
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:48px;height:48px;display:block">
+<defs><clipPath id="clip-needs"><rect x="2" y="2" width="20" height="20" rx="5"></rect></clipPath></defs>
+<rect x="2" y="2" width="20" height="20" rx="5" fill="#FFFFFF"></rect>
+<g clip-path="url(#clip-needs)" stroke="#000000" style="stroke-width:var(--stroke-pictogram)" transform="rotate(-45 12 12)">
+    <path d="M-8.0 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M-3.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M1.2 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M5.8 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M10.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M15.0 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M19.6 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M24.2 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M28.8 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M33.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+</g>
+<rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="#000000" style="stroke-width:var(--stroke-pictogram)" vector-effect="non-scaling-stroke"></rect>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Нужное</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:48px;height:48px;display:block">
+<defs><clipPath id="clip-wants"><rect x="2" y="2" width="20" height="20" rx="5"></rect></clipPath></defs>
+<rect x="2" y="2" width="20" height="20" rx="5" fill="#FFFFFF"></rect>
+<g clip-path="url(#clip-wants)" stroke="#000000" style="stroke-width:var(--stroke-pictogram)" transform="rotate(45 12 12)">
+    <path d="M-8.0 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M-3.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M1.2 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M5.8 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M10.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M15.0 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M19.6 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M24.2 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M28.8 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M33.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+</g>
+<rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="#000000" style="stroke-width:var(--stroke-pictogram)" vector-effect="non-scaling-stroke"></rect>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Хочу</figcaption>
+</figure>
+<figure style="margin:0;display:flex;flex-direction:column;align-items:center;gap:var(--s-2)">
+  <svg viewBox="0 0 24 24" style="width:48px;height:48px;display:block">
+<defs><clipPath id="clip-savings"><rect x="2" y="2" width="20" height="20" rx="5"></rect></clipPath></defs>
+<rect x="2" y="2" width="20" height="20" rx="5" fill="#FFFFFF"></rect>
+<g clip-path="url(#clip-savings)" stroke="#000000" style="stroke-width:var(--stroke-pictogram)" transform="rotate(0 12 12)">
+    <path d="M-8.0 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M-3.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M1.2 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M5.8 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M10.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M15.0 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M19.6 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M24.2 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M28.8 -8 V32" vector-effect="non-scaling-stroke"></path>
+    <path d="M33.4 -8 V32" vector-effect="non-scaling-stroke"></path>
+</g>
+<rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="#000000" style="stroke-width:var(--stroke-pictogram)" vector-effect="non-scaling-stroke"></rect>
+  </svg>
+  <figcaption style="font-size:var(--t-caption-size);line-height:var(--t-caption-line)">Копилка</figcaption>
+</figure>
+</div>
+
+<p class="note">Знак ошибки нейтральный: неверный ответ всё равно приносит монеты
+и разбор. Красным помечаются сбои ввода, а не решения ребёнка.</p>
+</body>
+</html>

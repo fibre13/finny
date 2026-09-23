@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Оформление задаётся средствами Compose; системная тема нужна только
+        для стартового окна. Панель действий отключена, чтобы кнопка возврата
+        располагалась единообразно внутри экранов (ТЗ 3.6).
+    -->
+    <style name="Theme.Finny" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/finny_primary</item>
+        <item name="android:windowBackground">@color/finny_background</item>
+    </style>
+</resources>

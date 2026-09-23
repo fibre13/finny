@@ -1,0 +1,150 @@
+<title>Финни — векторный питомец</title>
+<style>
+  :root{
+    --bg:#FFFBF2; --surface:#fff; --ink:#2B2B2B; --line:#E3DCCD;
+    --ginger:#E8913A; --grey:#9AA5B1; --white:#EDE4D6;
+  }
+  body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px 16px;margin:0}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:24px;line-height:32px;margin:0 0 4px}
+  h2{font-size:18px;line-height:24px;margin:32px 0 4px}
+  p.note{margin:0 0 8px;color:#5a5449;font-size:14px}
+  .grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+  .cell{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center;min-width:132px;flex:1 1 132px}
+  .cell figcaption{font-size:13px;margin-top:6px;color:#5a5449}
+  .actual{width:140px;height:140px;display:block;margin:0 auto}
+  .big{width:200px;height:200px;display:block;margin:0 auto}
+  table{border-collapse:collapse;width:100%;margin-top:8px;font-size:14px}
+  td,th{border:1px solid var(--line);padding:6px 8px;text-align:left}
+  th{background:#F6F1E4}
+  code{background:#F6F1E4;padding:1px 5px;border-radius:4px;font-size:13px}
+</style>
+
+<div class="wrap">
+<h1>Векторный питомец: что реально получается кодом</h1>
+<p class="note">Набросок сделан вручную теми же средствами (SVG-примитивы, переменные цвета), какими это делает код-модель. Показывает потолок качества, а не конкретный будущий результат.</p>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <!-- СЛОЙ 1: силуэты видов. Заливка берётся из currentColor -->
+  <g id="sil-cat">
+    <ellipse cx="100" cy="132" rx="46" ry="40" fill="currentColor"/>
+    <path d="M62 66 L60 30 L92 52 Z" fill="currentColor"/>
+    <path d="M138 66 L140 30 L108 52 Z" fill="currentColor"/>
+    <path d="M67 62 L66 42 L84 54 Z" fill="#000" opacity=".12"/>
+    <path d="M133 62 L134 42 L116 54 Z" fill="#000" opacity=".12"/>
+    <circle cx="100" cy="76" r="42" fill="currentColor"/>
+    <ellipse cx="100" cy="150" rx="30" ry="18" fill="#000" opacity=".07"/>
+  </g>
+  <g id="sil-dog">
+    <ellipse cx="100" cy="134" rx="46" ry="38" fill="currentColor"/>
+    <ellipse cx="57" cy="96" rx="12" ry="32" fill="currentColor" transform="rotate(-16 57 96)"/>
+    <ellipse cx="143" cy="96" rx="12" ry="32" fill="currentColor" transform="rotate(16 143 96)"/>
+    <ellipse cx="57" cy="100" rx="6" ry="21" fill="#000" opacity=".1" transform="rotate(-16 57 100)"/>
+    <ellipse cx="143" cy="100" rx="6" ry="21" fill="#000" opacity=".1" transform="rotate(16 143 100)"/>
+    <circle cx="100" cy="78" r="41" fill="currentColor"/>
+    <ellipse cx="100" cy="92" rx="19" ry="13" fill="#fff" opacity=".4"/>
+    <ellipse cx="100" cy="152" rx="32" ry="17" fill="#000" opacity=".07"/>
+  </g>
+  <g id="sil-rabbit">
+    <ellipse cx="100" cy="136" rx="42" ry="36" fill="currentColor"/>
+    <ellipse cx="80" cy="34" rx="13" ry="34" fill="currentColor"/>
+    <ellipse cx="120" cy="34" rx="13" ry="34" fill="currentColor"/>
+    <ellipse cx="80" cy="36" rx="7" ry="26" fill="#fff" opacity=".42"/>
+    <ellipse cx="120" cy="36" rx="7" ry="26" fill="#fff" opacity=".42"/>
+    <circle cx="100" cy="84" r="40" fill="currentColor"/>
+    <ellipse cx="100" cy="154" rx="28" ry="16" fill="#000" opacity=".07"/>
+  </g>
+
+  <!-- СЛОЙ 3: украшения. Одна точка привязки для всех силуэтов -->
+  <g id="acc-bow">
+    <path d="M140 46 L124 36 L124 58 Z" fill="#D94F6E"/>
+    <path d="M140 46 L156 36 L156 58 Z" fill="#D94F6E"/>
+    <circle cx="140" cy="47" r="7" fill="#B23A56"/>
+  </g>
+  <g id="acc-scarf">
+    <path d="M66 110 q34 20 68 0 l4 16 q-38 22 -76 0 Z" fill="#3D7C47"/>
+    <path d="M128 124 l16 4 l-6 26 l-16 -6 Z" fill="#2F6237"/>
+  </g>
+
+  <!-- СЛОЙ 4: выражения -->
+  <g id="exp-happy">
+    <path d="M94 84 l6 0 l-3 5 Z" fill="var(--ink)" opacity=".75"/>
+    <path d="M82 74 q6 -8 12 0" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M106 74 q6 -8 12 0" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M90 90 q10 10 20 0" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <g id="exp-neutral">
+    <path d="M94 84 l6 0 l-3 5 Z" fill="var(--ink)" opacity=".75"/>
+    <circle cx="88" cy="74" r="4.5" fill="var(--ink)"/>
+    <circle cx="112" cy="74" r="4.5" fill="var(--ink)"/>
+    <path d="M91 91 h18" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <g id="exp-sad">
+    <path d="M94 84 l6 0 l-3 5 Z" fill="var(--ink)" opacity=".75"/>
+    <path d="M82 72 q6 6 12 0" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M106 72 q6 6 12 0" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M90 94 q10 -9 20 0" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+</defs>
+</svg>
+
+<h2>Три вида × три окраса</h2>
+<p class="note">Один силуэт на вид. Окрас — подстановка цвета, не отдельный файл.</p>
+<div class="grid">
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Котёнок, рыжий</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--grey)"><use href="#sil-dog"/></g><use href="#exp-happy"/></svg><figcaption>Щенок, серый</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--white)"><use href="#sil-rabbit"/></g><use href="#exp-happy"/></svg><figcaption>Крольчонок, белый</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--grey)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Котёнок, серый</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-rabbit"/></g><use href="#exp-happy"/></svg><figcaption>Крольчонок, рыжий</figcaption></figure>
+</div>
+
+<h2>Украшения — отдельный слой поверх</h2>
+<p class="note">Точка привязки общая, поэтому бантик не перерисовывается под каждый вид.</p>
+<div class="grid">
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Без украшения</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/><use href="#acc-bow"/></svg><figcaption>Бантик</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/><use href="#acc-scarf"/></svg><figcaption>Шарфик</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--grey)"><use href="#sil-dog"/></g><use href="#exp-happy"/><use href="#acc-bow"/></svg><figcaption>Щенок + бантик</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--white)"><use href="#sil-rabbit"/></g><use href="#exp-happy"/><use href="#acc-scarf"/></svg><figcaption>Крольчонок + шарфик</figcaption></figure>
+</div>
+
+<h2>Выражение по показателям</h2>
+<p class="note">Дополняет текстовую метку «Голодный / В порядке / Довольный», не заменяет её.</p>
+<div class="grid">
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-sad"/></svg><figcaption>Голодный · 0–33</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-neutral"/></svg><figcaption>В порядке · 34–66</figcaption></figure>
+  <figure class="cell"><svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Довольный · 67–100</figcaption></figure>
+</div>
+
+<h2>Как это выглядит в приложении</h2>
+<p class="note">Слева — сейчас, справа — тот же блок с векторной фигурой. Размер фигуры 140 dp в обоих случаях.</p>
+<div class="grid">
+  <figure class="cell" style="flex:1 1 260px">
+    <div style="width:140px;height:140px;border-radius:24px;background:var(--ginger);display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:24px">Котёнок</div>
+    <div style="font-size:24px;font-weight:700;margin-top:8px">Finny</div>
+    <div style="font-size:16px">Малыш, бантик</div>
+    <figcaption>Сейчас</figcaption>
+  </figure>
+  <figure class="cell" style="flex:1 1 260px">
+    <svg class="actual" viewBox="0 0 200 180"><g style="color:var(--ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/><use href="#acc-bow"/></svg>
+    <div style="font-size:24px;font-weight:700;margin-top:8px">Finny</div>
+    <div style="font-size:16px">Малыш, бантик</div>
+    <figcaption>Векторная фигура</figcaption>
+  </figure>
+</div>
+
+<h2>Что переносится в Android</h2>
+<table>
+  <tr><th>Средство SVG</th><th>Android Vector Drawable</th></tr>
+  <tr><td>Пути, окружности, эллипсы, группы</td><td>Переносятся</td></tr>
+  <tr><td>Заливка, обводка, прозрачность</td><td>Переносятся</td></tr>
+  <tr><td>Линейный и радиальный градиент</td><td>Переносятся</td></tr>
+  <tr><td><code>&lt;use&gt;</code>, переменные цвета</td><td>Разворачиваются при конвертации; параметризация окраса делается в Compose через <code>tint</code></td></tr>
+  <tr><td>Фильтры, маски, режимы наложения</td><td>Не поддерживаются — затенение делается полупрозрачной заливкой поверх</td></tr>
+  <tr><td>Растровые вставки</td><td>Не поддерживаются</td></tr>
+</table>
+
+<h2>Вес</h2>
+<p class="note">Вся графика на этой странице — примерно 4 КБ разметки. Растровый набор под 81 комбинацию и четыре плотности экрана дал бы порядка нескольких мегабайт при текущем размере APK 8,99 МБ.</p>
+</div>

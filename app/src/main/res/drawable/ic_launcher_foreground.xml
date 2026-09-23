@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Временная иконка: монета с буквой. Заменяется на финальную графику позже. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!--
+        Центр монеты (54,54) совпадает с центром холста 108x108, поэтому
+        фигура помещается в безопасную зону адаптивной иконки (центральный
+        квадрат 66x66) и не обрезается маской на любом лаунчере. Прежний
+        центр (54,30) был смещён вверх на 24 единицы — исправлено.
+    -->
+    <path
+        android:fillColor="#F2B705"
+        android:pathData="M54,54 m-22,0 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,54 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0" />
+    <path
+        android:fillColor="#F2B705"
+        android:pathData="M48,46 h12 v4 h-4 v12 h-4 v-12 h-4 z" />
+</vector>

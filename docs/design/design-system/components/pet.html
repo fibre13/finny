@@ -1,0 +1,132 @@
+<!-- @dsCard group="Компоненты" name="Фигура питомца" subtitle="Четыре слоя вместо 81 изображения: силуэт, окрас, украшение, выражение" viewport="700x820" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Фигура питомца</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  .grid { display: flex; flex-wrap: wrap; gap: 12px; }
+  .cell { text-align: center; flex: 1 1 128px; min-width: 128px; }
+  .cell svg { width: var(--pet-size); height: var(--pet-size); display: block; margin: 0 auto; }
+  .cell figcaption { font-size: var(--t-caption-size); line-height: var(--t-caption-line); }
+</style>
+</head>
+<body>
+
+<h1>Фигура питомца</h1>
+<p class="note">Один компонент, четыре слоя. Три вида × три окраса × три украшения × три стадии
+дают 81 сочетание; послойно это 9 силуэтов, одна заливка, 3 украшения и 4 выражения.
+Система координат 200 × 200, общая точка привязки украшения у шеи.</p>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+
+  <!-- Слой 1. Силуэт: вид задаётся ушами и хвостом, остальное общее. -->
+  <g id="sil-cat">
+    <ellipse cx="100" cy="132" rx="46" ry="40" fill="currentColor"/>
+    <path d="M62 66 L60 30 L92 52 Z" fill="currentColor"/>
+    <path d="M138 66 L140 30 L108 52 Z" fill="currentColor"/>
+    <path d="M67 62 L66 42 L84 54 Z" fill="#000" opacity=".12"/>
+    <path d="M133 62 L134 42 L116 54 Z" fill="#000" opacity=".12"/>
+    <circle cx="100" cy="76" r="42" fill="currentColor"/>
+    <ellipse cx="100" cy="150" rx="30" ry="18" fill="#000" opacity=".07"/>
+  </g>
+  <g id="sil-dog">
+    <ellipse cx="100" cy="134" rx="46" ry="38" fill="currentColor"/>
+    <ellipse cx="57" cy="96" rx="12" ry="32" fill="currentColor" transform="rotate(-16 57 96)"/>
+    <ellipse cx="143" cy="96" rx="12" ry="32" fill="currentColor" transform="rotate(16 143 96)"/>
+    <ellipse cx="57" cy="100" rx="6" ry="21" fill="#000" opacity=".1" transform="rotate(-16 57 100)"/>
+    <ellipse cx="143" cy="100" rx="6" ry="21" fill="#000" opacity=".1" transform="rotate(16 143 100)"/>
+    <circle cx="100" cy="78" r="41" fill="currentColor"/>
+    <ellipse cx="100" cy="92" rx="19" ry="13" fill="#fff" opacity=".4"/>
+    <ellipse cx="100" cy="152" rx="32" ry="17" fill="#000" opacity=".07"/>
+  </g>
+  <g id="sil-rabbit">
+    <ellipse cx="100" cy="136" rx="42" ry="36" fill="currentColor"/>
+    <ellipse cx="80" cy="34" rx="13" ry="34" fill="currentColor"/>
+    <ellipse cx="120" cy="34" rx="13" ry="34" fill="currentColor"/>
+    <ellipse cx="80" cy="36" rx="7" ry="26" fill="#fff" opacity=".42"/>
+    <ellipse cx="120" cy="36" rx="7" ry="26" fill="#fff" opacity=".42"/>
+    <circle cx="100" cy="84" r="40" fill="currentColor"/>
+    <ellipse cx="100" cy="154" rx="28" ry="16" fill="#000" opacity=".07"/>
+  </g>
+
+  <!-- Слой 3. Украшение: общая точка привязки у шеи для всех силуэтов. -->
+  <g id="acc-bow">
+    <path d="M140 46 L124 36 L124 58 Z" fill="#D94F6E"/>
+    <path d="M140 46 L156 36 L156 58 Z" fill="#D94F6E"/>
+    <circle cx="140" cy="47" r="7" fill="#B23A56"/>
+  </g>
+  <g id="acc-scarf">
+    <path d="M66 110 q34 20 68 0 l4 16 q-38 22 -76 0 Z" fill="#3D7C47"/>
+    <path d="M128 124 l16 4 l-6 26 l-16 -6 Z" fill="#2F6237"/>
+  </g>
+
+  <!-- Слой 4. Выражение по паре «Забота / Радость». -->
+  <g id="exp-happy">
+    <path d="M94 84 l6 0 l-3 5 Z" fill="#23201A" opacity=".75"/>
+    <path d="M82 74 q6 -8 12 0" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M106 74 q6 -8 12 0" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M90 90 q10 10 20 0" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <g id="exp-neutral">
+    <path d="M94 84 l6 0 l-3 5 Z" fill="#23201A" opacity=".75"/>
+    <circle cx="88" cy="74" r="4.5" fill="#23201A"/>
+    <circle cx="112" cy="74" r="4.5" fill="#23201A"/>
+    <path d="M91 91 h18" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <g id="exp-sad">
+    <path d="M94 84 l6 0 l-3 5 Z" fill="#23201A" opacity=".75"/>
+    <path d="M82 72 q6 6 12 0" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M106 72 q6 6 12 0" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M90 94 q10 -9 20 0" stroke="#23201A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+</defs></svg>
+
+<h2>Слой 1 — силуэт: вид</h2>
+<div class="card grid">
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Котёнок</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-dog"/></g><use href="#exp-happy"/></svg><figcaption>Щенок</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-rabbit"/></g><use href="#exp-happy"/></svg><figcaption>Крольчонок</figcaption></figure>
+</div>
+<p class="note">Вид задаётся только ушами и хвостом. Стадия меняет пропорции: у малыша голова
+крупнее, у взрослого корпус вытянутее — персонаж при этом остаётся тем же.</p>
+
+<h2>Слой 2 — окрас</h2>
+<div class="card grid">
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Рыжий</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-grey)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Серый</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-white)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Белый</figcaption></figure>
+</div>
+<p class="note">Заливка подставляется значением из <code>pet_parts.json</code>. Отдельных
+файлов на окрас нет: затенение выводится смешиванием с чернилами, светлая часть — с белым.
+Новый окрас стоит одного значения.</p>
+
+<h2>Слой 3 — украшение</h2>
+<div class="card grid">
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Без украшения</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/><use href="#acc-bow"/></svg><figcaption>Бантик</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/><use href="#acc-scarf"/></svg><figcaption>Шарфик</figcaption></figure>
+</div>
+
+<h2>Слой 4 — выражение</h2>
+<div class="card grid">
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-sad"/></svg><figcaption>Голодный · 0–33</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-neutral"/></svg><figcaption>В порядке · 34–66</figcaption></figure>
+  <figure class="cell"><svg viewBox="0 0 200 180"><g style="color:var(--c-pet-ginger)"><use href="#sil-cat"/></g><use href="#exp-happy"/></svg><figcaption>Довольный · 67–100</figcaption></figure>
+</div>
+<p class="note">Выражение только дополняет текстовую метку показателя. Заменять метку
+выражением нельзя: состояние обязано читаться словами.</p>
+
+<h2>Ограничения формата</h2>
+<div class="card">
+  <div class="kv" style="padding:4px 0"><span class="k">Допустимо</span><span class="v">Пути, окружности, эллипсы, группы с преобразованиями, обводки, градиенты</span></div>
+  <div class="kv" style="padding:4px 0"><span class="k">Недопустимо</span><span class="v">Фильтры, маски, режимы наложения, растровые вставки</span></div>
+  <div class="kv" style="padding:4px 0"><span class="k">Проверять на</span><span class="v">140 dp — фактический размер в приложении</span></div>
+</div>
+<p class="note">Недопустимые средства не переносятся в Android Vector Drawable. Затенение
+делается полупрозрачной заливкой поверх, как в слоях выше.</p>
+
+</body>
+</html>

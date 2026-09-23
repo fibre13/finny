@@ -1,0 +1,48 @@
+<!-- @dsCard group="Компоненты" name="Кнопки и выбор" subtitle="Основная, вторичная, выбранная, неактивная с причиной" viewport="700x760" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кнопки и выбор</title>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<h1>Кнопки и выбор</h1>
+
+<h2>Действия</h2>
+<div class="card">
+  <button class="btn btn-primary" style="margin-bottom:12px">Утвердить план</button>
+  <button class="btn btn-secondary" style="margin-bottom:12px">Покупки</button>
+  <button class="btn btn-primary is-disabled" disabled>Закончить день</button>
+  <p class="note" style="margin-top:8px">Чтобы закончить день, сначала составь план.</p>
+</div>
+<p class="note">Неактивная кнопка обязательно сопровождается причиной текстом рядом.
+Одного приглушённого цвета недостаточно: ребёнок должен понять, что делать дальше.</p>
+
+<h2>Выбор из списка</h2>
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+    <span class="swatch" style="background:var(--c-pet-ginger)"></span>
+    <button class="btn is-selected">Рыжий — надето</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+    <span class="swatch" style="background:var(--c-pet-grey)"></span>
+    <button class="btn btn-secondary">Серый</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="swatch" style="background:var(--c-pet-white)"></span>
+    <button class="btn btn-secondary">Белый</button>
+  </div>
+</div>
+
+<h2>Недоступное украшение</h2>
+<div class="card">
+  <button class="btn is-selected" style="margin-bottom:8px">Бантик — надето</button>
+  <button class="btn is-disabled" disabled>Шарфик — не куплено</button>
+  <p class="note" style="margin-top:8px">Украшения появляются здесь после покупки в разделе «Покупки».</p>
+</div>
+<p class="note">Выбранное помечается словом «— надето», недоступное — «— не куплено».
+Подпись обязательна: состояние читается без цвета.</p>
+</body>
+</html>

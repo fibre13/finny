@@ -1,0 +1,89 @@
+{
+  "name": "Питомец Финни",
+  "source": "app/src/main/kotlin/ru/onefortwo/finny/ui/theme/Theme.kt",
+  "direction": "1b «Аппликация»",
+  "palette": {
+    "light": {
+      "primary": "#3D7C47",
+      "onPrimary": "#FFFFFF",
+      "secondary": "#F2B705",
+      "onSecondary": "#2B2B2B",
+      "background": "#FFFBF2",
+      "onBackground": "#2B2B2B",
+      "surface": "#FFFFFF",
+      "onSurface": "#2B2B2B",
+      "outline": "#8A8578",
+      "outlineVariant": "#DAD4C4",
+      "error": "#B3261E",
+      "Нужное": "#2E6B4F",
+      "Хочу": "#B4552A",
+      "Копилка": "#35558A",
+      "ink": "#23201A",
+      "paper": "#FFF1D6",
+      "disabledBg": "#EFE9DA",
+      "disabledText": "#6A655A",
+      "disabledOutline": "#8A8578"
+    },
+    "dark": {
+      "primary": "#8CCB96",
+      "onPrimary": "#10230F",
+      "secondary": "#D8A82E",
+      "onSecondary": "#221A00",
+      "background": "#14170F",
+      "onBackground": "#F0EDE2",
+      "surface": "#1F241A",
+      "onSurface": "#F0EDE2",
+      "outline": "#7C8473",
+      "outlineVariant": "#4A5142",
+      "error": "#F2B8B5",
+      "Нужное": "#7FC9A0",
+      "Хочу": "#E6A377",
+      "Копилка": "#9DB6E8",
+      "ink": "#F0EDE2",
+      "paper": "#14170F",
+      "disabledBg": "#2A2F24",
+      "disabledText": "#909787",
+      "disabledOutline": "#71796A"
+    }
+  },
+  "fonts": {
+    "body": {
+      "family": "Roboto",
+      "system": true
+    },
+    "heading": {
+      "family": "Roboto",
+      "system": true
+    }
+  },
+  "radius": {
+    "tag": 10,
+    "button": 16,
+    "card": 24,
+    "pet": 28
+  },
+  "space": [
+    4,
+    6,
+    8,
+    10,
+    12,
+    14,
+    16,
+    18,
+    24
+  ],
+  "constraints": {
+    "minTouchTarget": 48,
+    "minBodyText": 16,
+    "maxContentWidth": 640,
+    "minTextContrast": 4.5,
+    "minNonTextContrast": 3.0,
+    "offline": true,
+    "animations": false
+  },
+  "stroke": {
+    "direction1b": 2.5,
+    "pictogram": 2.5
+  }
+}

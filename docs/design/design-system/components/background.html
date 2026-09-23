@@ -1,0 +1,62 @@
+<!-- @dsCard group="Компоненты" name="Фон главного экрана" subtitle="Четыре слоя: облака и солнце, два холма, дерево" viewport="700x620" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Фон главного экрана</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  .plate { background: var(--c-paper); border: var(--stroke-1b) solid var(--c-ink); border-radius: var(--r-card); overflow: hidden; }
+  .plate svg { display: block; width: 100%; height: auto; }
+  .row { display: flex; align-items: flex-end; gap: var(--s-9); justify-content: center; }
+  .row figcaption { font-size: var(--t-caption-size); line-height: var(--t-caption-line); }
+</style>
+</head>
+<body>
+<h1>Фон главного экрана</h1>
+<p class="note">Четыре слоя: облака и солнце, дальний холм, ближний холм с контуром, дерево.
+Система координат 360 × 200. Узор бумаги остаётся фоном экрана и в графику не входит.</p>
+
+<div class="card plate">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 200" width="360" height="200">
+  <!-- Фон главного экрана. Направление 1b «Аппликация».
+       Цвета соответствуют токенам styles.css:
+       #3D7C47 c-primary · #F2B705 c-secondary · #23201A c-ink · #FFFFFF c-surface
+       Полупрозрачные заливки переносятся в android:fillAlpha. -->
+
+  <!-- солнце -->
+  <circle cx="196" cy="40" r="22" fill="#F2B705" stroke="#23201A" stroke-width="2.5"/>
+
+  <!-- облака -->
+  <g fill="#FFFFFF" stroke="#23201A" stroke-width="2.5">
+    <circle cx="62" cy="44" r="15"/>
+    <circle cx="86" cy="48" r="11"/>
+    <circle cx="40" cy="50" r="10"/>
+  </g>
+
+  <!-- дальний холм, fillAlpha 0.20 -->
+  <path d="M0 132 Q70 88 138 126 Q206 162 262 122 Q312 86 360 124 L360 200 L0 200 Z" fill="#3D7C47" opacity=".20"/>
+  <!-- ближний холм, fillAlpha 0.34 -->
+  <path d="M0 158 Q86 120 168 154 Q248 186 300 152 Q334 130 360 146 L360 200 L0 200 Z" fill="#3D7C47" opacity=".34"/>
+  <!-- контур ближнего холма -->
+  <path d="M0 166 Q86 128 168 162 Q248 194 300 160 Q334 138 360 154" fill="none" stroke="#23201A" stroke-width="2.5"/>
+
+  <!-- дерево -->
+  <g transform="translate(150 92)">
+    <path d="M8 62 L8 30" stroke="#23201A" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="8" cy="18" r="19" fill="#3D7C47" stroke="#23201A" stroke-width="2.5"/>
+    <circle cx="1" cy="12" r="6" fill="#FFFFFF" opacity=".35"/>
+  </g>
+</svg>
+</div>
+
+<h2>Ограничения формата</h2>
+<div class="card">
+  <div class="kv" style="padding:4px 0"><span class="k">Применено</span><span class="v">Пути, окружности, эллипсы, группы с преобразованиями, обводки</span></div>
+  <div class="kv" style="padding:4px 0"><span class="k">Не применено</span><span class="v">Фильтры, маски, режимы наложения, растровые вставки</span></div>
+  <div class="kv" style="padding:4px 0"><span class="k">Затенение</span><span class="v">Полупрозрачная заливка поверх, переносится в fillAlpha</span></div>
+</div>
+<p class="note">Ниже линии холма идёт только заливка: текст на фон не ставится, подписи остаются на карточках.</p>
+</body>
+</html>

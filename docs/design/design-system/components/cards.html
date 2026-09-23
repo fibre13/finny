@@ -1,0 +1,39 @@
+<!-- @dsCard group="Компоненты" name="Карточки и сообщения" subtitle="Раздел, сообщение, проблемное сообщение, строка значения" viewport="700x740" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карточки и сообщения</title>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<h1>Карточки и сообщения</h1>
+
+<h2>Карточка раздела</h2>
+<div class="card">
+  <p class="card-title">Монеты</p>
+  <div class="kv" style="padding:4px 0"><span class="k">Можно потратить</span><span class="v">50 монет</span></div>
+  <div class="kv" style="padding:4px 0"><span class="k">В копилке</span><span class="v">0 монет</span></div>
+  <p class="note" style="margin:8px 0 0">Цель пока не выбрана. Загляни в копилку.</p>
+</div>
+
+<h2>Сообщение о произошедшем</h2>
+<div class="card feedback">
+  <p class="kicker">Что произошло</p>
+  <p style="margin:0">Купили: Шарфик за 9 монет. У Финни радость выросла на 10.</p>
+  <p class="next">Что дальше: Теперь это украшение можно надеть в гардеробе.</p>
+  <button class="btn btn-secondary" style="margin-top:12px">Понятно</button>
+</div>
+
+<h2>Затруднение</h2>
+<div class="card feedback problem">
+  <p class="kicker">Внимание</p>
+  <p style="margin:0">«Домик-палатка» стоит 25 монет, а у тебя 18. Не хватает 7 монет.</p>
+  <p class="next">Что дальше: Выполни задание, выбери что-то дешевле или отложи покупку на завтра.</p>
+  <button class="btn btn-secondary" style="margin-top:12px">Понятно</button>
+</div>
+<p class="note">Затруднение помечается словом «Внимание» и объясняет следующий шаг.
+Ошибка ребёнка не наказывается: тон нейтральный, красный оставлен для сбоев ввода.</p>
+</body>
+</html>

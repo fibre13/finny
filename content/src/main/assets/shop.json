@@ -1,0 +1,86 @@
+[
+  {
+    "id": "food",
+    "title": "Корм",
+    "category": "needs",
+    "price": 10,
+    "stat": "care",
+    "stat_delta": 30,
+    "effect": "Финни будет сытым"
+  },
+  {
+    "id": "water",
+    "title": "Миска воды",
+    "category": "needs",
+    "price": 5,
+    "stat": "care",
+    "stat_delta": 15,
+    "effect": "Финни не будет хотеть пить"
+  },
+  {
+    "id": "vitamins",
+    "title": "Витамины",
+    "category": "needs",
+    "price": 8,
+    "stat": "care",
+    "stat_delta": 20,
+    "effect": "Финни будет бодрым"
+  },
+  {
+    "id": "brush",
+    "title": "Расчёска и уход",
+    "category": "needs",
+    "price": 7,
+    "stat": "care",
+    "stat_delta": 15,
+    "effect": "Шёрстка Финни будет чистой"
+  },
+  {
+    "id": "ball",
+    "title": "Мячик",
+    "category": "wants",
+    "price": 12,
+    "stat": "joy",
+    "stat_delta": 15,
+    "effect": "Финни будет весело играть"
+  },
+  {
+    "id": "bow",
+    "title": "Бантик",
+    "category": "wants",
+    "price": 6,
+    "stat": "joy",
+    "stat_delta": 8,
+    "effect": "Финни будет нарядным",
+    "unlocks_accessory": "bow"
+  },
+  {
+    "id": "tent",
+    "title": "Домик-палатка",
+    "category": "wants",
+    "price": 25,
+    "stat": "joy",
+    "stat_delta": 30,
+    "effect": "У Финни будет своё укрытие",
+    "unlocks_scenery": "house"
+  },
+  {
+    "id": "stickers",
+    "title": "Наклейки",
+    "category": "wants",
+    "price": 4,
+    "stat": "joy",
+    "stat_delta": 5,
+    "effect": "Финни украсит домик"
+  },
+  {
+    "id": "scarf",
+    "title": "Шарфик",
+    "category": "wants",
+    "price": 9,
+    "stat": "joy",
+    "stat_delta": 10,
+    "effect": "Финни будет тёплым и нарядным",
+    "unlocks_accessory": "scarf"
+  }
+]

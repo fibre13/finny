@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Разрешения не запрашиваются: камера, микрофон, геолокация, контакты,
+        Bluetooth и сеть для обязательного сценария не нужны (ТЗ 3.1 п. 4).
+    -->
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Finny">
+
+        <!--
+            Ориентация не закрепляется: приложение работает и в портретной,
+            и в альбомной ориентации, на телефонах и планшетах. Поддержка
+            планшетов и альбомной ориентации отнесена ТЗ 3.1 к необязательным
+            преимуществам; обязательный минимум — портрет от 360 dp — при этом
+            сохраняется.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.Finny">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

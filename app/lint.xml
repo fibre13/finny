@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+        Адаптивные значки обязаны лежать в каталоге с квалификатором v26:
+        без него компоновщик ресурсов их не находит, что проверено сборкой.
+        Замечание об избыточности квалификатора при minSdk 26 не применимо.
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+
+    <!--
+        Версии закреплены намеренно, см. docs/01-проектные-решения.md.
+        Эти три проверки сообщают не о дефекте, а о том, что в сети появилась
+        более новая версия. При warningsAsErrors = true любая публикация новой
+        версии ломала бы сборку у всех, кто склонировал репозиторий, — поэтому
+        проверки отключены, а обновление версий выполняется осознанно.
+    -->
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+
+    <!-- targetSdk 36 выбран осознанно, обоснование в docs/01-проектные-решения.md. -->
+    <issue id="OldTargetApi" severity="ignore" />
+</lint>

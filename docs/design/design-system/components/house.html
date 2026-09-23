@@ -1,0 +1,68 @@
+<!-- @dsCard group="Компоненты" name="Дом питомца" subtitle="Домик-палатка: корпус, вход, флажок; проверено на 120 и 64 dp" viewport="700x600" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дом питомца</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  .plate { background: var(--c-paper); border: var(--stroke-1b) solid var(--c-ink); border-radius: var(--r-card); overflow: hidden; }
+  .plate svg { display: block; width: 100%; height: auto; }
+  .row { display: flex; align-items: flex-end; gap: var(--s-9); justify-content: center; }
+  .row figcaption { font-size: var(--t-caption-size); line-height: var(--t-caption-line); }
+</style>
+</head>
+<body>
+<h1>Дом питомца</h1>
+<p class="note">«Домик-палатка», 25 монет. Появляется на фоне главного экрана после покупки.
+Система координат 120 × 100. Флажок и вход — отдельные пути, их можно убрать без перерисовки корпуса.</p>
+
+<div class="card">
+  <div class="row">
+    <figure style="margin:0;text-align:center">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" width="120" height="100">
+  <!-- Дом питомца — «Домик-палатка», 25 монет. Показывается на фоне после покупки.
+       #3D7C47 c-primary · #F2B705 c-secondary · #23201A c-ink · #FFF1D6 c-paper
+       Проверено на 120 dp и 64 dp. -->
+
+  <ellipse cx="60" cy="88" rx="46" ry="7" fill="#23201A" opacity=".08"/>
+  <path d="M60 18 L60 4" stroke="#23201A" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M60 2 L84 9 L60 16 Z" fill="#F2B705" stroke="#23201A" stroke-width="2.5"/>
+  <path d="M60 18 L110 88 L10 88 Z" fill="#3D7C47" stroke="#23201A" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- затенение полотнища, fillAlpha 0.10 -->
+  <path d="M60 18 L78 88 L42 88 Z" fill="#23201A" opacity=".10"/>
+  <path d="M40 88 Q40 56 60 56 Q80 56 80 88 Z" fill="#FFF1D6" stroke="#23201A" stroke-width="2.5"/>
+  <circle cx="60" cy="72" r="5" fill="#23201A" opacity=".18"/>
+</svg>
+      <figcaption>120 dp</figcaption>
+    </figure>
+    <figure style="margin:0;text-align:center;width:64px">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" width="64" height="53">
+  <!-- Дом питомца — «Домик-палатка», 25 монет. Показывается на фоне после покупки.
+       #3D7C47 c-primary · #F2B705 c-secondary · #23201A c-ink · #FFF1D6 c-paper
+       Проверено на 120 dp и 64 dp. -->
+
+  <ellipse cx="60" cy="88" rx="46" ry="7" fill="#23201A" opacity=".08"/>
+  <path d="M60 18 L60 4" stroke="#23201A" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M60 2 L84 9 L60 16 Z" fill="#F2B705" stroke="#23201A" stroke-width="2.5"/>
+  <path d="M60 18 L110 88 L10 88 Z" fill="#3D7C47" stroke="#23201A" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- затенение полотнища, fillAlpha 0.10 -->
+  <path d="M60 18 L78 88 L42 88 Z" fill="#23201A" opacity=".10"/>
+  <path d="M40 88 Q40 56 60 56 Q80 56 80 88 Z" fill="#FFF1D6" stroke="#23201A" stroke-width="2.5"/>
+  <circle cx="60" cy="72" r="5" fill="#23201A" opacity=".18"/>
+</svg>
+      <figcaption>64 dp</figcaption>
+    </figure>
+  </div>
+</div>
+
+<h2>Когда показывается</h2>
+<div class="card">
+  <div class="kv" style="padding:4px 0"><span class="k">Домик-палатка куплен</span><span class="v">дом на фоне</span></div>
+  <div class="kv" style="padding:4px 0"><span class="k">Не куплен</span><span class="v">фон без дома</span></div>
+</div>
+<p class="note">Дом не передаёт состояние, поэтому подписи рядом с ним нет: покупка уже подписана
+в «Покупках» и в гардеробе.</p>
+</body>
+</html>

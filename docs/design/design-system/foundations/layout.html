@@ -1,0 +1,43 @@
+<!-- @dsCard group="Основы" name="Отступы и размеры" subtitle="Шкала отступов, радиусы, минимальная зона нажатия" viewport="700x700" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Отступы и размеры</title>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<h1>Отступы и размеры</h1>
+
+<h2>Шкала отступов</h2>
+<div class="card"><div class="kv" style="padding:4px 0"><span class="k">4 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:16px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">6 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:24px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">8 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:32px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">10 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:40px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">12 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:48px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">14 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:56px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">16 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:64px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">18 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:72px;background:var(--c-primary);border-radius:3px"></span></span></div>
+<div class="kv" style="padding:4px 0"><span class="k">24 dp</span><span style="flex:3"><span style="display:inline-block;height:14px;width:96px;background:var(--c-primary);border-radius:3px"></span></span></div></div>
+
+<h2>Радиусы</h2>
+<div class="card" style="display:flex;gap:24px;flex-wrap:wrap"><div style="text-align:center"><div style="width:96px;height:72px;background:var(--c-surface);border:1px solid var(--c-outline);border-radius:10px"></div><div style="font-size:14px;margin-top:6px">Ярлык<br><code>--r-tag</code> · 10 dp</div></div>
+<div style="text-align:center"><div style="width:96px;height:72px;background:var(--c-surface);border:1px solid var(--c-outline);border-radius:16px"></div><div style="font-size:14px;margin-top:6px">Кнопка<br><code>--r-button</code> · 16 dp</div></div>
+<div style="text-align:center"><div style="width:96px;height:72px;background:var(--c-surface);border:1px solid var(--c-outline);border-radius:24px"></div><div style="font-size:14px;margin-top:6px">Карточка<br><code>--r-card</code> · 24 dp</div></div>
+<div style="text-align:center"><div style="width:96px;height:72px;background:var(--c-surface);border:1px solid var(--c-outline);border-radius:28px"></div><div style="font-size:14px;margin-top:6px">Рама питомца<br><code>--r-pet</code> · 28 dp</div></div></div>
+
+<h2>Обязательные размеры</h2>
+<div class="card">
+  <div class="kv" style="padding:6px 0"><span class="k">Минимальная высота интерактивного элемента</span><span class="v">48 dp</span></div>
+  <div class="kv" style="padding:6px 0"><span class="k">Максимальная ширина содержимого</span><span class="v">640 dp</span></div>
+  <div class="kv" style="padding:6px 0"><span class="k">Поля экрана</span><span class="v">16 dp</span></div>
+  <div class="kv" style="padding:6px 0"><span class="k">Внутренний отступ карточки</span><span class="v">16 dp</span></div>
+  <div class="kv" style="padding:6px 0"><span class="k">Фигура питомца</span><span class="v">140 dp</span></div>
+  <div class="kv" style="padding:6px 0"><span class="k">Зона ползунка / ручка</span><span class="v">48 / 32 dp</span></div>
+</div>
+<p class="note">48 dp — требование, а не рекомендация: элемент мельче не проходит проверку.
+На широких экранах содержимое ограничивается 640 dp и центрируется, строки текста
+не растягиваются на всю ширину планшета.</p>
+</body>
+</html>
