@@ -897,6 +897,10 @@ fun SectionCard(
      */
     icon: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    /** Внутренние отступы. Компактные экраны берут 16 × 12 dp. */
+    contentPadding: PaddingValues = PaddingValues(18.dp),
+    /** Отступ под карточкой; ноль, если промежутки задаёт родитель. */
+    bottomSpacing: Dp = CardSpacing,
     content: @Composable () -> Unit,
 ) {
     val colors = FinnyTheme.colors
@@ -917,11 +921,11 @@ fun SectionCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = CardSpacing)
+            .padding(bottom = bottomSpacing)
             .then(if (tone == CardTone.Surface) Modifier.softShadow(shape) else Modifier)
             .clip(shape)
             .background(container)
-            .padding(horizontal = 18.dp, vertical = 18.dp),
+            .padding(contentPadding),
     ) {
         CompositionLocalProvider(
             LocalContentColor provides contentColor,
@@ -1355,6 +1359,8 @@ fun CoinStepper(
     max: Int,
     onChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** Кнопки высотой 48 dp вместо 52: для экранов, которые должны помещаться целиком. */
+    compact: Boolean = false,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -1375,6 +1381,7 @@ fun CoinStepper(
                 enabled = target != value,
                 onClick = { onChange(target) },
                 modifier = Modifier.weight(1f),
+                compact = compact,
             )
         }
     }
@@ -1448,11 +1455,16 @@ private fun StepButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tall: Boolean = false,
+    compact: Boolean = false,
 ) {
     val colors = FinnyTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val minHeight = if (tall) maxOf(MinTouchTarget, 56.dp) else maxOf(MinTouchTarget, 52.dp)
+    val minHeight = when {
+        tall -> maxOf(MinTouchTarget, 56.dp)
+        compact -> maxOf(MinTouchTarget, 48.dp)
+        else -> maxOf(MinTouchTarget, 52.dp)
+    }
 
     OutlinedButton(
         onClick = onClick,

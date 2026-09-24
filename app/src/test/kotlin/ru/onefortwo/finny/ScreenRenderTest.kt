@@ -239,7 +239,7 @@ class ScreenRenderTest {
 
         compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(
-            "Чтобы отложить в копилку, сначала выбери цель. Введённые суммы сохранятся.",
+            "Чтобы отложить в копилку, сначала выбери цель. Суммы сохранятся.",
         )
             .performScrollTo()
             .assertIsDisplayed()
@@ -259,14 +259,16 @@ class ScreenRenderTest {
         }
 
         repeat(4) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
-        // «20 монет» выводится дважды: под «Нужное» и в строке «Распределено».
-        compose.onAllNodesWithText("20 монет").assertCountEquals(2)
+        // Сумма направления выводится один раз — на его карточке; общий
+        // итог — строкой «20 из 50».
+        compose.onAllNodesWithText("20 монет").assertCountEquals(1)
+        compose.onNodeWithText("20 из 50").assertIsDisplayed()
 
         game = game.copy(balance = Coins.ZERO)
         compose.waitForIdle()
 
         compose.onAllNodesWithText("20 монет").assertCountEquals(0)
-        compose.onNodeWithText("Лишние монеты").assertDoesNotExist()
+        compose.onNodeWithText("Больше, чем есть", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -320,13 +322,13 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Нужное: убавить на 5").assertIsNotEnabled()
 
         repeat(10) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
-        compose.onAllNodesWithText("50 монет").assertCountEquals(2)
+        compose.onAllNodesWithText("50 монет").assertCountEquals(1)
         // Весь бюджет: прибавлять некуда.
         compose.onNodeWithContentDescription("Нужное: прибавить 5").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Нужное: прибавить 1").assertIsNotEnabled()
 
         compose.onNodeWithContentDescription("Нужное: убавить на 1").performScrollTo().performClick()
-        compose.onAllNodesWithText("49 монет").assertCountEquals(2)
+        compose.onAllNodesWithText("49 монет").assertCountEquals(1)
     }
 
     @Test
@@ -525,11 +527,14 @@ class ScreenRenderTest {
         compose.onNodeWithText("Нужное").assertIsDisplayed()
         compose.onNodeWithText("Хочу").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Копилка").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Распределено").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("0 из 50").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Остаток 50 монет — можно оставить на всякий случай.")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
-    fun `экран покупок показывает цену и влияние на питомца`() {
+    fun `покупка показывает цену и влияние на питомца до списания монет`() {
         compose.setContent {
             FinnyTheme {
                 ShopScreen(
@@ -544,8 +549,13 @@ class ScreenRenderTest {
             }
         }
 
+        // В строке товара — название и цена на кнопке; влияние на питомца
+        // показывает окно подтверждения, до списания монет (ТЗ 2.5.6).
         compose.onNodeWithText("Корм").assertIsDisplayed()
-        compose.onNodeWithText("Финни будет сытым").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Купить Корм за 10 монет").performClick()
+        compose.onNodeWithText("Цена: 10 монет.").assertIsDisplayed()
+        compose.onNodeWithText("Это нужное.").assertIsDisplayed()
+        compose.onNodeWithText("Финни будет сытым").assertIsDisplayed()
     }
 
     @Test
@@ -823,8 +833,55 @@ class ScreenRenderTest {
             }
         }
 
-        compose.onNodeWithText("Сегодня куплено").assertIsDisplayed()
-        compose.onNodeWithText("Всего потрачено").assertIsDisplayed()
+        compose.onNodeWithText("куплено сегодня").assertIsDisplayed()
+        compose.onNodeWithText("Сегодня потрачено").assertIsDisplayed()
+    }
+
+    @Test
+    fun `в строке товара сказано, сколько монет не хватает`() {
+        compose.setContent {
+            FinnyTheme {
+                ShopScreen(
+                    items = content.shopItems(),
+                    pet = GameState.newProfile().pet,
+                    balance = Coins(24),
+                    message = null,
+                    onDismissMessage = {},
+                    onBuy = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        // Домик-палатка стоит 25 монет.
+        compose.onNodeWithText("Не хватает 1").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Сегодня потрачено").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `план помещается на телефоне 360 на 800 без прокрутки`() {
+        // Эталонный телефон 720 × 1600, 320 dpi: под строкой состояния
+        // (24 dp) и системной панелью (48 dp) экрану остаётся 728 dp.
+        compose.setContent {
+            FinnyTheme {
+                Box(modifier = Modifier.height(728.dp)) {
+                    PlanScreen(
+                        game = GameState.newProfile(),
+                        onConfirm = { _, _, _ -> },
+                        onBack = {},
+                        balance = Coins(50),
+                    )
+                }
+            }
+        }
+
+        // Худший случай по высоте: копилка без цели, причина в три строки.
+        compose.onNodeWithContentDescription("Копилка: прибавить 5").performClick()
+
+        val bottom = compose.onNodeWithText("Утвердить план").fetchSemanticsNode().boundsInRoot.bottom
+        val limit = with(compose.density) { 728.dp.toPx() }
+        assertTrue("Кнопка «Утвердить план» ниже края экрана: $bottom > $limit", bottom <= limit)
     }
 
     /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */

@@ -1,13 +1,19 @@
 package ru.onefortwo.finny.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,9 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.Coins
@@ -31,12 +41,14 @@ import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.PeriodOutcome
 import ru.onefortwo.finny.ui.common.BudgetDirectionIcon
 import ru.onefortwo.finny.ui.common.CardTone
+import ru.onefortwo.finny.ui.common.ChevronIcon
 import ru.onefortwo.finny.ui.common.CoinStepper
 import ru.onefortwo.finny.ui.common.LabeledValue
+import ru.onefortwo.finny.ui.common.LineGlyph
+import ru.onefortwo.finny.ui.common.LineIcon
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
-import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.state.Explanations
@@ -54,6 +66,9 @@ import ru.onefortwo.finny.ui.theme.PillShape
  *
  * Если подтвердить план не удалось, причина показывается на этом же экране,
  * а введённые суммы остаются: экран закрывается только принятым планом.
+ *
+ * На телефоне 360 × 800 dp при обычном шрифте редактор помещается целиком,
+ * вместе с кнопкой «Утвердить план»; при крупном шрифте экран прокручивается.
  */
 @Composable
 fun PlanScreen(
@@ -64,6 +79,8 @@ fun PlanScreen(
     onDismissMessage: () -> Unit = {},
     onChooseGoal: () -> Unit = {},
     balance: Coins? = null,
+    /** Название выбранной цели: куда уйдут монеты копилки. */
+    goalTitle: String? = null,
 ) {
     ScreenScaffold(
         eyebrow = "План на день ${game.period.number}",
@@ -72,6 +89,8 @@ fun PlanScreen(
         onBack = onBack,
         message = message,
         onDismissMessage = onDismissMessage,
+        bottomPadding = 16.dp,
+        singleLineTitle = true,
     ) {
         val plan = game.period.plan
 
@@ -79,37 +98,36 @@ fun PlanScreen(
             PlanEditor(
                 available = game.balance.amount,
                 hasGoal = game.savings.goal != null,
+                goalTitle = goalTitle,
                 onConfirm = onConfirm,
                 onChooseGoal = onChooseGoal,
             )
         } else {
-            Column {
-                SupportingText(
-                    text = "План составлен. Теперь видно, как расходы сходятся с планом.",
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
+            val palette = LocalBudgetColors.current
 
-                val palette = LocalBudgetColors.current
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SupportingText("План составлен. Видно, как расходы сходятся с планом.")
 
-                SectionCard(title = "План и факт") {
-                    Column {
+                SectionCard(
+                    title = "План и факт",
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                    bottomSpacing = 0.dp,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         PlanFactRow(
                             category = BudgetCategory.NEEDS,
-                            title = BudgetCategory.NEEDS.displayName,
                             planned = plan.needs.amount,
                             actual = game.period.spent(BudgetCategory.NEEDS).amount,
                             color = palette.needs,
                         )
                         PlanFactRow(
                             category = BudgetCategory.WANTS,
-                            title = BudgetCategory.WANTS.displayName,
                             planned = plan.wants.amount,
                             actual = game.period.spent(BudgetCategory.WANTS).amount,
                             color = palette.wants,
                         )
                         PlanFactRow(
                             category = BudgetCategory.SAVINGS,
-                            title = BudgetCategory.SAVINGS.displayName,
                             planned = plan.savings.amount,
                             actual = game.period.depositedToSavings.amount,
                             color = palette.savings,
@@ -117,7 +135,10 @@ fun PlanScreen(
                     }
                 }
 
-                SectionCard(title = "Осталось монет") {
+                SectionCard(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    bottomSpacing = 0.dp,
+                ) {
                     LabeledValue("Можно потратить", Explanations.coins(game.balance))
                 }
             }
@@ -128,6 +149,10 @@ fun PlanScreen(
 /**
  * Редактор плана: три направления и остаток.
  *
+ * Остаток и причина, по которой кнопка «Утвердить план» неактивна, стоят
+ * под полосой распределения в верхней карточке, рядом с суммой «N из M»
+ * (ТЗ 3.6). Отдельный блок «Итого» не выводится: экран помещается целиком.
+ *
  * Откладывать в копилку можно только на выбранную цель. Без цели план с
  * ненулевой копилкой не принимается, поэтому об этом сказано заранее, на
  * карточке копилки, с переходом к выбору цели: копилка открывается поверх
@@ -137,6 +162,7 @@ fun PlanScreen(
 private fun PlanEditor(
     available: Int,
     hasGoal: Boolean,
+    goalTitle: String?,
     onConfirm: (Int, Int, Int) -> Unit,
     onChooseGoal: () -> Unit,
 ) {
@@ -159,111 +185,96 @@ private fun PlanEditor(
     val withinBudget = remainder >= 0
     val needsGoal = savings > 0 && !hasGoal
     val valid = withinBudget && !needsGoal
+    val colors = FinnyTheme.colors
 
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionCard(
-            title = "Распредели монеты",
             tone = CardTone.Primary,
-            trailing = {
-                Text(
-                    text = "$total из $available",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = FinnyTheme.colors.coin,
-                )
-            },
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            bottomSpacing = 0.dp,
         ) {
-            Column {
-                Text(
-                    text = "У тебя ${Explanations.coins(available)}. Реши, сколько монет на что отложить.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                DistributionBar(
-                    available = available,
-                    needs = needs,
-                    wants = wants,
-                    savings = savings,
-                    modifier = Modifier.padding(top = 14.dp),
-                )
-            }
-        }
-
-        SectionCard(
-            title = BudgetCategory.NEEDS.displayName,
-            tone = CardTone.Sage,
-            icon = { BudgetDirectionIcon(BudgetCategory.NEEDS, size = 32.dp) },
-        ) {
-            AmountStepper(
-                hint = "Корм, вода, уход. Это покупают в первую очередь.",
-                value = needs,
-                max = available,
-                label = BudgetCategory.NEEDS.displayName,
-                onChange = { needs = it },
-            )
-        }
-
-        SectionCard(
-            title = BudgetCategory.WANTS.displayName,
-            tone = CardTone.Coin,
-            icon = { BudgetDirectionIcon(BudgetCategory.WANTS, size = 32.dp) },
-        ) {
-            AmountStepper(
-                hint = "Игрушки и украшения. Можно отложить на завтра.",
-                value = wants,
-                max = available,
-                label = BudgetCategory.WANTS.displayName,
-                onChange = { wants = it },
-            )
-        }
-
-        SectionCard(
-            title = BudgetCategory.SAVINGS.displayName,
-            icon = { BudgetDirectionIcon(BudgetCategory.SAVINGS, size = 32.dp) },
-        ) {
-            Column {
-                AmountStepper(
-                    hint = if (hasGoal) {
-                        "Эти монеты сразу уйдут в копилку на твою цель."
-                    } else {
-                        "Цель ещё не выбрана. Чтобы откладывать, сначала выбери, на что копишь."
-                    },
-                    value = savings,
-                    max = available,
-                    label = BudgetCategory.SAVINGS.displayName,
-                    onChange = { savings = it },
-                )
-                if (!hasGoal) {
-                    SecondaryButton(
-                        text = "Выбрать цель",
-                        onClick = onChooseGoal,
-                        modifier = Modifier.padding(top = 8.dp),
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Распредели монеты",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        text = "$total из $available",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.coin,
                     )
                 }
+                DistributionBar(available = available, needs = needs, wants = wants, savings = savings)
+                // Причина выводится для каждого случая, когда кнопка
+                // «Утвердить план» неактивна (ТЗ 3.6).
+                Text(
+                    text = when {
+                        !withinBudget ->
+                            "Больше, чем есть, на ${Explanations.coins(-remainder)}. Убавь одно из направлений."
+                        needsGoal ->
+                            "Чтобы отложить в копилку, сначала выбери цель. Суммы сохранятся."
+                        else ->
+                            "Остаток ${Explanations.coins(remainder)} — можно оставить на всякий случай."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (valid) FontWeight.Normal else FontWeight.Bold,
+                    color = if (valid) colors.onPrimary.copy(alpha = 0.9f) else colors.coin,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
         }
 
-        SectionCard(
-            title = "Итого",
-            tone = if (valid) CardTone.Surface else CardTone.Warning,
+        DirectionCard(
+            category = BudgetCategory.NEEDS,
+            tone = CardTone.Sage,
+            value = needs,
+            max = available,
+            onChange = { needs = it },
         ) {
-            Column {
-                LabeledValue("Распределено", Explanations.coins(total))
-                LabeledValue(
-                    label = if (withinBudget) "Остаток" else "Лишние монеты",
-                    value = Explanations.coins(kotlin.math.abs(remainder)),
-                )
-                // Причина выводится для каждого случая, когда кнопка
-                // «Утвердить план» неактивна (ТЗ 3.6).
-                SupportingText(
-                    text = when {
-                        !withinBudget ->
-                            "Ты распределил больше, чем есть. Уменьши одно из направлений."
-                        needsGoal ->
-                            "Чтобы отложить в копилку, сначала выбери цель. " +
-                                "Введённые суммы сохранятся."
-                        else -> "Остаток можно оставить на всякий случай."
-                    },
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+            SupportingText("Корм, вода, уход.")
+        }
+
+        DirectionCard(
+            category = BudgetCategory.WANTS,
+            tone = CardTone.Coin,
+            value = wants,
+            max = available,
+            onChange = { wants = it },
+        ) {
+            SupportingText("Игрушки и украшения.")
+        }
+
+        DirectionCard(
+            category = BudgetCategory.SAVINGS,
+            tone = CardTone.Surface,
+            value = savings,
+            max = available,
+            onChange = { savings = it },
+        ) {
+            if (hasGoal) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LineIcon(LineGlyph.GOAL, color = colors.onSurfaceMuted, size = 18.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    SupportingText(
+                        if (goalTitle != null) "На «$goalTitle»" else "Сразу уйдут в копилку на цель.",
+                    )
+                }
+            } else {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    SupportingText(
+                        text = "Цель не выбрана.",
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                    )
+                    ChooseGoalButton(onClick = onChooseGoal)
+                }
             }
         }
 
@@ -276,69 +287,124 @@ private fun PlanEditor(
 }
 
 /**
- * Сумма направления с подсказкой и кнопками шага.
+ * Карточка направления: значок, название и сумма в одной строке, под ними
+ * подсказка и кнопки шага.
  *
- * Сумма выводится крупно и объявляется программой чтения с экрана при
- * каждом изменении: кнопки шага меняют число, которое видно над ними.
+ * Сумма объявляется программой чтения с экрана при каждом изменении:
+ * кнопки шага меняют число, которое видно рядом с названием.
  */
 @Composable
-private fun AmountStepper(
-    hint: String,
+private fun DirectionCard(
+    category: BudgetCategory,
+    tone: CardTone,
     value: Int,
     max: Int,
-    label: String,
     onChange: (Int) -> Unit,
+    hint: @Composable () -> Unit,
 ) {
-    Column {
-        SupportingText(hint)
-        Text(
-            text = Explanations.coins(value),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier
-                .padding(top = 10.dp)
-                .semantics { liveRegion = LiveRegionMode.Polite },
-        )
-        CoinStepper(
-            label = label,
-            value = value,
-            max = max,
-            onChange = onChange,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+    SectionCard(
+        tone = tone,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        bottomSpacing = 0.dp,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BudgetDirectionIcon(category)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = category.displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                }
+                Text(
+                    text = Explanations.coins(value),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            hint()
+            CoinStepper(
+                label = category.displayName,
+                value = value,
+                max = max,
+                onChange = onChange,
+                compact = true,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 
-/** Строка сравнения плана и факта по направлению. */
+/** Переход к выбору цели: текстовая кнопка с целью нажатия 48 dp. */
+@Composable
+private fun ChooseGoalButton(onClick: () -> Unit) {
+    val colors = FinnyTheme.colors
+
+    Row(
+        modifier = Modifier
+            .clip(PillShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Выбрать цель",
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.attentionText,
+        )
+        ChevronIcon(color = colors.attentionText, size = 18.dp)
+    }
+}
+
+/**
+ * Строка сравнения плана и факта по направлению: «факт из плана», полоса
+ * цвета направления и вывод словами. Цвет полосы только помогает связать
+ * строку с направлением: направление названо словом, соотношение — числом
+ * и фразой.
+ */
 @Composable
 private fun PlanFactRow(
     category: BudgetCategory,
-    title: String,
     planned: Int,
     actual: Int,
     color: Color,
 ) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        // Направление названо словом и отмечено пиктограммой; цвет полосы
-        // только помогает связать строку с направлением. Соотношение факта
-        // с планом названо словами ниже.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BudgetDirectionIcon(category, size = 28.dp, modifier = Modifier.padding(end = 8.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium)
+    val title = category.displayName
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "$title: по плану ${Explanations.coins(planned)}, " +
+                        "на самом деле ${Explanations.coins(actual)}"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BudgetDirectionIcon(category)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text("$actual из $planned", style = MaterialTheme.typography.titleMedium)
         }
-        LabeledValue("По плану", Explanations.coins(planned))
-        LabeledValue("На самом деле", Explanations.coins(actual))
         ProgressBar(
             fraction = if (planned > 0) actual.toFloat() / planned else 0f,
             color = color,
-            modifier = Modifier.padding(top = 4.dp),
+            height = 8.dp,
         )
         SupportingText(
-            text = when {
+            when {
                 actual > planned -> "Потрачено больше плана на ${Explanations.coins(actual - planned)}."
                 actual < planned -> "Осталось в пределах плана: ${Explanations.coins(planned - actual)} не потрачено."
                 else -> "Точно по плану."
             },
-            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }
@@ -346,26 +412,23 @@ private fun PlanFactRow(
 /** Сравнение плана с фактом по завершённому периоду. */
 @Composable
 fun PlanFactSummary(outcome: PeriodOutcome) {
-    Column {
-        val palette = LocalBudgetColors.current
+    val palette = LocalBudgetColors.current
 
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         PlanFactRow(
             category = BudgetCategory.NEEDS,
-            title = BudgetCategory.NEEDS.displayName,
             planned = outcome.plan.needs.amount,
             actual = outcome.spentNeeds.amount,
             color = palette.needs,
         )
         PlanFactRow(
             category = BudgetCategory.WANTS,
-            title = BudgetCategory.WANTS.displayName,
             planned = outcome.plan.wants.amount,
             actual = outcome.spentWants.amount,
             color = palette.wants,
         )
         PlanFactRow(
             category = BudgetCategory.SAVINGS,
-            title = BudgetCategory.SAVINGS.displayName,
             planned = outcome.plan.savings.amount,
             actual = outcome.deposited.amount,
             color = palette.savings,
@@ -375,7 +438,8 @@ fun PlanFactSummary(outcome: PeriodOutcome) {
 
 /**
  * Полоса распределения: доли нужного, желаемого и копилки от бюджета,
- * нераспределённое — дорожкой. Под полосой те же числа словами, поэтому
+ * нераспределённое — дорожкой. Для программы чтения с экрана полоса скрыта:
+ * те же числа названы на карточках направлений и в строке «N из M», поэтому
  * цвет ничего не передаёт в одиночку (ТЗ 3.6).
  */
 @Composable
@@ -394,32 +458,25 @@ private fun DistributionBar(
     val scale = maxOf(available, total).coerceAtLeast(1)
     val rest = (scale - total).coerceAtLeast(0)
 
-    Column(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp)
-                .clip(PillShape)
-                .background(track)
-                .clearAndSetSemantics { },
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            parts.filter { it.first > 0 }.forEach { (value, color) ->
-                Box(
-                    modifier = Modifier
-                        .weight(value.toFloat())
-                        .height(12.dp)
-                        .background(color),
-                )
-            }
-            if (rest > 0) {
-                Box(modifier = Modifier.weight(rest.toFloat()).height(12.dp))
-            }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(12.dp)
+            .clip(PillShape)
+            .background(track)
+            .clearAndSetSemantics { },
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        parts.filter { it.first > 0 }.forEach { (value, color) ->
+            Box(
+                modifier = Modifier
+                    .weight(value.toFloat())
+                    .height(12.dp)
+                    .background(color),
+            )
         }
-        Text(
-            text = "Нужное $needs · Хочу $wants · Копилка $savings",
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+        if (rest > 0) {
+            Box(modifier = Modifier.weight(rest.toFloat()).height(12.dp))
+        }
     }
 }

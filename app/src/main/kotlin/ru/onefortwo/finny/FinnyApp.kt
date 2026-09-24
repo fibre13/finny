@@ -254,6 +254,9 @@ private fun AppNavHost(
         composable(Routes.PLAN) {
             PlanScreen(
                 game = state.game,
+                goalTitle = state.game.savings.goal?.let { goal ->
+                    content.goals().firstOrNull { it.id == goal.id }?.title
+                },
                 balance = balance,
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
