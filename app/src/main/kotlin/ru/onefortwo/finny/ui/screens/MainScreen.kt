@@ -404,7 +404,7 @@ private fun MoneyCard(state: AppState, goalTitle: String?) {
                 LabeledValue("В копилке", Explanations.coins(game.savings.saved))
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MoneyColumn("Можно потратить", Explanations.coins(game.balance), muted, Modifier.weight(1f))
+                    MoneyColumn("Можно потратить", Explanations.coins(game.balance), muted, Modifier.weight(1.4f))
                     MoneyColumn("В копилке", Explanations.coins(game.savings.saved), muted, Modifier.weight(1f))
                 }
             }
@@ -462,7 +462,13 @@ private fun MoneyCard(state: AppState, goalTitle: String?) {
 @Composable
 private fun MoneyColumn(label: String, value: String, muted: Color, modifier: Modifier) {
     Column(modifier = modifier) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = muted, maxLines = 1)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }

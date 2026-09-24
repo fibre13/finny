@@ -1,11 +1,9 @@
 package ru.onefortwo.finny.ui.theme
 
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -15,20 +13,15 @@ import ru.onefortwo.finny.R
  * Шрифт Inter (SIL Open Font License 1.1, см. docs/11-лицензии.md).
  *
  * Лежит в приложении, а не подгружается: приложение работает без сети.
- * Файл один, вариативный; начертания задаются осью насыщенности,
- * поэтому три веса не утяжеляют сборку втрое.
+ * Три статических начертания (400, 700, 800), полученные из вариативного
+ * Inter с подмножеством знаков для русского и латиницы. Вариативный файл
+ * не используется: Android 8.0 меняет форму знаков по оси насыщенности,
+ * но не их ширину, и в жирном тексте появляются разрывы между буквами.
  */
-@OptIn(ExperimentalTextApi::class)
-private fun inter(weight: FontWeight) = Font(
-    resId = R.font.inter_variable,
-    weight = weight,
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
-)
-
 val Inter = FontFamily(
-    inter(FontWeight.Normal),
-    inter(FontWeight.Bold),
-    inter(FontWeight.ExtraBold),
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_bold, FontWeight.Bold),
+    Font(R.font.inter_extrabold, FontWeight.ExtraBold),
 )
 
 private fun style(size: Int, line: Int, weight: FontWeight = FontWeight.Normal) = TextStyle(
