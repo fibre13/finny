@@ -36,14 +36,18 @@ class PixelArtTest {
                 assertNotNull("Нет фигуры $key", figure)
                 assertEquals(art.petSize, figure!!.width)
                 assertEquals(art.petSize, figure.height)
-                val anchors = art.anchors[key]
-                assertNotNull("Нет якорей $key", anchors)
-                listOf("eyes", "mouth", "bow", "scarf").forEach { name ->
-                    assertTrue("Нет якоря $name у $key", name in anchors!!)
+                assertNotNull("Нет второго кадра дыхания $key", art.sprite("${key}_1"))
+                val frames = art.anchors[key]
+                assertNotNull("Нет якорей $key", frames)
+                assertEquals("Якоря на два кадра дыхания: $key", 2, frames!!.size)
+                frames.forEach { anchors ->
+                    listOf("eyes", "mouth", "bow", "scarf").forEach { name ->
+                        assertTrue("Нет якоря $name у $key", name in anchors)
+                    }
                 }
                 assertNotNull("Нет шарфика $key", art.sprite("scarf_$key"))
             }
-            listOf("normal", "happy", "tired").forEach {
+            listOf("normal", "happy", "tired", "blink").forEach {
                 assertNotNull("Нет глаз $it у ${species.id}", art.sprite("${species.id}_eyes_$it"))
             }
             listOf("smile", "neutral", "sad").forEach {
@@ -69,5 +73,18 @@ class PixelArtTest {
                 assertTrue("Индекс $index вне палитры в $id", index == -1 || index in art.colors.indices)
             }
         }
+    }
+
+    @Test
+    fun `движения заданы для всех состояний, небо — для всех кадров`() {
+        val animation = art.animation
+        assertTrue("Такт должен быть положительным", animation.tickMs > 0)
+        listOf("idle", "happy", "tired").forEach { state ->
+            val motion = animation.states[state]
+            assertNotNull("Нет движений состояния $state", motion)
+            assertTrue(motion!!.breathTicks > 0)
+            assertTrue(motion.blinkInterval.first > motion.blinkTicks)
+        }
+        animation.skyFrames.forEach { assertNotNull("Нет кадра неба $it", art.sprite(it)) }
     }
 }

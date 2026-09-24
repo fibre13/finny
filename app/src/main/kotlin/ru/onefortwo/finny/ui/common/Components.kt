@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
@@ -1613,6 +1614,7 @@ fun PetFigure(
     caption: Boolean = true,
 ) {
     val art = rememberPixelArt()
+    val motion = rememberPetMotion(art.animation, care, joy)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -1630,9 +1632,17 @@ fun PetFigure(
             val landscape = LocalConfiguration.current.orientation ==
                 Configuration.ORIENTATION_LANDSCAPE
             val cropTop = if (landscape) SCENE_TOP_CROP_LANDSCAPE else 0
-            val image = remember(art, speciesId, stage, colorHex, accessoryId, care, joy, house, goalId) {
-                val pet = composePet(art, speciesId, stage, colorHex, accessoryId, care, joy, inScene = true)
-                pixelImage(composeScene(art, house, goalId, pet), art.sceneWidth)
+            // Кадры движения повторяются: изображения собираются один раз
+            // на сочетание и берутся из кэша.
+            val frames = remember(art, speciesId, stage, colorHex, accessoryId, care, joy, house, goalId) {
+                HashMap<MotionFrame, ImageBitmap>()
+            }
+            val image = frames.getOrPut(motion) {
+                val pet = composePet(
+                    art, speciesId, stage, colorHex, accessoryId, care, joy,
+                    inScene = true, frame = motion.breath, blink = motion.blink, dy = motion.dy,
+                )
+                pixelImage(composeScene(art, house, goalId, pet, skyFrame = motion.sky), art.sceneWidth)
             }
 
             PixelImage(
@@ -1646,8 +1656,18 @@ fun PetFigure(
                     .then(describePet),
             )
         } else {
-            val image = remember(art, speciesId, stage, colorHex, accessoryId, care, joy) {
-                pixelImage(composePet(art, speciesId, stage, colorHex, accessoryId, care, joy), art.petSize)
+            val frames = remember(art, speciesId, stage, colorHex, accessoryId, care, joy) {
+                HashMap<MotionFrame, ImageBitmap>()
+            }
+            // Облака на карточке не видны: кадр неба не различает изображения.
+            val image = frames.getOrPut(motion.copy(sky = 0)) {
+                pixelImage(
+                    composePet(
+                        art, speciesId, stage, colorHex, accessoryId, care, joy,
+                        frame = motion.breath, blink = motion.blink, dy = motion.dy,
+                    ),
+                    art.petSize,
+                )
             }
 
             Box(

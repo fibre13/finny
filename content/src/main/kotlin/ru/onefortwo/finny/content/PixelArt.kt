@@ -22,7 +22,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property ramps рампы окрасов по идентификатору из `pet_parts.json`:
  * основной, тень, свет (ARGB).
  * @property shadowIndex индекс тени под фигурой; цвет берётся по фону.
- * @property anchors якоря кадра 0 для пары «вид_стадия»: имя точки → клетка.
+ * @property anchors якоря пары «вид_стадия» по кадрам дыхания (0 и 1):
+ * имя точки → клетка. Во втором кадре голова опущена на клетку, и точки
+ * лица и украшений ниже на единицу.
  * @property sceneAnchors якоря сцены: `pet`, `goal`, `tent`.
  * @property baseline строка, на которой стоит фигура: точка привязки
  * питомца — середина этой строки.
@@ -40,8 +42,9 @@ class PixelArt(
     val shadowOnCard: Int,
     val shadowInScene: Int,
     val sprites: Map<String, PixelSprite>,
-    val anchors: Map<String, Map<String, PixelPoint>>,
+    val anchors: Map<String, List<Map<String, PixelPoint>>>,
     val sceneAnchors: Map<String, PixelPoint>,
+    val animation: PixelAnimation,
 ) {
     fun sprite(id: String): PixelSprite? = sprites[id]
 
@@ -62,6 +65,38 @@ class PixelSprite(
 )
 
 data class PixelPoint(val x: Int, val y: Int)
+
+/**
+ * Постоянные движения питомца и сцены (`animation.json`). Такт — [tickMs];
+ * интервалы заданы в тактах.
+ *
+ * @property states состояние `idle`, `happy` или `tired` → его движения.
+ * @property skyFrames кадры неба, сменяются раз в [skyTicks] тактов.
+ */
+class PixelAnimation(
+    val tickMs: Long,
+    val states: Map<String, PixelMotion>,
+    val skyFrames: List<String>,
+    val skyTicks: Int,
+)
+
+/**
+ * Движения одного состояния.
+ *
+ * @property breathTicks сколько тактов держится кадр дыхания.
+ * @property blinkEyes глаза на время моргания; [blinkTicks] — его длина,
+ * следующее — через случайное число тактов из [blinkInterval].
+ * @property jumpOffsets смещения фигуры вверх по тактам прыжка; `null` —
+ * состояние без прыжков.
+ */
+class PixelMotion(
+    val breathTicks: Int,
+    val blinkEyes: String,
+    val blinkTicks: Int,
+    val blinkInterval: IntRange,
+    val jumpOffsets: IntArray?,
+    val jumpInterval: IntRange?,
+)
 
 /** Разбор `pixel_art.json` формата 1. */
 object PixelArtParser {
@@ -93,7 +128,7 @@ object PixelArtParser {
 
         val anchorsRoot = root.obj("anchors")
         val anchors = anchorsRoot.filterKeys { it != "scene" }.mapValues { (_, pair) ->
-            points(pair.jsonObject.obj("0"))
+            listOf(points(pair.jsonObject.obj("0")), points(pair.jsonObject.obj("1")))
         }
 
         return PixelArt(
@@ -113,8 +148,33 @@ object PixelArtParser {
             sprites = sprites,
             anchors = anchors,
             sceneAnchors = points(anchorsRoot.obj("scene")),
+            animation = parseAnimation(root.obj("animation")),
         )
     }
+
+    private fun parseAnimation(obj: JsonObject): PixelAnimation {
+        val sky = obj.obj("sky")
+        return PixelAnimation(
+            tickMs = obj.int("tick_ms").toLong(),
+            states = obj.obj("states").mapValues { (_, value) ->
+                val state = value.jsonObject
+                val blink = state.obj("blink")
+                val jump = state["jump"]?.jsonObject
+                PixelMotion(
+                    breathTicks = state.obj("breath").int("ticks"),
+                    blinkEyes = blink.str("eyes"),
+                    blinkTicks = blink.int("ticks"),
+                    blinkInterval = range(blink.getValue("interval").jsonArray),
+                    jumpOffsets = jump?.getValue("offsets")?.jsonArray?.map { it.jsonPrimitive.int }?.toIntArray(),
+                    jumpInterval = jump?.let { range(it.getValue("interval").jsonArray) },
+                )
+            },
+            skyFrames = sky.getValue("frames").jsonArray.map { it.jsonPrimitive.content },
+            skyTicks = sky.int("ticks"),
+        )
+    }
+
+    private fun range(pair: JsonArray): IntRange = pair[0].jsonPrimitive.int..pair[1].jsonPrimitive.int
 
     /**
      * Строка спрайта — либо строка символов палитры (`.` — прозрачная

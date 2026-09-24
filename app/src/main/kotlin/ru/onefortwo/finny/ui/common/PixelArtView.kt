@@ -51,16 +51,26 @@ private fun stageId(stage: GrowthStage): String = stage.name.lowercase()
 private class PixelCanvas(val width: Int, val height: Int) {
     val pixels = IntArray(width * height)
 
-    /** Кладёт спрайт левым верхним углом в клетку [left], [top]. */
-    fun draw(sprite: PixelSprite, left: Int, top: Int, color: (Int) -> Int) {
+    /**
+     * Кладёт спрайт левым верхним углом в клетку [left], [top]. Клетки
+     * с индексом [fixedIndex] остаются на месте, остальные сдвигаются
+     * на [dy]: так при прыжке тень под фигурой остаётся на земле.
+     */
+    fun draw(
+        sprite: PixelSprite,
+        left: Int,
+        top: Int,
+        color: (Int) -> Int,
+        dy: Int = 0,
+        fixedIndex: Int = Int.MIN_VALUE,
+    ) {
         for (y in 0 until sprite.height) {
-            val ty = top + y
-            if (ty !in 0 until height) continue
             for (x in 0 until sprite.width) {
-                val tx = left + x
-                if (tx !in 0 until width) continue
                 val index = sprite.pixels[y * sprite.width + x]
-                if (index >= 0) pixels[ty * width + tx] = color(index)
+                if (index < 0) continue
+                val tx = left + x
+                val ty = top + y + if (index == fixedIndex) 0 else dy
+                if (tx in 0 until width && ty in 0 until height) pixels[ty * width + tx] = color(index)
             }
         }
     }
@@ -86,6 +96,10 @@ private class PixelCanvas(val width: Int, val height: Int) {
  * который совпадает со значением окраса в `pet_parts.json`.
  *
  * @param inScene тень под фигурой цвета луга, а не карточки.
+ * @param frame кадр дыхания: 0 или 1 (голова опущена на клетку).
+ * @param blink глаза закрыты — такт моргания.
+ * @param dy смещение фигуры по вертикали при прыжке, в клетках (вверх —
+ * отрицательное); тень остаётся на месте.
  */
 fun composePet(
     art: PixelArt,
@@ -96,6 +110,9 @@ fun composePet(
     care: StatLevel,
     joy: StatLevel,
     inScene: Boolean = false,
+    frame: Int = 0,
+    blink: Boolean = false,
+    dy: Int = 0,
 ): IntArray {
     val base = argbOf(colorHex)
     val ramp = art.ramps.values.firstOrNull { it[0] == base } ?: art.ramps.values.first()
@@ -112,17 +129,19 @@ fun composePet(
 
     val key = "${speciesId}_${stageId(stage)}"
     val canvas = PixelCanvas(art.petSize, art.petSize)
-    val anchors = art.anchors[key].orEmpty()
+    val anchors = art.anchors[key]?.getOrNull(frame).orEmpty()
 
     fun place(spriteId: String, anchor: String) {
         val sprite = art.sprite(spriteId) ?: return
         val point = anchors[anchor] ?: return
-        canvas.draw(sprite, point.x - sprite.pivotX, point.y - sprite.pivotY, color)
+        canvas.draw(sprite, point.x - sprite.pivotX, point.y - sprite.pivotY + dy, color)
     }
 
     // Фигура занимает весь холст 48 × 48 и кладётся без сдвига.
-    art.sprite("${key}_0")?.let { canvas.draw(it, 0, 0, color) }
-    place("${speciesId}_eyes_${eyesFor(care, joy)}", "eyes")
+    (art.sprite("${key}_$frame") ?: art.sprite("${key}_0"))?.let {
+        canvas.draw(it, 0, 0, color, dy = dy, fixedIndex = art.shadowIndex)
+    }
+    place("${speciesId}_eyes_${if (blink) "blink" else eyesFor(care, joy)}", "eyes")
     place("${speciesId}_mouth_${mouthFor(joy)}", "mouth")
     when (accessoryId) {
         "bow" -> place("bow_$speciesId", "bow")
@@ -134,12 +153,15 @@ fun composePet(
 /**
  * Сцена 180 × 100: небо, земля, палатка (после покупки домика), предмет
  * полученной цели и питомец в правой части.
+ *
+ * @param skyFrame кадр неба: облака сдвинуты на клетку во втором.
  */
-fun composeScene(art: PixelArt, house: Boolean, goalId: String?, pet: IntArray): IntArray {
+fun composeScene(art: PixelArt, house: Boolean, goalId: String?, pet: IntArray, skyFrame: Int = 0): IntArray {
     val canvas = PixelCanvas(art.sceneWidth, art.sceneHeight)
     val plain: (Int) -> Int = { art.colors[it] }
 
-    art.sprite("sky")?.let { canvas.draw(it, 0, 0, plain) }
+    val sky = art.animation.skyFrames.getOrNull(skyFrame) ?: "sky"
+    (art.sprite(sky) ?: art.sprite("sky"))?.let { canvas.draw(it, 0, 0, plain) }
     art.sprite("ground")?.let { canvas.draw(it, 0, 0, plain) }
     if (house) {
         val at = art.sceneAnchors["tent"]
@@ -160,7 +182,7 @@ fun composeScene(art: PixelArt, house: Boolean, goalId: String?, pet: IntArray):
 fun composeGoal(art: PixelArt, goalId: String): IntArray? {
     val sprite = art.sprite(goalId) ?: return null
     val canvas = PixelCanvas(sprite.width, sprite.height)
-    canvas.draw(sprite, 0, 0) { art.colors[it] }
+    canvas.draw(sprite, 0, 0, color = { art.colors[it] })
     return canvas.pixels
 }
 
