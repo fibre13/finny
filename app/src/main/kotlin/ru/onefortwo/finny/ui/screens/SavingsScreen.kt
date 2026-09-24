@@ -1,8 +1,12 @@
 package ru.onefortwo.finny.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -27,11 +33,15 @@ import ru.onefortwo.finny.ui.common.CoinStepper
 import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.PrimaryButton
+import ru.onefortwo.finny.ui.common.PixelImage
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.SupportingText
+import ru.onefortwo.finny.ui.common.composeGoal
+import ru.onefortwo.finny.ui.common.pixelImage
+import ru.onefortwo.finny.ui.common.rememberPixelArt
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.FeedbackMessage
 import ru.onefortwo.finny.ui.theme.FinnyTheme
@@ -98,6 +108,7 @@ fun SavingsScreen(
                     eyebrow = goalTitle ?: "Моя цель",
                     title = "${game.savings.saved.amount} из ${Explanations.coins(goal.price)}",
                     tone = CardTone.Primary,
+                    trailing = { GoalPicture(goal.id) },
                 ) {
                     Column {
                         ProgressBar(
@@ -277,4 +288,26 @@ private fun WithdrawalConfirmation(
             SecondaryButton(text = "Оставить в копилке", onClick = onCancel)
         },
     )
+}
+
+/**
+ * Иллюстрация цели на светлой плитке. Декоративная: цель названа
+ * надзаголовком карточки.
+ */
+@Composable
+private fun GoalPicture(goalId: String) {
+    val art = rememberPixelArt()
+    val image = remember(art, goalId) {
+        composeGoal(art, goalId)?.let { pixelImage(it, art.sprite(goalId)?.width ?: 32) }
+    } ?: return
+
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(FinnyTheme.colors.surface)
+            .clearAndSetSemantics { },
+    ) {
+        PixelImage(image = image, modifier = Modifier.fillMaxSize().padding(4.dp))
+    }
 }

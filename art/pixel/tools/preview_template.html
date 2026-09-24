@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пиксельная графика Финни</title>
+<style>
+  :root {
+    --bg: #F7F1E5; --card: #FFFDF8; --ink: #23201A; --muted: #6A655A;
+    --green: #3F7B57; --dark: #294C3A; --light-green: #E7EDDC; --line: #DAD4C4;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header, section { max-width: 1240px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  h3 { font-size: 14px; margin: 12px 0 6px; color: var(--dark); }
+  p.note { margin: 0 0 12px; color: var(--muted); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .panel.green { background: var(--light-green); }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .grid { display: grid; gap: 6px; align-items: end; overflow-x: auto; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cap { font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .scales { display: flex; gap: 8px; align-items: flex-end; padding: 8px; border-radius: 8px; background: var(--light-green); }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 16px; margin-bottom: 12px; }
+  .controls label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+  select, button { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  button { cursor: pointer; background: var(--green); color: #fff; border-color: var(--green); }
+  button:disabled { background: #EFE9DA; color: #6A655A; border-color: var(--line); cursor: default; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 8px 0; }
+  .live { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+  .frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card);
+           display: flex; align-items: center; justify-content: center; }
+  .scene-list { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  .scene-box { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+  .status { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--muted); }
+  [hidden] { display: none !important; }
+  @media (max-width: 600px) { header, section { padding: 12px 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Пиксельная графика «Питомец Финни»</h1>
+  <p class="note">Данные встроены при сборке. Логическая сетка переносится на экран с целым увеличением, без сглаживания.
+    Такт анимации — 125 мс, обновление — 60 раз в секунду.</p>
+  <label class="toggle"><input type="checkbox" id="reduced"> Анимации выключены</label>
+</header>
+
+<section id="sec-grid">
+  <h2>Все сочетания на карточке</h2>
+  <p class="note">Вид × стадия × окрас × украшение, фон #FFFDF8, ×2. Лицо — по средним показателям.</p>
+  <div class="panel" id="grid-card"></div>
+</section>
+
+<section id="sec-scales">
+  <h2>Светло-зелёный фон и увеличения</h2>
+  <p class="note">Все сочетания на #E7EDDC в ×1 и ×2; ниже — каждая фигура в ×1, ×2 и ×4 рядом (×4 — размер на главном экране при 72 dp на xxhdpi).</p>
+  <div class="panel green" id="grid-green"></div>
+  <div class="row" id="scales" style="margin-top:12px"></div>
+</section>
+
+<section id="sec-faces">
+  <h2>Выражения</h2>
+  <p class="note">Строки — забота, столбцы — радость. Глаза: забота низкая → усталые; иначе радость высокая → радостные; иначе обычные. Рот — по радости.</p>
+  <div class="row" id="faces"></div>
+</section>
+
+<section id="sec-live">
+  <h2>Живой питомец</h2>
+  <div class="panel">
+    <div class="controls">
+      <label>Вид<select id="c-species"></select></label>
+      <label>Стадия<select id="c-stage"></select></label>
+      <label>Окрас<select id="c-color"></select></label>
+      <label>Украшение<select id="c-acc"></select></label>
+      <label>Забота<select id="c-care"></select></label>
+      <label>Радость<select id="c-joy"></select></label>
+      <label>Размер показа<select id="c-size"></select></label>
+    </div>
+    <div class="row" id="react-buttons" style="margin-bottom:12px"></div>
+    <div class="live">
+      <div class="frame" id="live-card"></div>
+      <div class="frame" id="live-green" style="background:#E7EDDC"></div>
+    </div>
+    <p class="status" id="live-status"></p>
+  </div>
+</section>
+
+<section id="sec-strips">
+  <h2>Раскадровка реакций</h2>
+  <p class="note">Каждый такт реакции (125 мс) слева направо, ×2, холст 48 × 48 — как на карточке. Питомец — из настроек страницы при загрузке.</p>
+  <div class="panel" id="strips"></div>
+</section>
+
+<section id="sec-scene">
+  <h2>Сцена</h2>
+  <p class="note">180 × 100 клеток, целое увеличение по ширине окна, остаток — поля цвета неба. Питомец — из настроек выше.</p>
+  <div class="scene-list" id="scenes"></div>
+</section>
+
+<script>
+"use strict";
+const DATA = /*@PIXEL_ART@*/null;
+const Q = new URLSearchParams(location.search);
+
+// --- Данные ----------------------------------------------------------------
+const PAL = DATA.palette;
+const ANIM = DATA.animation;
+const SPR = {};
+for (const s of DATA.sprites) {
+  const px = new Int16Array(s.w * s.h);
+  let i = 0;
+  for (const row of s.rows) {
+    if (typeof row === "string") {
+      for (const ch of row) px[i++] = ch === "." ? -1 : PAL.chars.indexOf(ch);
+    } else {
+      for (const [idx, len] of row) for (let k = 0; k < len; k++) px[i++] = idx;
+    }
+  }
+  SPR[s.id] = { id: s.id, w: s.w, h: s.h, pivot: s.pivot, px };
+}
+const IDX = ch => PAL.chars.indexOf(ch);
+const OUTLINE_I = IDX("K"), SHADOW_I = PAL.shadow.index, LIGHT_I = IDX("c");
+const FUR_I = new Set([PAL.fur.F, PAL.fur.f, PAL.fur.G]);
+const SPECIES = DATA.species;
+const STAGES = ["baby", "teen", "adult"];
+const STAGE_T = { baby: "Малыш", teen: "Подросток", adult: "Взрослый" };
+const SPECIES_T = { cat: "Котёнок", dog: "Щенок", rabbit: "Крольчонок" };
+const COLORS = Object.keys(PAL.ramps);
+const COLOR_T = { ginger: "Рыжий", grey: "Серый", white: "Белый" };
+const ACCS = ["none", "bow", "scarf"];
+const ACC_T = { none: "Без украшения", bow: "Бантик", scarf: "Шарфик" };
+const LEVELS = ["low", "medium", "high"];
+const LEVEL_T = { low: "низкая", medium: "средняя", high: "высокая" };
+const GOALS = ["scooter", "aquarium", "party"];
+const GOAL_T = { scooter: "Самокат", aquarium: "Аквариум", party: "Праздник" };
+
+function rgb(hex) { const n = parseInt(hex.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+const LITTLE = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+function pack([r, g, b]) { return LITTLE ? (255 << 24 | b << 16 | g << 8 | r) >>> 0 : (r << 24 | g << 16 | b << 8 | 255) >>> 0; }
+const COLOR_CACHE = {};
+function colorsFor(ramp, bg) {
+  const key = ramp + "|" + bg;
+  if (!COLOR_CACHE[key]) {
+    const cols = PAL.colors.slice();
+    const r = PAL.ramps[ramp];
+    cols[PAL.fur.F] = r[0]; cols[PAL.fur.f] = r[1]; cols[PAL.fur.G] = r[2];
+    cols[SHADOW_I] = PAL.shadow[bg];
+    COLOR_CACHE[key] = Uint32Array.from(cols.map(c => pack(rgb(c))));
+  }
+  return COLOR_CACHE[key];
+}
+
+// --- Детерминированный генератор случайных чисел ---------------------------
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a = a + 0x6D2B79F5 >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const RAND = rng(+(Q.get("seed") || 7));
+const between = ([a, b]) => a + Math.floor(RAND() * (b - a + 1));
+
+// --- Логический холст ------------------------------------------------------
+class Layer {
+  constructor(w, h) {
+    this.w = w; this.h = h;
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = w; this.canvas.height = h;
+    this.ctx = this.canvas.getContext("2d");
+    this.img = this.ctx.createImageData(w, h);
+    this.buf = new Uint32Array(this.img.data.buffer);
+  }
+  fill(hex) { this.buf.fill(hex ? pack(rgb(hex)) : 0); }
+  // Кладёт спрайт левым верхним углом в (x, y). mode: "all" | "shadow" | "body"; flash — светлый силуэт.
+  blit(s, x, y, cols, mode = "all", flash = false) {
+    x |= 0; y |= 0;
+    const { w, h, px } = s, W = this.w, H = this.h, buf = this.buf;
+    for (let j = 0; j < h; j++) {
+      const Y = y + j; if (Y < 0 || Y >= H) continue;
+      for (let i = 0; i < w; i++) {
+        const X = x + i; if (X < 0 || X >= W) continue;
+        let c = px[j * w + i];
+        if (c < 0) continue;
+        if (mode === "shadow" && c !== SHADOW_I) continue;
+        if (mode === "body" && c === SHADOW_I) continue;
+        if (flash && c !== OUTLINE_I) c = LIGHT_I;
+        buf[Y * W + X] = cols[c];
+      }
+    }
+  }
+  present() { this.ctx.putImageData(this.img, 0, 0); }
+}
+
+// Видимый холст: целое увеличение, остаток — поля (прозрачные или цветом фона).
+class View {
+  constructor(layer, cssW, cssH, pad) {
+    this.layer = layer;
+    this.el = document.createElement("canvas");
+    this.pad = pad || null;
+    this.resize(cssW, cssH);
+  }
+  resize(cssW, cssH) {
+    const L = this.layer;
+    this.scale = Math.max(1, Math.floor(Math.min(cssW / L.w, cssH ? cssH / L.h : Infinity)));
+    this.el.width = cssW; this.el.height = cssH || L.h * this.scale;
+    this.el.style.width = this.el.width + "px"; this.el.style.height = this.el.height + "px";
+    this.ctx = this.el.getContext("2d");
+    this.ctx.imageSmoothingEnabled = false;
+  }
+  draw() {
+    const L = this.layer, s = this.scale, c = this.ctx;
+    L.present();
+    c.imageSmoothingEnabled = false;
+    if (this.pad) { c.fillStyle = this.pad; c.fillRect(0, 0, this.el.width, this.el.height); }
+    else c.clearRect(0, 0, this.el.width, this.el.height);
+    const ox = Math.floor((this.el.width - L.w * s) / 2), oy = Math.floor((this.el.height - L.h * s) / 2);
+    c.drawImage(L.canvas, 0, 0, L.w, L.h, ox, oy, L.w * s, L.h * s);
+  }
+}
+
+// Статичная картинка: логический размер × целое увеличение.
+function still(w, h, scale, paint, bg) {
+  const L = new Layer(w, h);
+  L.fill(bg || null);
+  paint(L);
+  const v = new View(L, w * scale, h * scale);
+  v.draw();
+  return v.el;
+}
+
+// --- Сборка фигуры ---------------------------------------------------------
+function pick(rules, stats) {
+  for (const r of rules) {
+    if (!r.if || Object.entries(r.if).every(([k, v]) => stats[k] === v)) return r.use;
+  }
+}
+function faceFor(care, joy) {
+  const s = { care, joy };
+  return { eyes: pick(ANIM.face.eyes, s), mouth: pick(ANIM.face.mouth, s) };
+}
+function anchorsOf(p, frame) { return DATA.anchors[`${p.species}_${p.stage}`][String(frame)]; }
+function accSprite(kind, sp, st) { return SPR[`${kind}_${sp}_${st}`] || SPR[`${kind}_${sp}`]; }
+function place(L, s, ox, oy, a, cols) { if (s && a) L.blit(s, ox + a.x - s.pivot[0], oy + a.y - s.pivot[1], cols); }
+
+// Кладёт питомца так, чтобы его pivot (середина базовой линии) пришёлся в (x, y).
+function drawPet(L, x, y, p, bg) {
+  const frame = p.frame || 0;
+  const base = SPR[`${p.species}_${p.stage}_${frame}`];
+  if (!base) return;
+  const cols = colorsFor(p.color, bg);
+  const ox = x - base.pivot[0], oy = y - base.pivot[1];
+  const dy = p.dy || 0;
+  L.blit(base, ox, oy, cols, "shadow");
+  L.blit(base, ox, oy + dy, cols, "body", !!p.flash);
+  if (p.flash) return;
+  const a = anchorsOf(p, frame);
+  place(L, SPR[`${p.species}_eyes_${p.eyes}`], ox, oy + dy, a.eyes, cols);
+  place(L, SPR[`${p.species}_mouth_${p.mouth}`], ox, oy + dy, a.mouth, cols);
+  if (p.acc === "bow") place(L, accSprite("bow", p.species, p.stage), ox, oy + dy, a.bow, cols);
+  if (p.acc === "scarf") place(L, accSprite("scarf", p.species, p.stage), ox, oy + dy, a.scarf, cols);
+}
+
+// Точки контура фигуры, упорядоченные по углу, — для вспышки при росте.
+const OUTLINE_CACHE = {};
+function outlinePoints(sp, st) {
+  const key = sp + st;
+  if (OUTLINE_CACHE[key]) return OUTLINE_CACHE[key];
+  const s = SPR[`${sp}_${st}_0`], pts = [];
+  let cx = 0, cy = 0, n = 0;
+  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
+    const c = s.px[y * s.w + x];
+    if (c < 0 || c === SHADOW_I) continue;
+    cx += x; cy += y; n++;
+    if (c !== OUTLINE_I) continue;
+    const out = [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => {
+      const X = x + dx, Y = y + dy;
+      return X < 0 || Y < 0 || X >= s.w || Y >= s.h || s.px[Y * s.w + X] < 0 || s.px[Y * s.w + X] === SHADOW_I;
+    });
+    if (out && y < 44) pts.push([x, y]);
+  }
+  cx /= n; cy /= n;
+  pts.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+  return OUTLINE_CACHE[key] = pts;
+}
+
+// --- Частицы ---------------------------------------------------------------
+class Pool {
+  constructor(n) { this.items = Array.from({ length: n }, () => ({ alive: false })); }
+  spawn(fx, x, y, vx, vy, life) {
+    const p = this.items.find(q => !q.alive);
+    if (!p) return;
+    Object.assign(p, { alive: true, fx, x0: x, y0: y, vx, vy, life, age: 0 });
+  }
+  tick() { for (const p of this.items) if (p.alive && ++p.age >= p.life) p.alive = false; }
+  clear() { for (const p of this.items) p.alive = false; }
+  draw(L, ox, oy) {
+    const cols = colorsFor("ginger", "card");
+    for (const p of this.items) {
+      if (!p.alive) continue;
+      const frames = ANIM.fx[p.fx];
+      const s = SPR[frames[Math.min(frames.length - 1, Math.floor(p.age * frames.length / p.life))]];
+      const x = Math.floor(p.x0 + p.vx * p.age), y = Math.floor(p.y0 + p.vy * p.age);
+      L.blit(s, ox + x - s.pivot[0], oy + y - s.pivot[1], cols);
+    }
+  }
+}
+
+// --- Питомец с анимацией ---------------------------------------------------
+const settings = { species: SPECIES[0], stage: "teen", color: "ginger", acc: "none", care: "medium", joy: "medium" };
+let reduced = false;
+
+class Actor {
+  constructor() {
+    this.pool = new Pool(ANIM.max_particles);
+    this.reset();
+  }
+  reset() {
+    this.frame = 0; this.breathT = 0; this.blinkIn = between([24, 40]); this.blinkT = 0;
+    this.jumpIn = null; this.jumpSeq = null; this.jumpI = 0;
+    this.reaction = null; this.stageOverride = null; this.pool.clear();
+  }
+  stateName() { return pick(ANIM.state, settings); }
+  start(name) {
+    if (reduced) return;
+    this.reaction = { name, t: 0, def: ANIM.reactions[name], from: settings.stage };
+    this.jumpSeq = null;
+    if (name === "grow") this.stageOverride = settings.stage;
+  }
+  tick() {
+    if (reduced) { this.frame = 0; this.blinkT = 0; this.jumpSeq = null; this.reaction = null; this.pool.clear(); return; }
+    const st = ANIM.states[this.stateName()];
+    if (++this.breathT >= st.breath.ticks) { this.breathT = 0; this.frame = this.frame ? 0 : 1; }
+    if (this.blinkT > 0) this.blinkT--;
+    if (--this.blinkIn <= 0) { this.blinkT = st.blink.ticks; this.blinkIn = between(st.blink.interval); }
+    // Прыжок состояния «радость» — только вне реакции.
+    if (st.jump && !this.reaction) {
+      if (this.jumpIn === null) this.jumpIn = between(st.jump.interval);
+      if (!this.jumpSeq && --this.jumpIn <= 0) { this.jumpSeq = st.jump.offsets; this.jumpI = 0; this.jumpIn = between(st.jump.interval); }
+    } else if (!st.jump) this.jumpIn = null;
+    if (this.jumpSeq && ++this.jumpI >= this.jumpSeq.length) this.jumpSeq = null;
+    this.pool.tick();
+    const r = this.reaction;
+    if (r) {
+      const d = r.def;
+      for (const j of d.jump || []) if (j.at === r.t) { this.jumpSeq = j.offsets; this.jumpI = 0; }
+      for (const e of d.emit || []) if (e.at === r.t) this.emit(e);
+      if (d.swap_stage === r.t) this.stageOverride = null;
+      if (++r.t >= d.ticks) { this.reaction = null; this.stageOverride = null; }
+    }
+  }
+  emit(e) {
+    const p = this.pet();
+    let x, y;
+    if (e.from === "outline") {
+      const pts = outlinePoints(p.species, p.stage);
+      [x, y] = pts[Math.floor(e.point * pts.length / e.of) % pts.length];
+    } else if (e.from === "base") { x = 24 + (e.dx || 0); y = 45 + (e.dy || 0); }
+    else { const a = anchorsOf(p, this.frame)[e.from]; x = a.x + (e.dx || 0); y = a.y + (e.dy || 0) + p.dy; }
+    this.pool.spawn(e.fx, x, y, e.vx || 0, e.vy || 0, e.life);
+  }
+  pet() {
+    const face = faceFor(settings.care, settings.joy);
+    const p = { ...settings, stage: this.stageOverride || settings.stage, frame: this.frame,
+                eyes: face.eyes, mouth: face.mouth, dy: 0, flash: false };
+    if (reduced) { p.frame = 0; return p; }
+    if (this.blinkT > 0) p.eyes = ANIM.states[this.stateName()].blink.eyes;
+    if (this.jumpSeq) p.dy = this.jumpSeq[this.jumpI];
+    const r = this.reaction;
+    if (r) {
+      const d = r.def;
+      if (d.eyes && this.blinkT === 0) p.eyes = d.eyes;
+      if (d.mouth && r.t >= d.mouth.from && r.t < d.mouth.to) {
+        p.mouth = d.mouth.frames[Math.floor((r.t - d.mouth.from) / d.mouth.ticks) % d.mouth.frames.length];
+      }
+      if (d.flash && r.t >= d.flash.at && r.t < d.flash.at + d.flash.ticks) p.flash = true;
+    }
+    return p;
+  }
+  // (x, y) — куда встаёт pivot фигуры; начало холста 48 × 48 — (x − 24, y − 45).
+  draw(L, x, y, bg) {
+    const p = this.pet();
+    drawPet(L, x, y, p, bg);
+    this.pool.draw(L, x - 24, y - 45);
+  }
+}
+
+// --- Разметка страницы -----------------------------------------------------
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) { if (k === "style") e.style.cssText = v; else e[k] = v; }
+  for (const k of kids) e.append(k);
+  return e;
+}
+function petStill(p, scale, bg, bgKey) {
+  return still(48, 48, scale, L => drawPet(L, 24, 45, p, bgKey), bg);
+}
+
+function buildGrid(target, scale, bg) {
+  const col = Math.max(48 * scale, 64);
+  const ACC_S = { none: "без укр.", bow: "бантик", scarf: "шарфик" };
+  for (const sp of SPECIES) {
+    target.append(el("h3", {}, SPECIES_T[sp] || sp));
+    const g = el("div", { className: "grid", style: `grid-template-columns: 72px repeat(9, ${col}px)` });
+    g.append(el("div", {}));
+    for (const color of COLORS) for (const acc of ACCS) {
+      g.append(el("div", { className: "cap" }, COLOR_T[color], el("br"), ACC_S[acc]));
+    }
+    for (const st of STAGES) {
+      g.append(el("div", { className: "cap", style: "text-align:left;align-self:center" }, STAGE_T[st]));
+      for (const color of COLORS) for (const acc of ACCS) {
+        const face = faceFor("medium", "medium");
+        const cv = petStill({ species: sp, stage: st, color, acc, frame: 0, ...face }, scale, bg, "card");
+        cv.title = `${SPECIES_T[sp]}, ${STAGE_T[st]}, ${COLOR_T[color]}, ${ACC_T[acc]}`;
+        g.append(el("div", { className: "cell" }, cv));
+      }
+    }
+    target.append(g);
+  }
+}
+
+function buildScales() {
+  const box = document.getElementById("scales");
+  for (const sp of SPECIES) for (const st of STAGES) COLORS.forEach((color, i) => {
+    const acc = ACCS[i % 3];
+    const p = { species: sp, stage: st, color, acc, frame: 0, ...faceFor("medium", "medium") };
+    const s = el("div", { className: "scales" });
+    for (const k of [1, 2, 4]) s.append(el("div", { className: "cell" }, petStill(p, k, "#E7EDDC", "card"), el("div", { className: "cap" }, "×" + k)));
+    box.append(el("div", { className: "cell" }, s, el("div", { className: "cap" }, `${SPECIES_T[sp]} · ${STAGE_T[st]} · ${COLOR_T[color]} · ${ACC_T[acc]}`)));
+  });
+}
+
+function buildFaces() {
+  const box = document.getElementById("faces");
+  const stage = Q.get("face_stage") || "teen";
+  for (const sp of SPECIES) {
+    const panel = el("div", { className: "panel" }, el("h3", {}, `${SPECIES_T[sp]}, ${STAGE_T[stage]}`));
+    const g = el("div", { className: "grid", style: `grid-template-columns: auto repeat(3, ${48 * 3}px)` });
+    g.append(el("div", {}), ...LEVELS.map(j => el("div", { className: "cap" }, "радость " + LEVEL_T[j])));
+    for (const care of LEVELS) {
+      g.append(el("div", { className: "cap" }, "забота " + LEVEL_T[care]));
+      for (const joy of LEVELS) {
+        const p = { species: sp, stage, color: "ginger", acc: "none", frame: 0, ...faceFor(care, joy) };
+        g.append(el("div", { className: "cell" }, petStill(p, 3, "#FFFDF8", "card"),
+          el("div", { className: "cap" }, `${faceFor(care, joy).eyes} · ${faceFor(care, joy).mouth}`)));
+      }
+    }
+    panel.append(g);
+    box.append(panel);
+  }
+}
+
+// Живые виды: карточка, светло-зелёный фон и сцены.
+const actors = [];
+const live = [];
+function makeLive() {
+  const sizes = [216, 288, 420];
+  const size = +document.getElementById("c-size").value || 216;
+  for (const [id, bg] of [["live-card", "#FFFDF8"], ["live-green", "#E7EDDC"]]) {
+    const host = document.getElementById(id);
+    host.innerHTML = "";
+    const L = new Layer(48, 48);
+    const v = new View(L, size, size);
+    host.style.width = size + "px"; host.style.height = size + "px";
+    host.append(v.el);
+    live.push({ L, v, bg, kind: "pet", actor: actors[0] });
+  }
+}
+
+function buildStrips() {
+  const box = document.getElementById("strips");
+  // Дыхание: кадры _0 и _1 рядом, ×3 — проверка, что части не смещаются друг относительно друга.
+  box.append(el("h3", {}, "Дыхание — кадры _0 и _1"));
+  const br = el("div", { className: "row" });
+  for (const sp of SPECIES) for (const st of STAGES) {
+    const pair = el("div", { className: "row", style: "gap:4px" });
+    for (const frame of [0, 1]) {
+      const p = { species: sp, stage: st, color: "white", acc: st === "teen" ? "bow" : st === "adult" ? "scarf" : "none", frame, ...faceFor("medium", "medium") };
+      pair.append(el("div", { className: "cell" }, petStill(p, 3, "#FFFDF8", "card"), el("div", { className: "cap" }, "_" + frame)));
+    }
+    br.append(el("div", { className: "cell" }, pair, el("div", { className: "cap" }, `${SPECIES_T[sp]} · ${STAGE_T[st]}`)));
+  }
+  box.append(br);
+  const saved = reduced; reduced = false;
+  for (const name of Object.keys(ANIM.reactions)) {
+    const stage0 = settings.stage;
+    const a = new Actor();
+    a.blinkIn = 1e9;
+    a.start(name);
+    if (name === "grow") settings.stage = STAGES[Math.min(2, STAGES.indexOf(stage0) + 1)];
+    const row = el("div", { className: "grid", style: "grid-template-columns: repeat(auto-fill, 96px)" });
+    for (let t = 0; t <= ANIM.reactions[name].ticks; t++) {
+      const cv = still(48, 48, 2, L => a.draw(L, 24, 45, "card"), "#FFFDF8");
+      row.append(el("div", { className: "cell" }, cv, el("div", { className: "cap" }, String(t))));
+      a.tick();
+    }
+    settings.stage = stage0;
+    box.append(el("h3", {}, name + " — " + ANIM.reactions[name].event), row);
+  }
+  reduced = saved;
+}
+
+function buildScenes() {
+  const box = document.getElementById("scenes");
+  const variants = [
+    { tent: false, goal: null, t: "Без палатки и цели" },
+    ...GOALS.map(g => ({ tent: true, goal: g, t: `С палаткой, цель — ${GOAL_T[g]}` })),
+  ];
+  const W = Math.min(box.clientWidth || 1200, 1208);
+  for (const vdef of variants) {
+    const L = new Layer(180, 100);
+    const v = new View(L, W, null, PAL.colors[IDX("A")]);
+    const actor = new Actor();
+    actors.push(actor);
+    box.append(el("div", {}, el("div", { className: "cap", style: "text-align:left;margin:4px 0" }, vdef.t),
+      el("div", { className: "scene-box" }, v.el)));
+    live.push({ L, v, kind: "scene", vdef, actor });
+  }
+}
+
+let tickNo = 0;
+function drawScene(item) {
+  const { L, vdef, actor } = item;
+  const A = DATA.anchors.scene;
+  const cols = colorsFor(settings.color, "scene");
+  const sky = reduced ? ANIM.reduced_motion.sky_frame : ANIM.sky.frames[Math.floor(tickNo / ANIM.sky.ticks) % ANIM.sky.frames.length];
+  L.fill(null);
+  L.blit(SPR[sky], 0, 0, cols);
+  L.blit(SPR.ground, 0, 0, cols);
+  if (vdef.tent) { const t = SPR.tent; L.blit(t, A.tent.x - t.pivot[0], A.tent.y - t.pivot[1], cols); }
+  if (vdef.goal) { const g = SPR[vdef.goal]; L.blit(g, A.goal.x - g.pivot[0], A.goal.y - g.pivot[1], cols); }
+  actor.draw(L, A.pet.x, A.pet.y, "scene");
+}
+
+function render() {
+  for (const item of live) {
+    if (item.kind === "pet") {
+      item.L.fill(null);
+      item.actor.draw(item.L, 24, 45, "card");
+    } else drawScene(item);
+    item.v.draw();
+  }
+  const a = actors[0];
+  const r = a.reaction ? `${a.reaction.name} ${a.reaction.t}/${a.reaction.def.ticks}` : "—";
+  document.getElementById("live-status").textContent =
+    `такт ${tickNo} · состояние ${reduced ? "анимации выключены" : a.stateName()} · кадр ${a.pet().frame} · реакция ${r} · ` +
+    `частиц ${a.pool.items.filter(p => p.alive).length}/${ANIM.max_particles} · ×${live[0].v.scale}`;
+}
+
+function tickAll() { tickNo++; for (const a of actors) a.tick(); }
+
+// Фиксированный шаг 60 Гц, такт 125 мс, отрисовка по requestAnimationFrame.
+const STEP = 1000 / ANIM.update_hz;
+let last = 0, acc = 0, tickAcc = 0, running = true;
+function update(dt) { tickAcc += dt; while (tickAcc >= ANIM.tick_ms) { tickAcc -= ANIM.tick_ms; tickAll(); } }
+function loop(now) {
+  if (!running) return;
+  if (!last) last = now;
+  acc += Math.min(250, now - last); last = now;
+  while (acc >= STEP) { update(STEP); acc -= STEP; }
+  render();
+  requestAnimationFrame(loop);
+}
+
+// --- Управление ------------------------------------------------------------
+function fillSelect(id, values, titles, value) {
+  const s = document.getElementById(id);
+  s.innerHTML = "";
+  for (const v of values) s.append(el("option", { value: v, textContent: titles[v] || v }));
+  s.value = value;
+  return s;
+}
+function init() {
+  for (const k of ["species", "stage", "color", "acc", "care", "joy"]) if (Q.get(k)) settings[k] = Q.get(k);
+  fillSelect("c-species", SPECIES, SPECIES_T, settings.species);
+  fillSelect("c-stage", STAGES, STAGE_T, settings.stage);
+  fillSelect("c-color", COLORS, COLOR_T, settings.color);
+  fillSelect("c-acc", ACCS, ACC_T, settings.acc);
+  fillSelect("c-care", LEVELS, LEVEL_T, settings.care);
+  fillSelect("c-joy", LEVELS, LEVEL_T, settings.joy);
+  fillSelect("c-size", ["216", "288", "420"], { 216: "216 px (72 dp, xxhdpi)", 288: "288 px (96 dp)", 420: "420 px (140 dp)" }, Q.get("size") || "216");
+  for (const k of ["species", "stage", "color", "acc", "care", "joy"]) {
+    document.getElementById("c-" + k).addEventListener("change", e => { settings[k] = e.target.value; });
+  }
+  document.getElementById("c-size").addEventListener("change", () => { live.splice(0, 2); makeLiveFront(); });
+
+  const rb = document.getElementById("react-buttons");
+  const RT = { eat: "eat — куплено нужное", play: "play — куплено желаемое", save: "save — пополнена копилка",
+               grow: "grow — новая стадия", reward: "reward — награда за задание" };
+  for (const name of Object.keys(ANIM.reactions)) {
+    const b = el("button", { textContent: RT[name] || name });
+    b.addEventListener("click", () => react(name));
+    rb.append(b);
+  }
+  const red = document.getElementById("reduced");
+  const mq = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+  red.checked = Q.has("reduced") ? Q.get("reduced") === "1" : !!(mq && mq.matches);
+  const applyReduced = () => { reduced = red.checked; for (const b of rb.querySelectorAll("button")) b.disabled = reduced; for (const a of actors) a.reset(); };
+  red.addEventListener("change", applyReduced);
+
+  actors.push(new Actor());
+  makeLiveFront();
+  buildGrid(document.getElementById("grid-card"), 2, "#FFFDF8");
+  const green = document.getElementById("grid-green");
+  const two = el("div", { className: "row" });
+  const g1 = el("div", {}); const g2 = el("div", {});
+  buildGrid(g1, 1, "#E7EDDC"); buildGrid(g2, 2, "#E7EDDC");
+  two.append(el("div", {}, el("div", { className: "cap", style: "text-align:left" }, "×1"), g1),
+             el("div", {}, el("div", { className: "cap", style: "text-align:left" }, "×2"), g2));
+  green.append(two);
+  buildScales();
+  buildFaces();
+  buildStrips();
+  buildScenes();
+  applyReduced();
+
+  const only = Q.get("only");
+  if (only) for (const s of document.querySelectorAll("section")) s.hidden = !only.split(",").includes(s.id.slice(4));
+  if (Q.has("hideheader")) document.querySelector("header").hidden = true;
+
+  // Режим снимка: заданное число тактов, при необходимости с реакцией, затем остановка.
+  if (Q.has("ticks")) {
+    const n = +Q.get("ticks");
+    const at = +(Q.get("react_at") || 0);
+    for (let i = 0; i < n; i++) { if (Q.get("react") && i === at) react(Q.get("react")); tickAll(); }
+    running = false;
+    render();
+    document.body.dataset.ready = "1";
+    return;
+  }
+  requestAnimationFrame(loop);
+}
+function makeLiveFront() {
+  const keep = live.splice(0);
+  makeLive();
+  for (const k of keep) if (k.kind !== "pet") live.push(k);
+}
+function react(name) {
+  if (reduced) return;
+  if (name === "grow") {
+    const i = STAGES.indexOf(settings.stage);
+    const next = STAGES[Math.min(STAGES.length - 1, i + 1)];
+    for (const a of actors) a.start("grow");
+    // Спрайт стадии меняется на такте swap_stage: до него показывается прежняя стадия.
+    settings.stage = next;
+    document.getElementById("c-stage").value = next;
+    return;
+  }
+  for (const a of actors) a.start(name);
+}
+init();
+</script>
+</body>
+</html>

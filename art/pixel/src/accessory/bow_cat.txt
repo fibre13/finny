@@ -1,0 +1,10 @@
+# 11 8
+# pivot 5 3
+.KK.....KK.
+KnPK...KPPK
+KPPPKKKPPpK
+KPPpKPKppPK
+KPpKKpKKppK
+.KKKpKpKKK.
+...KpKKpK..
+...KK..KK..

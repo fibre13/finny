@@ -1,0 +1,13 @@
+# 18 11
+# pivot 9 1
+.KKKKKKKKKKKKKKKK.
+KgggggggggggEEEEEK
+KEEEEEEEEEEEEEEDDK
+KEEDEEDEEDEEDEEDDK
+.KKKKKKKKKKKgEEDK.
+...........KgEEDK.
+...........KEEDDK.
+...........KEEDDK.
+...........KDEDDK.
+...........KEKEKK.
+............K.K...

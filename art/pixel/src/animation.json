@@ -1,0 +1,116 @@
+{
+ "tick_ms": 125,
+ "update_hz": 60,
+ "max_particles": 24,
+ "max_offset": 3,
+ "face": {
+  "eyes": [
+   {"if": {"care": "low"}, "use": "tired"},
+   {"if": {"joy": "high"}, "use": "happy"},
+   {"use": "normal"}
+  ],
+  "mouth": [
+   {"if": {"joy": "high"}, "use": "smile"},
+   {"if": {"joy": "medium"}, "use": "neutral"},
+   {"if": {"joy": "low"}, "use": "sad"}
+  ]
+ },
+ "state": [
+  {"if": {"care": "low"}, "use": "tired"},
+  {"if": {"joy": "high"}, "use": "happy"},
+  {"use": "idle"}
+ ],
+ "states": {
+  "idle": {
+   "breath": {"frames": [0, 1], "ticks": 4},
+   "blink": {"eyes": "blink", "ticks": 1, "interval": [24, 40]}
+  },
+  "happy": {
+   "breath": {"frames": [0, 1], "ticks": 4},
+   "blink": {"eyes": "blink", "ticks": 1, "interval": [24, 40]},
+   "jump": {"offsets": [0, -2, -3, -2, 0], "interval": [40, 64]}
+  },
+  "tired": {
+   "breath": {"frames": [0, 1], "ticks": 6},
+   "blink": {"eyes": "blink", "ticks": 1, "interval": [24, 40]}
+  }
+ },
+ "sky": {"frames": ["sky", "sky_1"], "ticks": 32},
+ "fx": {
+  "coin": ["coin_0", "coin_1", "coin_2", "coin_3"],
+  "heart": ["heart_0", "heart_1", "heart_2", "heart_3"],
+  "sparkle": ["sparkle_0", "sparkle_1", "sparkle_2", "sparkle_3"],
+  "crumb": ["crumb_0", "crumb_1", "crumb_2"],
+  "note": ["note_0", "note_1", "note_2", "note_3"]
+ },
+ "reactions": {
+  "eat": {
+   "event": "покупка из категории needs",
+   "ticks": 16,
+   "mouth": {"from": 0, "to": 8, "frames": ["chew_1", "chew_0"], "ticks": 2},
+   "emit": [
+    {"at": 1, "fx": "crumb", "from": "mouth", "dx": -3, "dy": 3, "vx": -0.25, "vy": 0.5, "life": 5},
+    {"at": 3, "fx": "crumb", "from": "mouth", "dx": 3, "dy": 3, "vx": 0.25, "vy": 0.5, "life": 5},
+    {"at": 5, "fx": "crumb", "from": "mouth", "dx": -2, "dy": 3, "vx": -0.5, "vy": 0.5, "life": 5},
+    {"at": 7, "fx": "crumb", "from": "mouth", "dx": 2, "dy": 3, "vx": 0.5, "vy": 0.5, "life": 5},
+    {"at": 9, "fx": "heart", "from": "fx_head", "dx": 0, "dy": 0, "vx": 0, "vy": -0.25, "life": 7}
+   ]
+  },
+  "play": {
+   "event": "покупка из категории wants",
+   "ticks": 16,
+   "eyes": "happy",
+   "jump": [{"at": 0, "offsets": [0, -2, -3, -2, 0]}, {"at": 6, "offsets": [0, -2, -3, -2, 0]}],
+   "emit": [
+    {"at": 1, "fx": "note", "from": "fx_head", "dx": -10, "dy": 6, "vx": -0.25, "vy": -0.5, "life": 8},
+    {"at": 3, "fx": "sparkle", "from": "fx_head", "dx": 10, "dy": 4, "vx": 0.25, "vy": -0.25, "life": 6},
+    {"at": 7, "fx": "note", "from": "fx_head", "dx": 11, "dy": 8, "vx": 0.25, "vy": -0.5, "life": 8},
+    {"at": 9, "fx": "sparkle", "from": "fx_head", "dx": -11, "dy": 2, "vx": -0.25, "vy": -0.25, "life": 6}
+   ]
+  },
+  "save": {
+   "event": "пополнение копилки",
+   "ticks": 16,
+   "eyes": "happy",
+   "emit": [
+    {"at": 0, "fx": "coin", "from": "scarf", "dx": 6, "dy": 2, "vx": 0.5, "vy": -1, "life": 8},
+    {"at": 3, "fx": "coin", "from": "scarf", "dx": 4, "dy": 4, "vx": 0.5, "vy": -1, "life": 8},
+    {"at": 6, "fx": "coin", "from": "scarf", "dx": 7, "dy": 3, "vx": 0.5, "vy": -1, "life": 8}
+   ]
+  },
+  "grow": {
+   "event": "переход на новую стадию",
+   "ticks": 16,
+   "flash": {"at": 6, "ticks": 1},
+   "swap_stage": 7,
+   "emit": [
+    {"at": 0, "fx": "sparkle", "from": "outline", "point": 0, "of": 8, "vx": 0, "vy": 0, "life": 6},
+    {"at": 1, "fx": "sparkle", "from": "outline", "point": 4, "of": 8, "vx": 0, "vy": 0, "life": 6},
+    {"at": 2, "fx": "sparkle", "from": "outline", "point": 2, "of": 8, "vx": 0, "vy": 0, "life": 6},
+    {"at": 3, "fx": "sparkle", "from": "outline", "point": 6, "of": 8, "vx": 0, "vy": 0, "life": 6},
+    {"at": 4, "fx": "sparkle", "from": "outline", "point": 1, "of": 8, "vx": 0, "vy": 0, "life": 5},
+    {"at": 5, "fx": "sparkle", "from": "outline", "point": 5, "of": 8, "vx": 0, "vy": 0, "life": 5},
+    {"at": 8, "fx": "sparkle", "from": "outline", "point": 3, "of": 8, "vx": 0, "vy": -0.25, "life": 6},
+    {"at": 9, "fx": "sparkle", "from": "outline", "point": 7, "of": 8, "vx": 0, "vy": -0.25, "life": 6}
+   ]
+  },
+  "reward": {
+   "event": "начисление награды за задание",
+   "ticks": 16,
+   "eyes": "happy",
+   "emit": [
+    {"at": 0, "fx": "coin", "from": "fx_head", "dx": -7, "dy": -6, "vx": 0, "vy": 1, "life": 8},
+    {"at": 3, "fx": "coin", "from": "fx_head", "dx": 7, "dy": -6, "vx": 0, "vy": 1, "life": 8},
+    {"at": 6, "fx": "coin", "from": "fx_head", "dx": 0, "dy": -6, "vx": 0, "vy": 1, "life": 8}
+   ]
+  }
+ },
+ "reduced_motion": {
+  "frame": 0,
+  "blink": false,
+  "jump": false,
+  "particles": false,
+  "reactions": false,
+  "sky_frame": "sky"
+ }
+}

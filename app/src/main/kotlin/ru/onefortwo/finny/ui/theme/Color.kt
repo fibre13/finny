@@ -127,30 +127,3 @@ val LightBudgetColors = BudgetColors(
 
 /** Доступ к цветам направлений из любого места дерева композиции. */
 val LocalBudgetColors = staticCompositionLocalOf { LightBudgetColors }
-
-/**
- * Цвета сцены главного экрана и контура питомца.
- *
- * Рисунок питомца и сцены — существующая графика приложения, и по
- * условиям переноса оформления она не меняется. Поэтому её цвета
- * отделены от ролей интерфейса и остались прежними.
- */
-@Immutable
-data class SceneColors(
-    val primary: Color,
-    val secondary: Color,
-    val surface: Color,
-    val onBackground: Color,
-    val ink: Color,
-)
-
-val LightScene = SceneColors(
-    primary = Color(0xFF3D7C47),
-    secondary = Color(0xFFF2B705),
-    surface = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF2B2B2B),
-    ink = Color(0xFF23201A),
-)
-
-/** Доступ к цветам сцены из любого места дерева композиции. */
-val LocalSceneColors = staticCompositionLocalOf { LightScene }

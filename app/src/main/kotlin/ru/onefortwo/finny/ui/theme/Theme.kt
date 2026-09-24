@@ -46,7 +46,6 @@ fun FinnyTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalFinnyColors provides LightFinnyColors,
         LocalBudgetColors provides LightBudgetColors,
-        LocalSceneColors provides LightScene,
     ) {
         MaterialTheme(
             colorScheme = LightColorScheme,

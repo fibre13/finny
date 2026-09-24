@@ -44,6 +44,10 @@ class ContentRepository(private val source: AssetSource) {
         ContentParser.parseGlossary(source.read(FILE_GLOSSARY))
     }
 
+    private val pixelArtCache: PixelArt by lazy {
+        PixelArtParser.parse(source.read(FILE_PIXEL_ART))
+    }
+
     /** Каталог покупок: обязательные и необязательные позиции (ТЗ 2.5.6). */
     fun shopItems(): List<ShopItemContent> = shopCache
 
@@ -76,6 +80,9 @@ class ContentRepository(private val source: AssetSource) {
     /** Части внешности питомца (ТЗ 2.5.2). */
     fun petParts(): PetPartsContent = petPartsCache
 
+    /** Пиксельная графика питомца, сцены и целей. */
+    fun pixelArt(): PixelArt = pixelArtCache
+
     /** Справочный раздел с объяснением основных терминов (ТЗ 2.5.11). */
     fun glossary(): List<GlossaryEntry> = glossaryCache
 
@@ -85,5 +92,8 @@ class ContentRepository(private val source: AssetSource) {
         const val FILE_TASKS = "tasks.json"
         const val FILE_PET_PARTS = "pet_parts.json"
         const val FILE_GLOSSARY = "glossary.json"
+
+        /** Собирается из `art/pixel` командой `python art/pixel/tools/build.py`. */
+        const val FILE_PIXEL_ART = "pixel_art.json"
     }
 }

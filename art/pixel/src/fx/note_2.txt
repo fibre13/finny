@@ -1,0 +1,7 @@
+# 4 5
+# pivot 2 2
+.KK.
+.KuK
+KuuK
+KuK.
+.K..

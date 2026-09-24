@@ -1,0 +1,8 @@
+# 7 6
+# pivot 3 3
+.KK.KK.
+KPPKPPK
+KPPPPpK
+.KPPpK.
+..KpK..
+...K...

@@ -214,6 +214,8 @@ fun MainScreen(
                     joy = game.pet.joy.level,
                     scene = true,
                     house = state.hasScenery("house"),
+                    // В сцене одно место под предмет цели: последняя полученная.
+                    goalId = state.achievedGoalIds.lastOrNull(),
                     caption = false,
                 )
                 SupportingText(caption, modifier = Modifier.padding(top = 12.dp))

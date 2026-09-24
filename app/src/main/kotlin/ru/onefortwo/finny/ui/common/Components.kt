@@ -2,7 +2,6 @@ package ru.onefortwo.finny.ui.common
 
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -92,7 +91,6 @@ import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.FeedbackMessage
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.theme.LightFinnyColors
-import ru.onefortwo.finny.ui.theme.LocalSceneColors
 import ru.onefortwo.finny.ui.theme.PillShape
 
 /**
@@ -741,10 +739,11 @@ fun SelectButton(
 /**
  * Компактный вариант выбора для экранов, которые должны помещаться
  * целиком: подпись по центру, над ней — необязательный образец цвета.
- * Выбранный выделен фоном, обводкой 2,5 dp и галочкой рядом с подписью,
- * без строки «✓ выбрано». Состояние читается без цвета — по галочке и
- * толщине обводки, а программа чтения с экрана произносит «выбрано»
- * (ТЗ 3.6).
+ * Выбранный выделен фоном, обводкой 2,5 dp и галочкой в правом верхнем
+ * углу, без строки «✓ выбрано». Галочка стоит в углу, а не рядом с
+ * подписью: в плитке шириной около 90 dp «Шарфик» с галочкой в строку
+ * не помещался. Состояние читается без цвета — по галочке и толщине
+ * обводки, а программа чтения с экрана произносит «выбрано» (ТЗ 3.6).
  */
 @Composable
 fun CheckOption(
@@ -757,7 +756,7 @@ fun CheckOption(
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.small
 
-    Column(
+    Box(
         modifier = modifier
             .heightIn(min = MinTouchTarget)
             .clip(shape)
@@ -768,26 +767,31 @@ fun CheckOption(
                 shape = shape,
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .semantics { stateDescription = if (selected) "выбрано" else "не выбрано" }
-            .padding(horizontal = 6.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .semantics { stateDescription = if (selected) "выбрано" else "не выбрано" },
+        contentAlignment = Alignment.Center,
     ) {
-        if (swatch != null) {
-            swatch()
-            Spacer(modifier = Modifier.size(4.dp))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (swatch != null) {
+                swatch()
+                Spacer(modifier = Modifier.size(4.dp))
+            }
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f, fill = false),
             )
-            if (selected) {
-                Spacer(modifier = Modifier.width(4.dp))
-                CheckIcon(color = colors.primary, size = 16.dp)
-            }
+        }
+        if (selected) {
+            CheckIcon(
+                color = colors.primary,
+                size = 16.dp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 5.dp, end = 5.dp),
+            )
         }
     }
 }
@@ -1576,8 +1580,8 @@ private fun StepButton(
 // --- Питомец -----------------------------------------------------------------
 
 /**
- * Изображение питомца. Сам рисунок и сцена — существующая графика
- * приложения и не меняются; здесь только рамка вокруг них.
+ * Изображение питомца: пиксельная фигура на карточке или в сцене
+ * (`art/pixel`, см. [composePet] и [composeScene]).
  */
 @Composable
 fun PetFigure(
@@ -1592,27 +1596,28 @@ fun PetFigure(
     care: StatLevel = StatLevel.MEDIUM,
     joy: StatLevel = StatLevel.MEDIUM,
     /**
-     * Показывать фон-сцену за фигурой. На главном экране — да; на экранах
+     * Показывать фон-сцену за фигурой. В окне «… дома» — да; на экранах
      * выбора внешности и гардероба фигура показывается без сцены, чтобы
      * ничто не спорило с выбором окраса и украшения.
      */
     scene: Boolean = false,
     /**
-     * Показывать дом питомца на фоне. Появляется после покупки
+     * Показывать домик-палатку в сцене. Появляется после покупки
      * «Домика-палатки» и остаётся навсегда.
      */
     house: Boolean = false,
+    /** Полученная цель: её предмет стоит в сцене между палаткой и питомцем. */
+    goalId: String? = null,
     size: Dp = 140.dp,
     /** Подписи с именем и стадией под рисунком. */
     caption: Boolean = true,
 ) {
+    val art = rememberPixelArt()
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val base = parseColor(colorHex)
-        val sceneColors = LocalSceneColors.current
-
         // Фигура озвучивается одной фразой: для программы чтения с экрана
         // это один объект.
         val describePet = Modifier.semantics(mergeDescendants = true) {
@@ -1620,66 +1625,40 @@ fun PetFigure(
         }
 
         if (scene) {
-            // Питомец стоит внутри сцены, а не поверх неё: дом занимает
-            // левую часть, дерево середину, питомец правую.
+            // В альбомной ориентации высота мала: верхние строки неба
+            // срезаются, а фигуры остаются прежнего размера.
             val landscape = LocalConfiguration.current.orientation ==
                 Configuration.ORIENTATION_LANDSCAPE
-            val topCrop = if (landscape) SCENE_TOP_CROP_LANDSCAPE else 0f
-            val shape = MaterialTheme.shapes.medium
+            val cropTop = if (landscape) SCENE_TOP_CROP_LANDSCAPE else 0
+            val image = remember(art, speciesId, stage, colorHex, accessoryId, care, joy, house, goalId) {
+                val pet = composePet(art, speciesId, stage, colorHex, accessoryId, care, joy, inScene = true)
+                pixelImage(composeScene(art, house, goalId, pet), art.sceneWidth)
+            }
 
-            Canvas(
+            PixelImage(
+                image = image,
+                cropTop = cropTop,
+                background = Color(art.colors[art.indexOf('A')]),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(sceneAspect(topCrop))
-                    .clip(shape)
-                    .background(FinnyTheme.colors.appBackground)
+                    .aspectRatio(art.sceneWidth.toFloat() / (art.sceneHeight - cropTop))
+                    .clip(MaterialTheme.shapes.medium)
                     .then(describePet),
-            ) {
-                drawScene(
-                    primary = sceneColors.primary,
-                    secondary = sceneColors.secondary,
-                    surface = sceneColors.surface,
-                    onBackground = sceneColors.onBackground,
-                    ink = sceneColors.ink,
-                    night = false,
-                    house = house,
-                    topCrop = topCrop,
-                ) {
-                    drawPet(
-                        speciesId = speciesId,
-                        baseColor = base,
-                        accessoryId = accessoryId,
-                        stage = stage,
-                        care = care,
-                        joy = joy,
-                        fitToCanvas = false,
-                        outlineColor = sceneColors.ink,
-                    )
-                }
-            }
+            )
         } else {
-            val petShape = MaterialTheme.shapes.large
+            val image = remember(art, speciesId, stage, colorHex, accessoryId, care, joy) {
+                pixelImage(composePet(art, speciesId, stage, colorHex, accessoryId, care, joy), art.petSize)
+            }
 
             Box(
                 modifier = Modifier
                     .size(size)
-                    .clip(petShape)
+                    .clip(MaterialTheme.shapes.large)
                     .background(FinnyTheme.colors.surface)
                     .then(describePet),
                 contentAlignment = Alignment.Center,
             ) {
-                // Доля 118 к 140 взята из канвы: фигура не упирается в рамку.
-                Canvas(modifier = Modifier.size(size * 0.84f)) {
-                    drawPet(
-                        speciesId = speciesId,
-                        baseColor = base,
-                        accessoryId = accessoryId,
-                        stage = stage,
-                        care = care,
-                        joy = joy,
-                        outlineColor = sceneColors.ink,
-                    )
-                }
+                PixelImage(image = image, modifier = Modifier.fillMaxSize())
             }
         }
         if (caption) {
@@ -1696,6 +1675,9 @@ fun PetFigure(
         }
     }
 }
+
+/** Срез верхних строк неба в альбомной ориентации. */
+private const val SCENE_TOP_CROP_LANDSCAPE = 7
 
 /** Подпись питомца: «Малыш · бантик». */
 fun petCaption(stage: GrowthStage, accessoryTitle: String): String =
