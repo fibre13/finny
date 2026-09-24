@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithContentDescription
 import java.io.File
 import androidx.compose.foundation.layout.Box
@@ -94,9 +95,54 @@ class ScreenRenderTest {
             FinnyTheme { OnboardingScreen(onContinue = {}) }
         }
 
-        compose.onNodeWithText("Решение 1. Купить нужное").assertIsDisplayed()
-        compose.onNodeWithText("Решение 2. Купить желаемое").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Решение 3. Отложить в копилку").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("1. Купить нужное").assertIsDisplayed()
+        compose.onNodeWithText("2. Купить желаемое").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("3. Отложить в копилку").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `шаги знакомства помещаются на телефоне 360 на 800 без прокрутки`() {
+        // Эталонный телефон 720 × 1600, 320 dpi: под строкой состояния
+        // (24 dp) и системной панелью (48 dp) экрану остаётся 728 dp.
+        var step by mutableStateOf(1)
+        compose.setContent {
+            FinnyTheme {
+                Box(modifier = Modifier.height(728.dp)) {
+                    if (step == 1) {
+                        OnboardingScreen(onContinue = {}, step = 1)
+                    } else {
+                        PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> })
+                    }
+                }
+            }
+        }
+        val limit = with(compose.density) { 728.dp.toPx() }
+        fun assertFits(button: String) {
+            val bottom = compose.onNodeWithText(button).fetchSemanticsNode().boundsInRoot.bottom
+            assertTrue("Кнопка «$button» ниже края экрана: $bottom > $limit", bottom <= limit)
+        }
+
+        assertFits("Дальше")
+
+        step = 2
+        compose.waitForIdle()
+        assertFits("Выбрать")
+
+        // Шаг 3 до выбора — худший случай: под кнопкой причина её недоступности.
+        compose.onNodeWithText("Выбрать").performClick()
+        assertFits("Проверить выбор")
+        // Причина выводится; её положение здесь не проверяется: Robolectric
+        // отводит каждой строке текста около 35 px независимо от стиля, и
+        // высоты получаются больше, чем на устройстве. Поэтому проверка
+        // кнопок строже реальной: на эмуляторе 360 × 800 причина помещается.
+        compose.onNodeWithText("Выбери задания и придумай имя, и кнопка станет доступной.")
+            .assertExists()
+
+        compose.onNodeWithText("Попроще").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Финни")
+        compose.onNodeWithText("Проверить выбор").performClick()
+        assertFits("Начать первый день")
     }
 
     @Test

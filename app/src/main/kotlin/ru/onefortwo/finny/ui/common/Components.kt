@@ -655,6 +655,13 @@ fun SelectButton(
     selectedSuffix: String = "выбрано",
     supporting: String? = null,
     leading: (@Composable () -> Unit)? = null,
+    /**
+     * Компактный вид для экранов, которые должны помещаться целиком:
+     * без круглой отметки слева и строки «✓ выбрано»; выбранный отмечен
+     * галочкой справа и обводкой 2,5 dp. Программа чтения с экрана
+     * по-прежнему произносит состояние.
+     */
+    compact: Boolean = false,
 ) {
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.small
@@ -672,7 +679,7 @@ fun SelectButton(
                 },
             )
             .border(
-                width = if (selected) 2.dp else 1.5.dp,
+                width = if (selected) (if (compact) 2.5.dp else 2.dp) else 1.5.dp,
                 color = when {
                     !enabled -> colors.disabledContainer
                     selected -> colors.primary
@@ -687,11 +694,13 @@ fun SelectButton(
                 onClick = onClick,
             )
             .semantics { stateDescription = if (selected) selectedSuffix else "не $selectedSuffix" }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = if (compact) 14.dp else 16.dp, vertical = if (compact) 10.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SelectionMark(selected = selected, enabled = enabled)
-        Spacer(modifier = Modifier.width(12.dp))
+        if (!compact) {
+            SelectionMark(selected = selected, enabled = enabled)
+            Spacer(modifier = Modifier.width(12.dp))
+        }
         if (leading != null) {
             leading()
             Spacer(modifier = Modifier.width(12.dp))
@@ -699,19 +708,85 @@ fun SelectButton(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = text,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
                 color = if (enabled) colors.onSurface else colors.disabledContent,
             )
             if (supporting != null) {
-                SupportingText(supporting)
+                if (compact) {
+                    Text(
+                        text = supporting,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                        color = LocalMutedColor.current,
+                    )
+                } else {
+                    SupportingText(supporting)
+                }
             }
-            if (selected) {
+            if (selected && !compact) {
                 Text(
                     text = "✓ $selectedSuffix",
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.successText,
                     modifier = Modifier.clearAndSetSemantics { },
                 )
+            }
+        }
+        if (compact && selected) {
+            Spacer(modifier = Modifier.width(10.dp))
+            CheckIcon(color = colors.primary)
+        }
+    }
+}
+
+/**
+ * Компактный вариант выбора для экранов, которые должны помещаться
+ * целиком: подпись по центру, над ней — необязательный образец цвета.
+ * Выбранный выделен фоном, обводкой 2,5 dp и галочкой рядом с подписью,
+ * без строки «✓ выбрано». Состояние читается без цвета — по галочке и
+ * толщине обводки, а программа чтения с экрана произносит «выбрано»
+ * (ТЗ 3.6).
+ */
+@Composable
+fun CheckOption(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    swatch: (@Composable () -> Unit)? = null,
+) {
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.small
+
+    Column(
+        modifier = modifier
+            .heightIn(min = MinTouchTarget)
+            .clip(shape)
+            .background(if (selected) colors.selectedContainer else colors.surface)
+            .border(
+                width = if (selected) 2.5.dp else 1.5.dp,
+                color = if (selected) colors.primary else colors.outline,
+                shape = shape,
+            )
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .semantics { stateDescription = if (selected) "выбрано" else "не выбрано" }
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (swatch != null) {
+            swatch()
+            Spacer(modifier = Modifier.size(4.dp))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (selected) {
+                Spacer(modifier = Modifier.width(4.dp))
+                CheckIcon(color = colors.primary, size = 16.dp)
             }
         }
     }

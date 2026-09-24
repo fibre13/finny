@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,18 +12,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.ui.common.BudgetDirectionIcon
 import ru.onefortwo.finny.ui.common.CardTone
+import ru.onefortwo.finny.ui.common.IconTile
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SectionCard
@@ -39,6 +46,9 @@ const val ONBOARDING_STEPS = 4
  * доступен и позже, с главного экрана, как подсказка «Как играть»:
  * тогда шагов над заголовком нет, а внизу кнопка возврата.
  *
+ * Три решения — строки одной карточки, а не три карточки: на телефоне
+ * 360 × 800 dp экран помещается целиком вместе с кнопкой.
+ *
  * @param step номер шага знакомства либо `null`, если экран открыт
  * как подсказка.
  */
@@ -53,60 +63,85 @@ fun OnboardingScreen(
         title = "Как играть",
         onBack = onBack,
         top = step?.let { { StepProgress(step = it) } },
+        bottomPadding = 16.dp,
     ) {
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SupportingText(
-                text = "У тебя есть питомец Финни и монеты на каждый день. " +
+                "У тебя есть питомец Финни и монеты на каждый день. " +
                     "Монет мало, а хочется многого — поэтому каждый день ты решаешь, на что их потратить.",
-                modifier = Modifier.padding(bottom = 16.dp),
             )
 
             SectionCard(
-                title = "Решение 1. Купить нужное",
-                tone = CardTone.Sage,
-                icon = { BudgetDirectionIcon(BudgetCategory.NEEDS, size = 32.dp) },
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                bottomSpacing = 0.dp,
             ) {
-                SupportingText(
-                    "Корм, вода, уход. Без этого Финни грустит и голодает. " +
-                        "Нужное покупают первым.",
-                )
+                Column {
+                    DecisionRow(
+                        category = BudgetCategory.NEEDS,
+                        tile = FinnyTheme.colors.selectedContainer,
+                        title = "1. Купить нужное",
+                        text = "Корм, вода, уход. Без этого Финни грустит. Покупают первым.",
+                    )
+                    DecisionDivider()
+                    DecisionRow(
+                        category = BudgetCategory.WANTS,
+                        tile = FinnyTheme.colors.coinContainer,
+                        title = "2. Купить желаемое",
+                        text = "Игрушки и украшения радуют Финни. Их можно отложить на завтра — это не ошибка.",
+                    )
+                    DecisionDivider()
+                    DecisionRow(
+                        category = BudgetCategory.SAVINGS,
+                        tile = FinnyTheme.colors.appBackground,
+                        title = "3. Отложить в копилку",
+                        text = "Копилка растёт понемногу и приближает цель — например, самокат.",
+                    )
+                }
             }
 
             SectionCard(
-                title = "Решение 2. Купить желаемое",
-                tone = CardTone.Coin,
-                icon = { BudgetDirectionIcon(BudgetCategory.WANTS, size = 32.dp) },
+                tone = CardTone.Primary,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                bottomSpacing = 0.dp,
             ) {
-                SupportingText(
-                    "Игрушки и украшения. Они радуют Финни. " +
-                        "Если монет мало, желаемое можно отложить на завтра — это не ошибка.",
-                )
-            }
-
-            SectionCard(
-                title = "Решение 3. Отложить в копилку",
-                icon = { BudgetDirectionIcon(BudgetCategory.SAVINGS, size = 32.dp) },
-            ) {
-                SupportingText(
-                    "Копилка растёт понемногу и приближает цель — например, самокат для Финни.",
-                )
-            }
-
-            SectionCard(tone = CardTone.Primary) {
                 Text(
                     text = "Ошибиться не страшно: прогресс не пропадёт, а исправить всё можно " +
                         "на следующий день.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = CompactBody,
                 )
             }
 
-            PrimaryButton(
-                text = continueText,
-                onClick = onContinue,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            PrimaryButton(text = continueText, onClick = onContinue)
         }
     }
+}
+
+/** Основной текст с межстрочным 22 sp: строки решений плотнее обычного абзаца. */
+private val CompactBody
+    @Composable get() = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
+
+/** Строка решения: значок направления в плитке его цвета, заголовок, пояснение. */
+@Composable
+private fun DecisionRow(category: BudgetCategory, tile: Color, title: String, text: String) {
+    Row(modifier = Modifier.padding(vertical = 10.dp)) {
+        IconTile(size = 40.dp, container = tile) {
+            BudgetDirectionIcon(category, size = 22.dp)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(text = text, style = CompactBody, color = FinnyTheme.colors.onSurfaceMuted)
+        }
+    }
+}
+
+@Composable
+private fun DecisionDivider() {
+    HorizontalDivider(color = FinnyTheme.colors.onSurface.copy(alpha = 0.1f))
 }
 
 /**
