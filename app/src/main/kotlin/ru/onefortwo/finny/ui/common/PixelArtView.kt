@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -20,6 +21,7 @@ import ru.onefortwo.finny.content.PixelSprite
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.StatLevel
 import kotlin.math.atan2
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
 
@@ -227,8 +229,81 @@ private fun outlinePoint(art: PixelArt, sprite: PixelSprite, point: Int, of: Int
 }
 
 /**
- * Сцена 180 × 100: небо, земля, палатка (после покупки домика), предмет
- * полученной цели и питомец в правой части.
+ * Самочувствие питомца для панели в небе сцены: значения 0…100 и признак
+ * низкого уровня (деления тогда коралловые).
+ */
+data class SceneStats(val care: Int, val careLow: Boolean, val joy: Int, val joyLow: Boolean)
+
+/** Ширина и высота панели самочувствия в клетках. */
+const val STATS_PANEL_WIDTH = 31
+const val STATS_PANEL_HEIGHT = 20
+
+/**
+ * Панель самочувствия отдельным изображением: на экране она выводится
+ * вдвое крупнее сцены, иначе деления при увеличении сцены ×3 — около
+ * 4 × 6 dp и ребёнку не читаются.
+ */
+fun composeStats(art: PixelArt, stats: SceneStats): IntArray {
+    val canvas = PixelCanvas(STATS_PANEL_WIDTH, STATS_PANEL_HEIGHT)
+    canvas.drawStats(art, 0, 0, stats)
+    return canvas.pixels
+}
+
+/** Деления полоски: 5 штук, заполнено по 20 единиц на деление. */
+private const val STAT_SEGMENTS = 5
+
+/**
+ * Панель «Забота» и «Радость» 31 × 20 клеток: миска и сердечко, рядом —
+ * по 5 делений. Уровень читается по числу закрашенных делений, а не
+ * только по цвету; словами его произносит программа чтения с экрана.
+ */
+private fun PixelCanvas.drawStats(art: PixelArt, left: Int, top: Int, stats: SceneStats) {
+    val c = { ch: Char -> art.colors[art.indexOf(ch)] }
+    val panelWidth = STATS_PANEL_WIDTH
+    val panelHeight = STATS_PANEL_HEIGHT
+    for (y in 0 until panelHeight) {
+        for (x in 0 until panelWidth) {
+            val corner = (x == 0 || x == panelWidth - 1) && (y == 0 || y == panelHeight - 1)
+            if (corner) continue
+            val border = x == 0 || y == 0 || x == panelWidth - 1 || y == panelHeight - 1
+            val tx = left + x
+            val ty = top + y
+            if (tx in 0 until width && ty in 0 until height) {
+                pixels[ty * width + tx] = if (border) c('K') else c('c')
+            }
+        }
+    }
+    fun row(iconId: String, value: Int, low: Boolean, fill: Char, y: Int) {
+        art.sprite(iconId)?.let { draw(it, left + 2, y, { index -> art.colors[index] }) }
+        val filled = ((value + 19) / 20).coerceIn(0, STAT_SEGMENTS)
+        repeat(STAT_SEGMENTS) { i ->
+            val color = when {
+                i >= filled -> c('z')
+                low -> c('R')
+                else -> c(fill)
+            }
+            for (dy in 0 until 4) for (dx in 0 until 3) {
+                val tx = left + 10 + i * 4 + dx
+                val ty = y + 1 + dy
+                if (tx in 0 until width && ty in 0 until height) pixels[ty * width + tx] = color
+            }
+        }
+    }
+    row("icon_care", stats.care, stats.careLow, 'E', top + 2)
+    row("heart_0", stats.joy, stats.joyLow, 'P', top + 11)
+}
+
+/** Левый край основной сцены 180 × 100 в изображении с боковыми полосами. */
+fun sceneCoreLeft(art: PixelArt): Int = art.sprite("edge_left")?.width ?: 0
+
+/** Ширина сцены вместе с боковыми полосами. */
+fun sceneFullWidth(art: PixelArt): Int = sceneCoreLeft(art) + art.sceneWidth + (art.sprite("edge_right")?.width ?: 0)
+
+/**
+ * Сцена 180 × 100 с боковыми полосами по 40 клеток: небо, земля, палатка
+ * (после покупки домика), предмет полученной цели и питомец в правой
+ * части. Полосы продолжают холмы, луг и крону дерева, когда окно шире
+ * основной сцены; координаты якорей — в клетках основной сцены.
  *
  * @param skyFrame кадр неба: облака сдвинуты на клетку во втором.
  * @param stickers наклейки на палатке (после покупки «Наклеек»).
@@ -241,24 +316,27 @@ fun composeScene(
     skyFrame: Int = 0,
     stickers: Boolean = false,
 ): IntArray {
-    val canvas = PixelCanvas(art.sceneWidth, art.sceneHeight)
+    val ox = sceneCoreLeft(art)
+    val canvas = PixelCanvas(sceneFullWidth(art), art.sceneHeight)
     val plain: (Int) -> Int = { art.colors[it] }
 
+    art.sprite("edge_left")?.let { canvas.draw(it, 0, 0, plain) }
+    art.sprite("edge_right")?.let { canvas.draw(it, ox + art.sceneWidth, 0, plain) }
     val sky = art.animation.skyFrames.getOrNull(skyFrame) ?: "sky"
-    (art.sprite(sky) ?: art.sprite("sky"))?.let { canvas.draw(it, 0, 0, plain) }
-    art.sprite("ground")?.let { canvas.draw(it, 0, 0, plain) }
+    (art.sprite(sky) ?: art.sprite("sky"))?.let { canvas.draw(it, ox, 0, plain) }
+    art.sprite("ground")?.let { canvas.draw(it, ox, 0, plain) }
     if (house) {
         val at = art.sceneAnchors["tent"]
-        art.sprite("tent")?.let { if (at != null) canvas.draw(it, at.x, at.y, plain) }
-        if (stickers) art.sprite("tent_stickers")?.let { if (at != null) canvas.draw(it, at.x, at.y, plain) }
+        art.sprite("tent")?.let { if (at != null) canvas.draw(it, ox + at.x, at.y, plain) }
+        if (stickers) art.sprite("tent_stickers")?.let { if (at != null) canvas.draw(it, ox + at.x, at.y, plain) }
     }
     if (goalId != null) {
         val at = art.sceneAnchors["goal"]
-        art.sprite(goalId)?.let { if (at != null) canvas.draw(it, at.x - it.pivotX, at.y - it.pivotY, plain) }
+        art.sprite(goalId)?.let { if (at != null) canvas.draw(it, ox + at.x - it.pivotX, at.y - it.pivotY, plain) }
     }
     art.sceneAnchors["pet"]?.let { at ->
         // Точка привязки фигуры — середина базовой линии холста 48 × 48.
-        canvas.drawAll(pet, art.petSize, at.x - art.petSize / 2, at.y - art.baseline)
+        canvas.drawAll(pet, art.petSize, ox + at.x - art.petSize / 2, at.y - art.baseline)
     }
     return canvas.pixels
 }
@@ -297,6 +375,14 @@ fun pixelImage(pixels: IntArray, width: Int): ImageBitmap =
  * @param cropTop сколько верхних строк не показывать (сцена в альбомной
  * ориентации).
  * @param background цвет полей вокруг изображения.
+ * @param extendEdges поля заполняются продолжением краёв изображения:
+ * над сценой — небо, под ней — трава, по бокам — крайние столбцы
+ * боковых полос (ровные небо, холм и луг).
+ * @param coreLeft левый край и [coreWidth] ширина основной части
+ * изображения: увеличение подбирается по ней, а по бокам показывается
+ * столько боковых полос, сколько помещается по ширине.
+ * @param overlay рисование поверх изображения: увеличение и положение
+ * левого верхнего угла основной части на экране.
  */
 @Composable
 fun PixelImage(
@@ -304,20 +390,50 @@ fun PixelImage(
     modifier: Modifier = Modifier,
     cropTop: Int = 0,
     background: Color = Color.Transparent,
+    extendEdges: Boolean = false,
+    coreLeft: Int = 0,
+    coreWidth: Int = image.width,
+    overlay: DrawScope.(scale: Int, left: Int, top: Int) -> Unit = { _, _, _ -> },
 ) {
     Canvas(modifier = modifier) {
         val srcHeight = image.height - cropTop
-        val scale = floor(min(size.width / image.width, size.height / srcHeight)).toInt().coerceAtLeast(1)
-        val width = image.width * scale
+        val scale = floor(min(size.width / coreWidth, size.height / srcHeight)).toInt().coerceAtLeast(1)
+        val visible = min(image.width, ceil(size.width / scale).toInt())
+        val srcLeft = (coreLeft + coreWidth / 2 - visible / 2).coerceIn(0, image.width - visible)
+        val width = visible * scale
         val height = srcHeight * scale
+        val left = ((size.width - width) / 2).toInt()
+        val top = ((size.height - height) / 2).toInt()
+        val right = size.width.toInt() - left - width
+        val bottom = size.height.toInt() - top - height
         if (background != Color.Transparent) drawRect(background)
+        if (extendEdges) {
+            fun edge(src: IntOffset, srcSize: IntSize, dst: IntOffset, dstSize: IntSize) {
+                if (dstSize.width > 0 && dstSize.height > 0) {
+                    drawImage(image, src, srcSize, dst, dstSize, filterQuality = FilterQuality.None)
+                }
+            }
+            // Сначала бока на высоту изображения, затем верх и низ на всю
+            // ширину области — вместе с углами.
+            edge(IntOffset(srcLeft, cropTop), IntSize(1, srcHeight), IntOffset(0, top), IntSize(left, height))
+            edge(
+                IntOffset(srcLeft + visible - 1, cropTop), IntSize(1, srcHeight),
+                IntOffset(left + width, top), IntSize(right, height),
+            )
+            edge(IntOffset(srcLeft, cropTop), IntSize(visible, 1), IntOffset(0, 0), IntSize(size.width.toInt(), top))
+            edge(
+                IntOffset(srcLeft, image.height - 1), IntSize(visible, 1),
+                IntOffset(0, top + height), IntSize(size.width.toInt(), bottom),
+            )
+        }
         drawImage(
             image = image,
-            srcOffset = IntOffset(0, cropTop),
-            srcSize = IntSize(image.width, srcHeight),
-            dstOffset = IntOffset(((size.width - width) / 2).toInt(), ((size.height - height) / 2).toInt()),
+            srcOffset = IntOffset(srcLeft, cropTop),
+            srcSize = IntSize(visible, srcHeight),
+            dstOffset = IntOffset(left, top),
             dstSize = IntSize(width, height),
             filterQuality = FilterQuality.None,
         )
+        overlay(scale, left + (coreLeft - srcLeft) * scale, top - cropTop * scale)
     }
 }

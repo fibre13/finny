@@ -204,11 +204,14 @@ class ScreenRenderTest {
         compose.onNodeWithText("Финни").assertIsDisplayed()
         compose.onNodeWithText("Можно потратить").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("В копилке").performScrollTo().assertIsDisplayed()
-        // Стартовое значение 60 — средний уровень. Уровень назван словом:
-        // пиктограмма рядом его только дублирует и текст не заменяет
-        // (ТЗ 3.6: состояние читается не по цвету и не по рисунку).
-        compose.onNodeWithText("Забота: В порядке").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Радость: Спокойный").performScrollTo().assertIsDisplayed()
+        // Стартовое значение 60 — средний уровень. На экране он показан
+        // числом делений панели в сцене (не только цветом), словами — в
+        // описании сцены для программы чтения с экрана (ТЗ 3.6).
+        compose.onNodeWithContentDescription("Забота: В порядке, 60 из 100", substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        compose.onNodeWithContentDescription("Радость: Спокойный, 60 из 100", substring = true)
+            .assertIsDisplayed()
     }
 
     @Test
@@ -858,7 +861,7 @@ class ScreenRenderTest {
         val limit = with(compose.density) { 536.dp.toPx() }
         assertTrue("Кнопка «Закончить день» ниже края экрана: $bottom > $limit", bottom <= limit)
         compose.onNodeWithText("Можно потратить").assertIsDisplayed()
-        compose.onNodeWithText("Забота: В порядке").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Забота: В порядке", substring = true).assertIsDisplayed()
     }
 
     @Test

@@ -238,6 +238,7 @@ private fun AppNavHost(
                 activeTask = activeTask,
                 reaction = reactions.firstOrNull(),
                 onReactionPlayed = viewModel::reactionPlayed,
+                onOpenPet = { navController.openTab(NavSection.PET) },
                 goalTitle = goalTitle,
                 onDismissMessage = viewModel::dismissMessage,
                 onOpenPlan = { navController.navigate(Routes.PLAN) },

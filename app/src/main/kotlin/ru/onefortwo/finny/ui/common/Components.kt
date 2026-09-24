@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -79,6 +80,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpOffset
@@ -1351,45 +1354,6 @@ fun StatBar(
     }
 }
 
-/**
- * Компактная строка показателя для экрана без прокрутки: значок уровня,
- * «Забота: В порядке» и полоса 8 dp. Число «60 из 100» на экране не
- * выводится, но произносится программой чтения с экрана; уровень назван
- * словом, поэтому состояние не передаётся одним цветом (ТЗ 3.6).
- */
-@Composable
-fun StatLine(
-    name: String,
-    value: Int,
-    label: String,
-    level: StatLevel,
-    modifier: Modifier = Modifier,
-) {
-    val colors = FinnyTheme.colors
-
-    Column(
-        modifier = modifier.semantics(mergeDescendants = true) {
-            contentDescription = "$name: $label, $value из 100"
-        },
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatLevelIcon(level = level, size = 20.dp, modifier = Modifier.padding(end = 4.dp))
-            Text(
-                text = "$name: $label",
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        ProgressBar(
-            fraction = value / 100f,
-            height = 8.dp,
-            color = if (level == StatLevel.LOW) colors.attention else colors.success,
-        )
-    }
-}
-
 /** Полоса заполнения: дорожка 10 dp со скруглёнными краями. */
 @Composable
 fun ProgressBar(
@@ -1618,6 +1582,15 @@ fun PetFigure(
     /** Реакция на событие игры; по окончании вызывается [onReactionEnd]. */
     reaction: PetReaction? = null,
     onReactionEnd: (Long) -> Unit = {},
+    /** Панель «Забота» и «Радость» в небе сцены (главный экран). */
+    stats: SceneStats? = null,
+    /** Описание для программы чтения с экрана вместо «вид, украшение». */
+    description: String? = null,
+    /**
+     * Сцена занимает всю отведённую область: увеличение подбирается под
+     * ширину и высоту, поля — продолжение неба, холмов и травы.
+     */
+    fillArea: Boolean = false,
 ) {
     val art = rememberPixelArt()
     val motion = rememberPetMotion(art.animation, care, joy, reaction, onReactionEnd)
@@ -1629,7 +1602,7 @@ fun PetFigure(
         // Фигура озвучивается одной фразой: для программы чтения с экрана
         // это один объект.
         val describePet = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "$speciesTitle, $accessoryTitle"
+            contentDescription = description ?: "$speciesTitle, $accessoryTitle"
         }
 
         if (scene) {
@@ -1651,17 +1624,50 @@ fun PetFigure(
                 )
                 pixelImage(
                     composeScene(art, house, goalId, pet, skyFrame = motion.sky, stickers = stickers),
-                    art.sceneWidth,
+                    sceneFullWidth(art),
                 )
             }
+
+            val statsImage = remember(art, stats) {
+                stats?.let { pixelImage(composeStats(art, it), STATS_PANEL_WIDTH) }
+            }
+            val statsAt = art.sceneAnchors["stats"]
 
             PixelImage(
                 image = image,
                 cropTop = cropTop,
                 background = Color(art.colors[art.indexOf('A')]),
+                extendEdges = fillArea,
+                coreLeft = sceneCoreLeft(art),
+                coreWidth = art.sceneWidth,
+                overlay = { scale, left, top ->
+                    if (statsImage != null && statsAt != null) {
+                        // Клетка панели в полтора раза крупнее клетки сцены,
+                        // округлённо вниз до целых пикселей: при сцене ×3
+                        // деления иначе около 4 × 6 dp. Место в небе подобрано
+                        // так, что панель не задевает солнце, холмы, палатку
+                        // и питомца в прыжке (точка stats в anchors.json).
+                        val cell = scale * 3 / 2
+                        drawImage(
+                            image = statsImage,
+                            srcOffset = IntOffset.Zero,
+                            srcSize = IntSize(STATS_PANEL_WIDTH, STATS_PANEL_HEIGHT),
+                            dstOffset = IntOffset(left + statsAt.x * scale, top + statsAt.y * scale),
+                            dstSize = IntSize(STATS_PANEL_WIDTH * cell, STATS_PANEL_HEIGHT * cell),
+                            filterQuality = FilterQuality.None,
+                        )
+                    }
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(art.sceneWidth.toFloat() / (art.sceneHeight - cropTop))
+                    .then(
+                        if (fillArea) {
+                            Modifier.fillMaxSize()
+                        } else {
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(art.sceneWidth.toFloat() / (art.sceneHeight - cropTop))
+                        },
+                    )
                     .clip(MaterialTheme.shapes.medium)
                     .then(describePet),
             )

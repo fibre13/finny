@@ -9,7 +9,10 @@ import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.common.SceneStats
 import ru.onefortwo.finny.ui.common.composeGoal
+import ru.onefortwo.finny.ui.common.composeStats
+import ru.onefortwo.finny.ui.common.sceneFullWidth
 import ru.onefortwo.finny.ui.common.composePet
 import ru.onefortwo.finny.ui.common.composeScene
 
@@ -62,7 +65,7 @@ class PixelArtComposeTest {
             inScene = true,
         )
         val bare = composeScene(art, house = false, goalId = null, pet = pet)
-        assertEquals(art.sceneWidth * art.sceneHeight, bare.size)
+        assertEquals(sceneFullWidth(art) * art.sceneHeight, bare.size)
         assertFalse(bare.contentEquals(composeScene(art, house = true, goalId = null, pet = pet)))
         content.goals().forEach { goal ->
             assertFalse(
@@ -71,5 +74,22 @@ class PixelArtComposeTest {
             )
             assertTrue("Нет иллюстрации цели ${goal.id}", composeGoal(art, goal.id) != null)
         }
+    }
+
+    @Test
+    fun `панель самочувствия показывает уровень числом делений, низкий — коралловым`() {
+        val coral = art.colors[art.indexOf('R')]
+        val green = art.colors[art.indexOf('E')]
+        val empty = art.colors[art.indexOf('z')]
+        // Деление 3 × 4 клетки: считается число клеток нужного цвета.
+        val cellsPerSegment = 12
+        val full = composeStats(art, SceneStats(care = 100, careLow = false, joy = 100, joyLow = false))
+        val low = composeStats(art, SceneStats(care = 20, careLow = true, joy = 60, joyLow = false))
+
+        assertEquals(0, full.count { it == empty })
+        assertTrue("Нет зелёных делений заботы", full.count { it == green } >= 5 * cellsPerSegment)
+        assertEquals("Одно деление низкой заботы", cellsPerSegment, low.count { it == coral })
+        // Забота 20 — одно деление из пяти, радость 60 — три: пустых 4 + 2.
+        assertEquals(6 * cellsPerSegment, low.count { it == empty })
     }
 }

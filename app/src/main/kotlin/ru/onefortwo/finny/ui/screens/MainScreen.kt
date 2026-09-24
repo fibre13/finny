@@ -5,9 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,10 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,16 +30,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.PetPartsContent
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.economy.PetStatKind
+import ru.onefortwo.finny.economy.StatLevel
 import ru.onefortwo.finny.ui.common.AdaptiveGrid
 import ru.onefortwo.finny.ui.common.ChevronIcon
 import ru.onefortwo.finny.ui.common.fillRemaining
 import ru.onefortwo.finny.ui.common.Eyebrow
-import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.HeaderIconButton
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.LineGlyph
@@ -56,7 +49,7 @@ import ru.onefortwo.finny.ui.common.PetFigure
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
-import ru.onefortwo.finny.ui.common.StatLine
+import ru.onefortwo.finny.ui.common.SceneStats
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.softShadow
 import ru.onefortwo.finny.ui.state.AppState
@@ -67,10 +60,6 @@ import ru.onefortwo.finny.ui.theme.FinnyTheme
 /** Промежуток между блоками главного экрана. */
 private val BlockGap = 8.dp
 
-/** Пределы фигуры питомца: она уступает высоту остальным блокам. */
-private val FigureMax = 96.dp
-private val FigureMin = 72.dp
-
 /**
  * Главный экран (ТЗ 2.5.3): питомец, баланс, накопления, текущая цель,
  * показатели состояния и активное задание видны одновременно.
@@ -78,10 +67,10 @@ private val FigureMin = 72.dp
  * Экран помещается целиком, без прокрутки, на телефоне 360×640 dp при
  * обычном размере шрифта (макет Figma «Главная — один экран», 42:2 и
  * состояния под ним). Разделы открываются значками сверху, как вкладки
- * снизу; «Как играть» и «Для взрослого» — кнопками в шапке. Карточка
- * питомца забирает оставшуюся высоту: фигура уменьшается от 96 до 72 dp,
- * а при нехватке места строка «стадия · украшение» скрывается. При
- * крупном шрифте экран прокручивается, ничего не обрезается.
+ * снизу; «Как играть» и «Для взрослого» — кнопками в шапке. Сцена с
+ * питомцем забирает оставшуюся высоту и видна целиком: увеличение
+ * подбирается под место, «Забота» и «Радость» — панелью в небе сцены.
+ * При крупном шрифте экран прокручивается, ничего не обрезается.
  *
  * Состояния не добавляют блоков: демонстрационный режим отмечен в шапке,
  * время — в карточке задания, прожитый день — причиной у «Закончить день».
@@ -109,20 +98,14 @@ fun MainScreen(
      */
     reaction: PetReaction? = null,
     onReactionPlayed: (Long) -> Unit = {},
+    /** Нажатие на сцену открывает вкладку «Питомец». */
+    onOpenPet: () -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
     val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
     val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
     val accessory = parts.accessories.firstOrNull { it.id == profile.appearance.accessoryId }
-    // «Без украшения» в подписи не пишется: подпись должна помещаться
-    // в одну строку рядом с фигурой.
-    val caption = if (accessory == null || accessory.id == "none") {
-        game.stage.displayName
-    } else {
-        "${game.stage.displayName} · ${accessory.title.lowercase()}"
-    }
-    var showHome by rememberSaveable { mutableStateOf(false) }
 
     ScreenScaffold(
         eyebrow = "День ${game.period.number}" + if (state.isDemo) " · демо" else "",
@@ -149,42 +132,39 @@ fun MainScreen(
         )
         Spacer(modifier = Modifier.height(BlockGap))
 
-        PetCard(
-            petName = profile.petName,
-            caption = caption,
-            figure = { size ->
-                PetFigure(
-                    petName = profile.petName,
-                    speciesId = profile.appearance.speciesId,
-                    speciesTitle = species?.title ?: "Питомец",
-                    accessoryId = profile.appearance.accessoryId,
-                    accessoryTitle = accessory?.title ?: "без украшения",
-                    colorHex = color?.hex ?: "#CCCCCC",
-                    stage = game.stage,
-                    care = game.pet.care.level,
-                    joy = game.pet.joy.level,
-                    size = size,
-                    caption = false,
-                    reaction = reaction,
-                    onReactionEnd = onReactionPlayed,
-                )
-            },
-            onOpenHome = { showHome = true },
-            stats = {
-                StatLine(
-                    name = Explanations.statName(PetStatKind.CARE),
-                    value = game.pet.care.value,
-                    label = Explanations.statLabel(PetStatKind.CARE, game.pet.care),
-                    level = game.pet.care.level,
-                )
-                StatLine(
-                    name = Explanations.statName(PetStatKind.JOY),
-                    value = game.pet.joy.value,
-                    label = Explanations.statLabel(PetStatKind.JOY, game.pet.joy),
-                    level = game.pet.joy.level,
-                )
-            },
-        )
+        val careLabel = Explanations.statLabel(PetStatKind.CARE, game.pet.care)
+        val joyLabel = Explanations.statLabel(PetStatKind.JOY, game.pet.joy)
+        SceneCard(onOpenPet = onOpenPet) {
+            PetFigure(
+                petName = profile.petName,
+                speciesId = profile.appearance.speciesId,
+                speciesTitle = species?.title ?: "Питомец",
+                accessoryId = profile.appearance.accessoryId,
+                accessoryTitle = accessory?.title ?: "без украшения",
+                colorHex = color?.hex ?: "#CCCCCC",
+                stage = game.stage,
+                care = game.pet.care.level,
+                joy = game.pet.joy.level,
+                scene = true,
+                fillArea = true,
+                house = state.hasScenery("house"),
+                stickers = state.hasScenery("stickers"),
+                // В сцене одно место под предмет цели: последняя полученная.
+                goalId = state.achievedGoalIds.lastOrNull(),
+                caption = false,
+                reaction = reaction,
+                onReactionEnd = onReactionPlayed,
+                stats = SceneStats(
+                    care = game.pet.care.value,
+                    careLow = game.pet.care.level == StatLevel.LOW,
+                    joy = game.pet.joy.value,
+                    joyLow = game.pet.joy.level == StatLevel.LOW,
+                ),
+                description = "${profile.petName} дома. " +
+                    "${Explanations.statName(PetStatKind.CARE)}: $careLabel, ${game.pet.care.value} из 100. " +
+                    "${Explanations.statName(PetStatKind.JOY)}: $joyLabel, ${game.pet.joy.value} из 100.",
+            )
+        }
         Spacer(modifier = Modifier.height(BlockGap))
 
         MoneyCard(state = state, goalTitle = goalTitle)
@@ -204,36 +184,6 @@ fun MainScreen(
             else -> null
         }
         FinishDayRow(reason = reason, onFinish = onFinishPeriod)
-    }
-
-    if (showHome) {
-        FinnyDialog(
-            title = "${profile.petName} дома",
-            onDismiss = { showHome = false },
-            content = {
-                PetFigure(
-                    petName = profile.petName,
-                    speciesId = profile.appearance.speciesId,
-                    speciesTitle = species?.title ?: "Питомец",
-                    accessoryId = profile.appearance.accessoryId,
-                    accessoryTitle = accessory?.title ?: "без украшения",
-                    colorHex = color?.hex ?: "#CCCCCC",
-                    stage = game.stage,
-                    care = game.pet.care.level,
-                    joy = game.pet.joy.level,
-                    scene = true,
-                    house = state.hasScenery("house"),
-                    stickers = state.hasScenery("stickers"),
-                    // В сцене одно место под предмет цели: последняя полученная.
-                    goalId = state.achievedGoalIds.lastOrNull(),
-                    caption = false,
-                )
-                SupportingText(caption, modifier = Modifier.padding(top = 12.dp))
-            },
-            actions = {
-                PrimaryButton(text = "Понятно", onClick = { showHome = false })
-            },
-        )
     }
 }
 
@@ -327,68 +277,25 @@ private fun SectionCell(
 }
 
 /**
- * Карточка питомца и самочувствия. Забирает свободную высоту экрана;
- * фигура — существующий рисунок, по нажатию открывается сцена с домом.
+ * Сцена питомца на главном экране: забирает свободную высоту, сцена
+ * видна целиком при любой высоте. «Забота» и «Радость» — панелью в небе
+ * сцены. Нажатие открывает вкладку «Питомец».
  */
 @Composable
-private fun PetCard(
-    petName: String,
-    caption: String,
-    figure: @Composable (Dp) -> Unit,
-    onOpenHome: () -> Unit,
-    stats: @Composable ColumnScope.() -> Unit,
-) {
-    val colors = FinnyTheme.colors
-    val shape = MaterialTheme.shapes.medium
-
-    // Крупный шрифт: экран всё равно прокручивается, фигура остаётся полной.
-    val minHeight = if (LocalDensity.current.fontScale >= 1.3f) FigureMax + 24.dp else FigureMin + 24.dp
-    BoxWithConstraints(
+private fun SceneCard(onOpenPet: () -> Unit, content: @Composable () -> Unit) {
+    Box(
         modifier = Modifier
-            .fillRemaining(minHeight)
+            .fillRemaining(SceneMinHeight)
             .fillMaxWidth()
-            .clip(shape)
-            .background(colors.selectedContainer)
-            .padding(12.dp),
-        contentAlignment = Alignment.CenterStart,
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(role = Role.Button, onClickLabel = "Открыть питомца", onClick = onOpenPet),
     ) {
-        val inner = if (constraints.hasBoundedHeight) maxHeight else FigureMax
-        val figureSize = inner.coerceIn(FigureMin, FigureMax)
-        // Подпись — строка 24 dp над двумя показателями по 34 dp.
-        val showCaption = inner >= 96.dp || LocalDensity.current.fontScale > 1f
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(figureSize)
-                    .clip(MaterialTheme.shapes.medium)
-                    .clickable(
-                        role = Role.Button,
-                        onClickLabel = "Посмотреть, где живёт $petName",
-                        onClick = onOpenHome,
-                    ),
-            ) {
-                figure(figureSize)
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                if (showCaption) {
-                    Text(
-                        text = caption,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                stats()
-            }
-        }
+        content()
     }
 }
+
+/** Наименьшая высота сцены: при меньшей экран прокручивается. */
+private val SceneMinHeight = 72.dp
 
 /** Монеты и цель на тёмной карточке. */
 @Composable

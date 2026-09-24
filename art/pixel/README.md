@@ -174,6 +174,7 @@ KnPK...KPPK
 - `scene/sky.txt`, `scene/sky_1.txt` — дневное небо, солнце слева вверху, три облака; во втором кадре облака сдвинуты на клетку вправо.
 - `scene/ground.txt` — дальние холмы, луг с травой и цветами, дерево у правого края.
 - `scene/tent.txt` — домик-палатка 62 × 52 с флажком; показывается после покупки «Домика-палатки» (`unlocks_scenery: house`).
+- `scene/edge_left.txt`, `scene/edge_right.txt` — боковые полосы 40 × 100: продолжение неба, холмов и луга, справа — закругление кроны дерева. Слева и справа от сцены 180 × 100, когда окно шире её; внешние столбцы ровные, и при ещё более широком окне продолжаются без швов.
 - `scene/tent_stickers.txt` — наклейки на палатке (звезда, цветок, сердце в белой кайме), слой 62 × 52 поверх `tent` по тому же якорю; показывается после покупки «Наклеек» (`unlocks_scenery: stickers`), если палатка уже есть.
 
 Порядок слоёв: небо, земля, палатка, наклейки, цель, питомец, частицы.
@@ -303,6 +304,7 @@ art/pixel/
   src/accessory/bow_{вид}.txt                                   3
   src/accessory/scarf_{вид}_{стадия}.txt                        9
   src/scene/{sky|sky_1|ground|tent|tent_stickers}.txt           5
+  src/scene/edge_{left|right}.txt                               2
   src/goal/{scooter|aquarium|party}.txt                         3
   src/fx/{coin|heart|sparkle|note}_{0..3}.txt, crumb_{0..2}.txt 19
   tools/build.py

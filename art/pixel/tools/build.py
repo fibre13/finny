@@ -241,7 +241,7 @@ def main():
                 err(path, 1, f"иллюстрация цели {sp['w']} × {sp['h']}, требуется {GOAL_W} × {GOAL_H}")
             elif kind == "fx" and (sp["w"] > FX_MAX or sp["h"] > FX_MAX):
                 err(path, 1, f"частица {sp['w']} × {sp['h']}, допускается до {FX_MAX} × {FX_MAX}")
-            elif kind == "scene" and (sp["w"], sp["h"]) != (SCENE_W, SCENE_H) and not sid.startswith("tent"):
+            elif kind == "scene" and (sp["w"], sp["h"]) != (SCENE_W, SCENE_H) and not sid.startswith(("tent", "edge_")):
                 err(path, 1, f"слой сцены {sp['w']} × {sp['h']}, требуется {SCENE_W} × {SCENE_H}")
 
     def need(sid, where, line=0):
