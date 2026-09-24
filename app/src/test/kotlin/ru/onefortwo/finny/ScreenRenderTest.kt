@@ -1,31 +1,55 @@
 package ru.onefortwo.finny
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import java.io.File
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import ru.onefortwo.finny.content.AssetSource
+import ru.onefortwo.finny.content.ChoiceTask
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.PetAppearance
+import ru.onefortwo.finny.content.TaskCheck
+import ru.onefortwo.finny.content.toDomain
+import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GameState
+import ru.onefortwo.finny.economy.IncomeSource
+import ru.onefortwo.finny.economy.PeriodCompletion
+import ru.onefortwo.finny.economy.PlanConfirmation
+import ru.onefortwo.finny.economy.chooseGoal
+import ru.onefortwo.finny.economy.confirmPlan
+import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
 import ru.onefortwo.finny.ui.screens.OnboardingSetup
+import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
 import ru.onefortwo.finny.ui.screens.PlanScreen
 import ru.onefortwo.finny.ui.screens.SavingsScreen
 import ru.onefortwo.finny.ui.screens.ShopScreen
+import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
+import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.Profile
 import ru.onefortwo.finny.ui.theme.DisplaySettings
@@ -142,8 +166,8 @@ class ScreenRenderTest {
 
     @Test
     fun `у неактивной кнопки завершения дня всегда есть причина текстом`() {
-        // Прожитый день выключает кнопку. Объяснение есть в блоке «День
-        // прожит», но он остаётся вверху экрана: рядом с самой кнопкой
+        // Прожитый день выключает кнопку. Объяснение есть в блоке «На сегодня
+        // день закончен», но он остаётся вверху экрана: рядом с самой кнопкой
         // причина обязана быть текстом, а не только приглушённым цветом
         // (ТЗ 3.6).
         val state = AppState(
@@ -177,7 +201,199 @@ class ScreenRenderTest {
         }
 
         compose.onNodeWithText("Закончить день").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Сегодня день уже закончен. Новый план будет завтра.")
+        compose.onNodeWithText(
+            "Закончить этот день получится завтра: один игровой день — в одни сутки.",
+        )
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `без цели план предлагает её выбрать и объясняет, почему кнопка неактивна`() {
+        // Без цели откладывать некуда: об этом сказано на карточке копилки
+        // заранее, с переходом к выбору цели, а не после отказа.
+        var opened = false
+        compose.setContent {
+            FinnyTheme {
+                PlanScreen(
+                    game = GameState.newProfile(),
+                    onConfirm = { _, _, _ -> },
+                    onBack = {},
+                    onChooseGoal = { opened = true },
+                )
+            }
+        }
+
+        compose.onNodeWithText("Выбрать цель").performScrollTo().performClick()
+        assertTrue("Переход к выбору цели не сработал", opened)
+    }
+
+    @Test
+    fun `копилка без цели выключает утверждение плана и называет причину`() {
+        compose.setContent {
+            FinnyTheme {
+                PlanScreen(game = GameState.newProfile(), onConfirm = { _, _, _ -> }, onBack = {})
+            }
+        }
+
+        // Третья дорожка — «Копилка». Значение выставляется через семантику,
+        // как это делает программа чтения с экрана.
+        sliders()[2].performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(8f) }
+
+        compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText(
+            "Чтобы отложить в копилку, сначала выбери цель. Введённые суммы сохранятся.",
+        )
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `суммы плана урезаются, если бюджет уменьшился, пока план открыт`() {
+        // Из копилки поверх плана можно отложить монеты с баланса. Суммы,
+        // превысившие новый бюджет, должны урезаться: при нулевом бюджете
+        // ползунков нет, и уменьшить их было бы нечем.
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        var game by mutableStateOf(GameState.newProfile().chooseGoal(goal))
+        compose.setContent {
+            FinnyTheme {
+                PlanScreen(game = game, onConfirm = { _, _, _ -> }, onBack = {})
+            }
+        }
+
+        sliders()[0].performSemanticsAction(SemanticsActions.SetProgress) { it(19f) }
+        // «19 монет» выводится дважды: под «Нужное» и в строке «Распределено».
+        compose.onAllNodesWithText("19 монет").assertCountEquals(2)
+
+        game = game.copy(balance = Coins.ZERO)
+        compose.waitForIdle()
+
+        compose.onAllNodesWithText("19 монет").assertCountEquals(0)
+        compose.onNodeWithText("Лишние монеты").assertDoesNotExist()
+    }
+
+    @Test
+    fun `после утверждения плана блок прожитого дня не предлагает составить план`() {
+        // Прожитый день и уже утверждённый план на следующий: предлагать
+        // составить план второй раз нельзя — повторно он не составляется.
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        val first = GameState.newProfile().chooseGoal(goal)
+            .confirmPlan(BudgetPlan(Coins(20), Coins(10), Coins(5))) as PlanConfirmation.Success
+        val nextDay = (first.state.finishPeriod() as PeriodCompletion.Success).state
+        val planned = nextDay.confirmPlan(BudgetPlan(Coins(10), Coins(5), Coins(0)))
+            as PlanConfirmation.Success
+        val state = AppState(profile = profile, game = planned.state, lastFinishedDate = "2026-09-15")
+
+        compose.setContent {
+            FinnyTheme {
+                MainScreen(
+                    state = state,
+                    parts = content.petParts(),
+                    activeTask = content.tasks().first(),
+                    titleOf = { it },
+                    goalTitle = null,
+                    onDismissMessage = {},
+                    onOpenPlan = {},
+                    onOpenShop = {},
+                    onOpenTasks = {},
+                    onOpenSavings = {},
+                    onOpenHistory = {},
+                    onOpenGlossary = {},
+                    onOpenHelp = {},
+                    onOpenAdult = {},
+                    onOpenWardrobe = {},
+                    onFinishPeriod = {},
+                    today = "2026-09-15",
+                )
+            }
+        }
+
+        compose.onNodeWithText("День 1 закончен. План на день 2 составлен: можно делать покупки.")
+            .assertIsDisplayed()
+        compose.onNodeWithText("можно составить план", substring = true).assertDoesNotExist()
+    }
+
+    /** Ползунки экрана по порядку: у них нет текста, только диапазон значений. */
+    private fun sliders() =
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+
+    @Test
+    fun `с выбранной целью план не предлагает выбирать её снова`() {
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        compose.setContent {
+            FinnyTheme {
+                PlanScreen(
+                    game = GameState.newProfile().chooseGoal(goal),
+                    onConfirm = { _, _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("Выбрать цель").assertDoesNotExist()
+    }
+
+    @Test
+    fun `карточка результата показывает фактически начисленную сумму за повтор`() {
+        // За повтор начисляется половина. Карточка обязана назвать ту же
+        // сумму, на которую изменился баланс, а не полную награду (ТЗ 2.5.4).
+        val task = content.task("save_temptation") as ChoiceTask
+        compose.setContent {
+            FinnyTheme {
+                TaskDetailScreen(
+                    task = task,
+                    onAnswer = {
+                        AnsweredTask(
+                            check = TaskCheck(
+                                isCorrect = true,
+                                explanation = "Объяснение",
+                                reward = IncomeSource.TASK_CORRECT,
+                            ),
+                            credited = Coins(5),
+                            isRepeat = true,
+                        )
+                    },
+                    onBack = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText(task.options.first().title).performScrollTo().performClick()
+        compose.onNodeWithText("Ответить").performScrollTo().performClick()
+
+        compose.onNodeWithText(
+            "Награда за задание ещё раз: +5 монет, за повтор — половина награды.",
+        )
+            .performScrollTo()
+            .assertIsDisplayed()
+        compose.onNodeWithText("+10 монет", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `итоги дня говорят, что план на новый день можно составить сразу`() {
+        // Монеты следующего дня начисляются при завершении текущего, и план
+        // на него можно составить сразу. Экран итогов не должен отсылать
+        // за монетами и планом «на завтра».
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        val planned = GameState.newProfile().chooseGoal(goal)
+            .confirmPlan(BudgetPlan(Coins(20), Coins(10), Coins(5))) as PlanConfirmation.Success
+        val finished = planned.state.finishPeriod() as PeriodCompletion.Success
+
+        compose.setContent {
+            FinnyTheme {
+                PeriodResultScreen(
+                    petName = "Финни",
+                    outcome = finished.outcome,
+                    nextDayTomorrow = true,
+                    onOpenRecoveryTask = {},
+                    onContinue = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText(
+            "План на новый день можно составить уже сейчас, а закончить этот день получится завтра.",
+        )
             .performScrollTo()
             .assertIsDisplayed()
     }

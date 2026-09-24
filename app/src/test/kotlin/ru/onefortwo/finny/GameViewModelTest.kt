@@ -173,16 +173,23 @@ class GameViewModelTest {
         // у того же условия, которое передаётся на проверку.
         val task = numberTask("save_rate")
 
-        val check = model.answerTask(task, TaskAnswer.Number(task.answer))
+        val first = model.answerTask(task, TaskAnswer.Number(task.answer))
 
-        assertTrue(check!!.isCorrect)
+        assertTrue(first.check.isCorrect)
+        assertFalse(first.isRepeat)
+        assertEquals(10, first.credited.amount)
         assertEquals(before + 10, model.state.value.game.balance.amount)
 
         // Повтор даёт половину: задание остаётся упражнением, но
         // набирать монеты повторением невыгодно.
-        model.answerTask(task, TaskAnswer.Number(task.answer))
+        val repeat = model.answerTask(task, TaskAnswer.Number(task.answer))
         assertEquals(before + 15, model.state.value.game.balance.amount)
         assertTrue(model.state.value.message!!.text.contains("половина"))
+
+        // Карточка результата показывает ту же сумму, на которую изменился
+        // баланс, а не полную награду источника (ТЗ 2.5.4).
+        assertTrue(repeat.isRepeat)
+        assertEquals(5, repeat.credited.amount)
     }
 
     @Test
@@ -204,10 +211,10 @@ class GameViewModelTest {
         val before = model.state.value.game.balance.amount
 
         val task = numberTask("save_rate")
-        val check = model.answerTask(task, TaskAnswer.Number(task.answer + 3))
+        val answered = model.answerTask(task, TaskAnswer.Number(task.answer + 3))
 
-        assertFalse(check!!.isCorrect)
-        assertTrue(check.explanation.isNotBlank())
+        assertFalse(answered.check.isCorrect)
+        assertTrue(answered.check.explanation.isNotBlank())
         assertEquals(before + 5, model.state.value.game.balance.amount)
     }
 
@@ -236,6 +243,27 @@ class GameViewModelTest {
         val period = model.state.value.game.period
         assertTrue("План должен считаться подтверждённым", period.isPlanConfirmed)
         assertFalse("Решения за день нет, завершать нечего", period.canFinish)
+    }
+
+    @Test
+    fun `план с копилкой без цели не принимается, и экран об этом узнаёт`() {
+        // У нового профиля цели нет, и план с ненулевой копилкой
+        // отклоняется. Результат нужен экрану плана: закрываться он должен
+        // только принятым планом, иначе отклонённый план выглядит принятым,
+        // а введённые суммы пропадают вместе с экраном. Тест
+        // «выполнение задания не отменяет подтверждённый план» этот случай
+        // не покрывает: там цель выбрана заранее.
+        val model = viewModel()
+
+        val accepted = model.confirmPlan(needs = 20, wants = 10, savings = 10)
+
+        assertFalse("План без цели не должен приниматься", accepted)
+        assertFalse(model.state.value.game.period.isPlanConfirmed)
+        assertTrue(model.state.value.message!!.isProblem)
+
+        model.chooseGoal("scooter")
+        assertTrue(model.confirmPlan(needs = 20, wants = 10, savings = 10))
+        assertTrue(model.state.value.game.period.isPlanConfirmed)
     }
 
     @Test

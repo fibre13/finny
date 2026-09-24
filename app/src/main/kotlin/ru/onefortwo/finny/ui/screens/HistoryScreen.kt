@@ -81,7 +81,7 @@ fun HistoryScreen(
                     tasks.forEach { task ->
                         Text(
                             text = if (task.id in completedIds) {
-                                "Выполнено — ${task.title}"
+                                "Уже решал — ${task.title}"
                             } else {
                                 "Ещё впереди — ${task.title}"
                             },

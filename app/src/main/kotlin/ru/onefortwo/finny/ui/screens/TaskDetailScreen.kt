@@ -38,6 +38,7 @@ import ru.onefortwo.finny.content.PlanCategory
 import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskContent
+import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.IncomeSource
 import ru.onefortwo.finny.ui.common.CoinSlider
 import ru.onefortwo.finny.ui.common.MinTouchTarget
@@ -45,6 +46,7 @@ import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.TaskResultIcon
+import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.Explanations
 
 /**
@@ -57,11 +59,11 @@ import ru.onefortwo.finny.ui.state.Explanations
 @Composable
 fun TaskDetailScreen(
     task: TaskContent,
-    onAnswer: (TaskAnswer) -> TaskCheck?,
+    onAnswer: (TaskAnswer) -> AnsweredTask,
     onBack: () -> Unit,
 ) {
-    var result by rememberSaveable(stateSaver = TaskCheckSaver) {
-        mutableStateOf<TaskCheck?>(null)
+    var result by rememberSaveable(stateSaver = AnsweredTaskSaver) {
+        mutableStateOf<AnsweredTask?>(null)
     }
 
     ScreenScaffold(title = task.title, onBack = onBack) {
@@ -79,15 +81,22 @@ fun TaskDetailScreen(
                     is ChoiceTask -> ChoiceForm(task) { result = onAnswer(it) }
                 }
             } else {
-                ResultCard(check = current, onBack = onBack)
+                ResultCard(answered = current, onBack = onBack)
             }
         }
     }
 }
 
-/** Итог задания: результат, последствие, объяснение и награда. */
+/**
+ * Итог задания: результат, последствие, объяснение и награда.
+ *
+ * Сумма берётся фактически начисленная, а не полная награда источника:
+ * за повтор начисляется половина, и на карточке должна стоять та же сумма,
+ * на которую изменился баланс (ТЗ 2.5.4).
+ */
 @Composable
-private fun ResultCard(check: TaskCheck, onBack: () -> Unit) {
+private fun ResultCard(answered: AnsweredTask, onBack: () -> Unit) {
+    val check = answered.check
     Column {
         SectionCard(
             title = if (check.isCorrect) "Верно" else "Почти",
@@ -104,8 +113,11 @@ private fun ResultCard(check: TaskCheck, onBack: () -> Unit) {
                 }
                 Text(check.explanation, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    text = "${Explanations.incomeSource(check.reward)}: " +
-                        "+${Explanations.coins(check.reward.amount)}.",
+                    text = Explanations.reward(
+                        source = check.reward,
+                        amount = answered.credited,
+                        repeat = answered.isRepeat,
+                    ) + ".",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp),
                 )
@@ -283,21 +295,25 @@ private fun ChoiceForm(task: ChoiceTask, onSubmit: (TaskAnswer) -> Unit) {
 /**
  * Сохранение результата задания при повороте экрана.
  *
- * [TaskCheck] состоит из простых значений, поэтому раскладывается в список:
- * признак наличия результата, правильность, объяснение, последствие
- * (пустая строка вместо null) и название источника награды.
+ * [AnsweredTask] состоит из простых значений, поэтому раскладывается в
+ * список: признак наличия результата, правильность, объяснение, последствие
+ * (пустая строка вместо null), название источника награды, начисленная
+ * сумма и признак повтора.
  */
-private val TaskCheckSaver: Saver<TaskCheck?, Any> = listSaver(
-    save = { check ->
-        if (check == null) {
+private val AnsweredTaskSaver: Saver<AnsweredTask?, Any> = listSaver(
+    save = { answered ->
+        if (answered == null) {
             listOf(false)
         } else {
+            val check = answered.check
             listOf(
                 true,
                 check.isCorrect,
                 check.explanation,
                 check.outcome ?: "",
                 check.reward.name,
+                answered.credited.amount,
+                answered.isRepeat,
             )
         }
     },
@@ -305,11 +321,15 @@ private val TaskCheckSaver: Saver<TaskCheck?, Any> = listSaver(
         if (items.first() == false) {
             null
         } else {
-            TaskCheck(
-                isCorrect = items[1] as Boolean,
-                explanation = items[2] as String,
-                outcome = (items[3] as String).ifEmpty { null },
-                reward = IncomeSource.valueOf(items[4] as String),
+            AnsweredTask(
+                check = TaskCheck(
+                    isCorrect = items[1] as Boolean,
+                    explanation = items[2] as String,
+                    outcome = (items[3] as String).ifEmpty { null },
+                    reward = IncomeSource.valueOf(items[4] as String),
+                ),
+                credited = Coins(items[5] as Int),
+                isRepeat = items[6] as Boolean,
             )
         }
     },

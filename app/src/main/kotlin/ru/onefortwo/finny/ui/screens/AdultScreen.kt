@@ -196,7 +196,7 @@ private fun AdultContent(
 
                     if (topics.isEmpty()) {
                         Text(
-                            "Ребёнок ещё не завершил ни одного задания.",
+                            "Ребёнок ещё не решал ни одного задания.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
@@ -214,7 +214,7 @@ private fun AdultContent(
             SectionCard(title = "Общий прогресс") {
                 Column {
                     LabeledValue("Завершено игровых дней", (game.period.number - 1).toString())
-                    LabeledValue("Выполнено заданий", "${completedIds.size} из ${tasks.size}")
+                    LabeledValue("Пройдено заданий", "${completedIds.size} из ${tasks.size}")
                     LabeledValue("Стадия развития питомца", game.stage.displayName)
                     Text(
                         text = "Прогресс показан без оценок: приложение не сравнивает ребёнка " +
@@ -363,7 +363,7 @@ private fun AdultContent(
                 Column {
                     Text(
                         text = "Сброс удалит игровой прогресс: профиль питомца, монеты, " +
-                            "копилку и выполненные задания.",
+                            "копилку и отметки о решённых заданиях.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     SecondaryButton(

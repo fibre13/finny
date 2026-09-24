@@ -100,15 +100,28 @@ fun MainScreen(
             }
 
             if (state.isDayFinished(today)) {
-                SectionCard(title = "День прожит") {
+                // Закончив день, ребёнок сразу получает монеты следующего и
+                // может составить на него план. Завтра остаётся только
+                // закончить этот день — так и сказано, без обещания монет и
+                // плана «завтра»: они уже есть.
+                SectionCard(title = "На сегодня день закончен") {
                     Column {
+                        // Предложение составить план уместно, только пока плана
+                        // нет: утверждённый план второй раз не составляется.
                         Text(
-                            text = "Сегодняшний игровой день уже закончен. " +
-                                "${profile.petName} отдыхает и ждёт тебя завтра.",
+                            text = "День ${game.period.number - 1} закончен. " +
+                                if (game.period.isPlanConfirmed) {
+                                    "План на день ${game.period.number} составлен: " +
+                                        "можно делать покупки."
+                                } else {
+                                    "Монеты на день ${game.period.number} уже у тебя: " +
+                                        "можно составить план и сделать покупки."
+                                },
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = "Завтра будут новые монеты и новый план.",
+                            text = "Закончить день ${game.period.number} получится завтра: " +
+                                "один игровой день — в одни сутки.",
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 8.dp),
                         )
@@ -211,15 +224,14 @@ fun MainScreen(
                         )
                         if (activeTask.id in state.completedTaskIds) {
                             Text(
-                                text = "Это задание ты уже проходил. Числа будут новые, " +
-                                    "а монет дадут половину.",
+                                text = repeatNote(activeTask),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
                         }
                     } else {
                         Text(
-                            "Заданий для твоего класса пока нет.",
+                            "Заданий пока нет.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -297,7 +309,7 @@ fun MainScreen(
             // нужно прокрутить, и рядом с ней ребёнок видел бы только
             // приглушённый цвет (ТЗ 3.6).
             val disabledReason = when {
-                dayFinished -> "Сегодня день уже закончен. Новый план будет завтра."
+                dayFinished -> "Закончить этот день получится завтра: один игровой день — в одни сутки."
                 !game.period.isPlanConfirmed -> "Чтобы закончить день, сначала составь план."
                 !game.period.canFinish ->
                     "Чтобы закончить день, купи что-нибудь или отложи монеты в копилку."

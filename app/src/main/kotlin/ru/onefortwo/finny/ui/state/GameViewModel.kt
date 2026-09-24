@@ -57,6 +57,20 @@ fun interface DateProvider {
     fun today(): String
 }
 
+/**
+ * Итог ответа на задание: проверка и фактически начисленная сумма.
+ *
+ * Сумма передаётся отдельно от источника награды: за повтор начисляется
+ * половина, и карточка результата обязана показывать именно её, а не полную
+ * награду источника. Иначе баланс менялся бы не на ту сумму, что названа
+ * ребёнку (ТЗ 2.5.4).
+ */
+data class AnsweredTask(
+    val check: TaskCheck,
+    val credited: Coins,
+    val isRepeat: Boolean,
+)
+
 class GameViewModel(
     val content: ContentRepository,
     private val repository: GameRepository?,
@@ -240,39 +254,58 @@ class GameViewModel(
 
     // --- План бюджета ----------------------------------------------------
 
-    fun confirmPlan(needs: Int, wants: Int, savings: Int) {
+    /**
+     * Подтверждает план. Возвращает `true`, если план принят.
+     *
+     * Результат нужен экрану плана: закрываться он должен только при успехе.
+     * Иначе отклонённый план выглядел бы принятым, а введённые суммы
+     * пропадали бы вместе с экраном и их пришлось бы набирать заново.
+     */
+    fun confirmPlan(needs: Int, wants: Int, savings: Int): Boolean {
         val plan = BudgetPlan(Coins(needs), Coins(wants), Coins(savings))
 
-        when (val result = _state.value.game.confirmPlan(plan)) {
-            is PlanConfirmation.Success -> _state.update {
-                val moved = result.movedToSavings
-                it.copy(
-                    game = result.state,
-                    message = FeedbackMessage(
-                        text = if (moved.amount > 0) {
-                            "План на день готов. ${Explanations.coins(moved)} сразу ушли в копилку."
-                        } else {
-                            "План на день готов."
-                        },
-                        nextStep = "Теперь купи то, что нужно ${petName}.",
-                    ),
-                )
+        return when (val result = _state.value.game.confirmPlan(plan)) {
+            is PlanConfirmation.Success -> {
+                _state.update {
+                    val moved = result.movedToSavings
+                    it.copy(
+                        game = result.state,
+                        message = FeedbackMessage(
+                            text = if (moved.amount > 0) {
+                                "План на день готов. ${Explanations.coins(moved)} сразу ушли в копилку."
+                            } else {
+                                "План на день готов."
+                            },
+                            nextStep = "Теперь купи то, что нужно ${petName}.",
+                        ),
+                    )
+                }
+                true
             }
 
-            is PlanConfirmation.ExceedsBudget -> showProblem(
-                "Ты распределил больше, чем есть: лишние ${Explanations.coins(result.excess)}.",
-                "Уменьши одно из направлений.",
-            )
+            is PlanConfirmation.ExceedsBudget -> {
+                showProblem(
+                    "Ты распределил больше, чем есть: лишние ${Explanations.coins(result.excess)}.",
+                    "Уменьши одно из направлений.",
+                )
+                false
+            }
 
-            PlanConfirmation.AlreadyConfirmed -> showProblem(
-                "План на сегодня уже составлен.",
-                "Изменить его можно будет завтра.",
-            )
+            PlanConfirmation.AlreadyConfirmed -> {
+                showProblem(
+                    "План на этот день уже составлен.",
+                    "Новый план составляется на следующий день.",
+                )
+                false
+            }
 
-            PlanConfirmation.NoGoalSelected -> showProblem(
-                "Чтобы откладывать в копилку, нужно выбрать цель.",
-                "Загляни в раздел «Копилка» и выбери, на что копишь.",
-            )
+            PlanConfirmation.NoGoalSelected -> {
+                showProblem(
+                    "Чтобы откладывать в копилку, нужно выбрать цель.",
+                    "Нажми «Выбрать цель» — введённые суммы сохранятся.",
+                )
+                false
+            }
         }
     }
 
@@ -418,8 +451,16 @@ class GameViewModel(
      * без награды повтор выглядел странно: задание открыто, числа новые,
      * а монет нет. Полная награда за повтор превращала бы задания
      * в источник монет без обучения.
+     *
+     * Задание попадает в пройденные при любом ответе, в том числе
+     * ошибочном: за ошибку тоже начисляется награда за старание, и без
+     * отметки каждый повторный ошибочный ответ приносил бы её полностью.
+     * Отметка переводит повторы на половинную награду и делает повторение
+     * невыгодным; число повторов она не ограничивает. Поэтому интерфейс
+     * называет такие задания «уже решал», а не «выполнено»: отметка
+     * означает попытку, а не верный ответ.
      */
-    fun answerTask(task: TaskContent, answer: TaskAnswer): TaskCheck? {
+    fun answerTask(task: TaskContent, answer: TaskAnswer): AnsweredTask {
         val taskId = task.id
         val check = task.check(answer)
         val repeat = taskId in _state.value.completedTaskIds
@@ -439,7 +480,7 @@ class GameViewModel(
             )
         }
 
-        return check
+        return AnsweredTask(check = check, credited = event.amount, isRepeat = repeat)
     }
 
     // --- Игровой период --------------------------------------------------

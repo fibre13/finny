@@ -56,6 +56,9 @@ private object Routes {
     const val WARDROBE = "wardrobe"
 }
 
+/** Задание восстановления после неудачного дня (ТЗ 2.5.9); есть на обоих уровнях. */
+private const val RECOVERY_TASK_ID = "recover_help"
+
 /**
  * Навигация приложения. Последовательность экранов повторяет сквозной
  * сценарий из Приложения А: знакомство, создание питомца, главный экран,
@@ -173,11 +176,20 @@ fun FinnyApp(viewModel: GameViewModel) {
         composable(Routes.PLAN) {
             PlanScreen(
                 game = state.game,
+                message = state.message,
+                onDismissMessage = viewModel::dismissMessage,
                 onBack = { navController.popBackStack() },
+                // Экран закрывается только принятым планом. Отклонённый план
+                // остаётся на экране вместе с причиной: иначе он выглядел бы
+                // принятым, а введённые суммы пропадали бы с экраном.
                 onConfirm = { needs, wants, savings ->
-                    viewModel.confirmPlan(needs, wants, savings)
-                    navController.popBackStack()
+                    if (viewModel.confirmPlan(needs, wants, savings)) {
+                        navController.popBackStack()
+                    }
                 },
+                // Копилка открывается поверх плана: запись плана остаётся
+                // в стеке, и введённые суммы при возврате сохраняются.
+                onChooseGoal = { navController.navigate(Routes.SAVINGS) },
             )
         }
 
@@ -205,9 +217,14 @@ fun FinnyApp(viewModel: GameViewModel) {
         composable("${Routes.TASK}/{taskId}") { entry ->
             val taskId = entry.arguments?.getString("taskId")
             // Числа берутся один раз на открытие экрана: при повороте
-            // и перерисовке условие не должно меняться под руками.
-            val task = remember(entry.id, taskId) {
-                taskId?.let { content.task(it)?.withNumbers(Random.Default) }
+            // и перерисовке условие не должно меняться под руками. Поэтому
+            // сохраняется зерно случайных чисел, а не сами числа: при повороте
+            // Android пересоздаёт экран, обычная память композиции теряется,
+            // а введённый ответ и результат восстанавливаются — без зерна
+            // они относились бы уже к другому условию.
+            val seed = rememberSaveable(taskId) { Random.nextLong() }
+            val task = remember(taskId, seed) {
+                taskId?.let { content.task(it)?.withNumbers(Random(seed)) }
             }
 
             if (task == null) {
@@ -245,8 +262,14 @@ fun FinnyApp(viewModel: GameViewModel) {
                 PeriodResultScreen(
                     petName = state.profile?.petName ?: "Финни",
                     outcome = outcome,
-                    onOpenTasks = {
-                        navController.navigate(Routes.TASKS) {
+                    // В обычном режиме второй игровой день в те же сутки
+                    // не заканчивается; в демонстрационном ограничения нет.
+                    nextDayTomorrow = !state.isDemo,
+                    // Кнопка восстановления открывает само задание, а не
+                    // общий список: путь восстановления должен быть понятным
+                    // и коротким (ТЗ 2.5.9).
+                    onOpenRecoveryTask = {
+                        navController.navigate("${Routes.TASK}/$RECOVERY_TASK_ID") {
                             popUpTo(Routes.MAIN)
                         }
                     },

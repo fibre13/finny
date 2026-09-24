@@ -29,7 +29,8 @@ import ru.onefortwo.finny.ui.state.Explanations
 fun PeriodResultScreen(
     petName: String,
     outcome: PeriodOutcome,
-    onOpenTasks: () -> Unit,
+    nextDayTomorrow: Boolean,
+    onOpenRecoveryTask: () -> Unit,
     onContinue: () -> Unit,
 ) {
     val summary = Explanations.periodSummary(petName, outcome)
@@ -111,19 +112,33 @@ fun PeriodResultScreen(
 
             outcome.nextPeriodIncome?.let { income ->
                 SectionCard(title = "Новый день") {
-                    Text(
-                        text = "${Explanations.incomeSource(income.source)}: " +
-                            "+${Explanations.coins(income.amount)}. " +
-                            "Теперь у тебя ${Explanations.coins(income.balanceAfter)}.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Column {
+                        Text(
+                            text = "${Explanations.incomeSource(income.source)}: " +
+                                "+${Explanations.coins(income.amount)}. " +
+                                "Теперь у тебя ${Explanations.coins(income.balanceAfter)}.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        // Монеты следующего дня начисляются сразу, и план на него
+                        // можно составить сейчас. Завтра нужно только закончить
+                        // этот день: об этом сказано здесь, чтобы ребёнок не ждал
+                        // завтра ни монет, ни плана.
+                        if (nextDayTomorrow) {
+                            Text(
+                                text = "План на новый день можно составить уже сейчас, " +
+                                    "а закончить этот день получится завтра.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
                 }
             }
 
             if (outcome.isSetback) {
                 SecondaryButton(
                     text = "Выполнить задание «Помоги Финни»",
-                    onClick = onOpenTasks,
+                    onClick = onOpenRecoveryTask,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
             }

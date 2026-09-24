@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,8 +38,10 @@ import ru.onefortwo.finny.ui.common.MinTouchTarget
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
+import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.state.Explanations
+import ru.onefortwo.finny.ui.state.FeedbackMessage
 import ru.onefortwo.finny.ui.theme.LocalAppliqueDecor
 import ru.onefortwo.finny.ui.theme.LocalBudgetColors
 
@@ -48,18 +51,34 @@ import ru.onefortwo.finny.ui.theme.LocalBudgetColors
  * До подтверждения план свободно изменяется, приложение контролирует, чтобы
  * сумма не превышала доступный бюджет, и постоянно показывает остаток.
  * После подтверждения экран показывает сравнение плана с фактом.
+ *
+ * Если подтвердить план не удалось, причина показывается на этом же экране,
+ * а введённые суммы остаются: экран закрывается только принятым планом.
  */
 @Composable
 fun PlanScreen(
     game: GameState,
     onConfirm: (Int, Int, Int) -> Unit,
     onBack: () -> Unit,
+    message: FeedbackMessage? = null,
+    onDismissMessage: () -> Unit = {},
+    onChooseGoal: () -> Unit = {},
 ) {
-    ScreenScaffold(title = "План на день ${game.period.number}", onBack = onBack) {
+    ScreenScaffold(
+        title = "План на день ${game.period.number}",
+        onBack = onBack,
+        message = message,
+        onDismissMessage = onDismissMessage,
+    ) {
         val plan = game.period.plan
 
         if (plan == null) {
-            PlanEditor(available = game.balance.amount, onConfirm = onConfirm)
+            PlanEditor(
+                available = game.balance.amount,
+                hasGoal = game.savings.goal != null,
+                onConfirm = onConfirm,
+                onChooseGoal = onChooseGoal,
+            )
         } else {
             Column {
                 Text(
@@ -101,20 +120,41 @@ fun PlanScreen(
     }
 }
 
-/** Редактор плана: три направления и остаток. */
+/**
+ * Редактор плана: три направления и остаток.
+ *
+ * Откладывать в копилку можно только на выбранную цель. Без цели план с
+ * ненулевой копилкой не принимается, поэтому об этом сказано заранее, на
+ * карточке копилки, с переходом к выбору цели: копилка открывается поверх
+ * плана, и введённые суммы при возврате сохраняются.
+ */
 @Composable
 private fun PlanEditor(
     available: Int,
+    hasGoal: Boolean,
     onConfirm: (Int, Int, Int) -> Unit,
+    onChooseGoal: () -> Unit,
 ) {
     var needs by rememberSaveable { mutableIntStateOf(0) }
     var wants by rememberSaveable { mutableIntStateOf(0) }
     var savings by rememberSaveable { mutableIntStateOf(0) }
 
+    // Бюджет может уменьшиться, пока экран плана лежит в стеке под копилкой:
+    // из копилки можно отложить монеты с баланса. Суммы, превышающие новый
+    // бюджет, урезаются до него. Иначе при нулевом бюджете ползунки не
+    // выводятся, и уменьшить лишние суммы было бы нечем.
+    LaunchedEffect(available) {
+        needs = needs.coerceAtMost(available)
+        wants = wants.coerceAtMost(available)
+        savings = savings.coerceAtMost(available)
+    }
+
     val budget = LocalBudgetColors.current
     val total = needs + wants + savings
     val remainder = available - total
-    val valid = remainder >= 0
+    val withinBudget = remainder >= 0
+    val needsGoal = savings > 0 && !hasGoal
+    val valid = withinBudget && !needsGoal
 
     Column {
         Text(
@@ -156,27 +196,45 @@ private fun PlanEditor(
             icon = { BudgetDirectionIcon(BudgetCategory.SAVINGS) },
             edgeColor = budget.savings,
         ) {
-            AmountSlider(
-                hint = "Эти монеты сразу уйдут в копилку на твою цель.",
-                value = savings,
-                max = available,
-                color = budget.savings,
-                onChange = { savings = it },
-            )
+            Column {
+                AmountSlider(
+                    hint = if (hasGoal) {
+                        "Эти монеты сразу уйдут в копилку на твою цель."
+                    } else {
+                        "Цель ещё не выбрана. Чтобы откладывать, сначала выбери, на что копишь."
+                    },
+                    value = savings,
+                    max = available,
+                    color = budget.savings,
+                    onChange = { savings = it },
+                )
+                if (!hasGoal) {
+                    SecondaryButton(
+                        text = "Выбрать цель",
+                        onClick = onChooseGoal,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
         }
 
         SectionCard(title = "Итого") {
             Column {
                 LabeledValue("Распределено", Explanations.coins(total))
                 LabeledValue(
-                    label = if (valid) "Остаток" else "Лишние монеты",
+                    label = if (withinBudget) "Остаток" else "Лишние монеты",
                     value = Explanations.coins(kotlin.math.abs(remainder)),
                 )
+                // Причина выводится для каждого случая, когда кнопка
+                // «Утвердить план» неактивна (ТЗ 3.6).
                 Text(
-                    text = if (valid) {
-                        "Остаток можно оставить на всякий случай."
-                    } else {
-                        "Ты распределил больше, чем есть. Уменьши одно из направлений."
+                    text = when {
+                        !withinBudget ->
+                            "Ты распределил больше, чем есть. Уменьши одно из направлений."
+                        needsGoal ->
+                            "Чтобы отложить в копилку, сначала выбери цель. " +
+                                "Введённые суммы сохранятся."
+                        else -> "Остаток можно оставить на всякий случай."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 8.dp),

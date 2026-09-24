@@ -77,24 +77,30 @@ object Explanations {
     }
 
     /**
-     * Сообщение о начислении: источник и сумма (ТЗ 2.5.4).
+     * Строка о награде: источник и фактически начисленная сумма.
      *
-     * За повтор задания начисляется половина, и об этом говорится прямо:
-     * иначе меньшая сумма при том же источнике выглядит ошибкой счёта.
+     * За повтор задания начисляется половина награды за этот ответ, и об
+     * этом говорится прямо: иначе меньшая сумма при том же источнике
+     * выглядит ошибкой счёта. Половина считается от награды за текущий
+     * ответ, а не за первый: первый мог быть ошибочным, поэтому
+     * «половина от первого раза» была бы неверна.
      */
+    fun reward(source: IncomeSource, amount: Coins, repeat: Boolean = false): String =
+        if (repeat) {
+            "${incomeSource(source)} ещё раз: +${coins(amount)}, за повтор — половина награды"
+        } else {
+            "${incomeSource(source)}: +${coins(amount)}"
+        }
+
+    /** Сообщение о начислении: источник и сумма (ТЗ 2.5.4). */
     fun income(
         source: IncomeSource,
         amount: Coins,
         balanceAfter: Coins,
         repeat: Boolean = false,
-    ): FeedbackMessage {
-        val reason = if (repeat) {
-            "${incomeSource(source)} ещё раз: +${coins(amount)}, половина от первого раза"
-        } else {
-            "${incomeSource(source)}: +${coins(amount)}"
-        }
-        return FeedbackMessage(text = "$reason. Теперь у тебя ${coins(balanceAfter)}.")
-    }
+    ): FeedbackMessage = FeedbackMessage(
+        text = "${reward(source, amount, repeat)}. Теперь у тебя ${coins(balanceAfter)}.",
+    )
 
     /** Объяснение успешной покупки: что изменилось и почему. */
     fun purchase(
@@ -129,12 +135,6 @@ object Explanations {
             else -> FeedbackMessage(text = base)
         }
     }
-
-    /** Сообщение о том, что игровой день на сегодня уже прожит. */
-    fun dayFinished(petName: String): FeedbackMessage = FeedbackMessage(
-        text = "На сегодня всё: день уже прожит. $petName отдыхает и ждёт тебя завтра.",
-        nextStep = "Завтра будут новые монеты и новый план.",
-    )
 
     /** Сообщение о том, что экранное время на сегодня закончилось. */
     fun timeIsUp(): FeedbackMessage = FeedbackMessage(
