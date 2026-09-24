@@ -230,10 +230,14 @@ private fun AppNavHost(
             val activeTask = TaskQueue.next(availableTasks, state.completedTaskIds)
                 ?: TaskQueue.repeatSuggestion(availableTasks, state.game.period.number)
 
+            val reactions by viewModel.reactions.collectAsStateWithLifecycle()
+
             MainScreen(
                 state = state,
                 parts = content.petParts(),
                 activeTask = activeTask,
+                reaction = reactions.firstOrNull(),
+                onReactionPlayed = viewModel::reactionPlayed,
                 goalTitle = goalTitle,
                 onDismissMessage = viewModel::dismissMessage,
                 onOpenPlan = { navController.navigate(Routes.PLAN) },

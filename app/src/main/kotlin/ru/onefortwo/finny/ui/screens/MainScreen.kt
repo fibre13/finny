@@ -60,6 +60,7 @@ import ru.onefortwo.finny.ui.common.StatLine
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.softShadow
 import ru.onefortwo.finny.ui.state.AppState
+import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
@@ -102,6 +103,12 @@ fun MainScreen(
     today: String,
     /** Открыть задание сразу, минуя список. */
     onOpenTask: (String) -> Unit = {},
+    /**
+     * Реакция питомца на последнее событие игры: покупка, копилка,
+     * награда, рост. Проигрывается при возвращении на главный экран.
+     */
+    reaction: PetReaction? = null,
+    onReactionPlayed: (Long) -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -158,6 +165,8 @@ fun MainScreen(
                     joy = game.pet.joy.level,
                     size = size,
                     caption = false,
+                    reaction = reaction,
+                    onReactionEnd = onReactionPlayed,
                 )
             },
             onOpenHome = { showHome = true },
@@ -214,6 +223,7 @@ fun MainScreen(
                     joy = game.pet.joy.level,
                     scene = true,
                     house = state.hasScenery("house"),
+                    stickers = state.hasScenery("stickers"),
                     // В сцене одно место под предмет цели: последняя полученная.
                     goalId = state.achievedGoalIds.lastOrNull(),
                     caption = false,

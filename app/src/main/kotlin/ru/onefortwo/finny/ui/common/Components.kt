@@ -89,6 +89,7 @@ import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.StatLevel
 import ru.onefortwo.finny.ui.state.Explanations
+import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.FeedbackMessage
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.theme.LightFinnyColors
@@ -1607,14 +1608,19 @@ fun PetFigure(
      * «Домика-палатки» и остаётся навсегда.
      */
     house: Boolean = false,
+    /** Наклейки на палатке: появляются после покупки «Наклеек». */
+    stickers: Boolean = false,
     /** Полученная цель: её предмет стоит в сцене между палаткой и питомцем. */
     goalId: String? = null,
     size: Dp = 140.dp,
     /** Подписи с именем и стадией под рисунком. */
     caption: Boolean = true,
+    /** Реакция на событие игры; по окончании вызывается [onReactionEnd]. */
+    reaction: PetReaction? = null,
+    onReactionEnd: (Long) -> Unit = {},
 ) {
     val art = rememberPixelArt()
-    val motion = rememberPetMotion(art.animation, care, joy)
+    val motion = rememberPetMotion(art.animation, care, joy, reaction, onReactionEnd)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -1634,15 +1640,19 @@ fun PetFigure(
             val cropTop = if (landscape) SCENE_TOP_CROP_LANDSCAPE else 0
             // Кадры движения повторяются: изображения собираются один раз
             // на сочетание и берутся из кэша.
-            val frames = remember(art, speciesId, stage, colorHex, accessoryId, care, joy, house, goalId) {
+            val frames = remember(art, speciesId, stage, colorHex, accessoryId, care, joy, house, stickers, goalId) {
                 HashMap<MotionFrame, ImageBitmap>()
             }
             val image = frames.getOrPut(motion) {
                 val pet = composePet(
                     art, speciesId, stage, colorHex, accessoryId, care, joy,
                     inScene = true, frame = motion.breath, blink = motion.blink, dy = motion.dy,
+                    reaction = motion.reaction, reactionTick = motion.reactionTick, stageBefore = motion.stageBefore,
                 )
-                pixelImage(composeScene(art, house, goalId, pet, skyFrame = motion.sky), art.sceneWidth)
+                pixelImage(
+                    composeScene(art, house, goalId, pet, skyFrame = motion.sky, stickers = stickers),
+                    art.sceneWidth,
+                )
             }
 
             PixelImage(
@@ -1665,6 +1675,8 @@ fun PetFigure(
                     composePet(
                         art, speciesId, stage, colorHex, accessoryId, care, joy,
                         frame = motion.breath, blink = motion.blink, dy = motion.dy,
+                        reaction = motion.reaction, reactionTick = motion.reactionTick,
+                        stageBefore = motion.stageBefore,
                     ),
                     art.petSize,
                 )

@@ -87,4 +87,32 @@ class PixelArtTest {
         }
         animation.skyFrames.forEach { assertNotNull("Нет кадра неба $it", art.sprite(it)) }
     }
+
+    @Test
+    fun `у каждой реакции есть кадры частиц, рта и точки вылета`() {
+        val animation = art.animation
+        listOf("eat", "play", "save", "reward", "grow").forEach { kind ->
+            val reaction = animation.reactions[kind]
+            assertNotNull("Нет реакции $kind", reaction)
+            reaction!!.emits.forEach { emit ->
+                val frames = animation.fx[emit.fx]
+                assertNotNull("Нет частицы ${emit.fx} в $kind", frames)
+                frames!!.forEach { assertNotNull("Нет кадра частицы $it", art.sprite(it)) }
+                assertTrue(
+                    "Неизвестная точка ${emit.from} в $kind",
+                    emit.from in setOf("eyes", "mouth", "bow", "scarf", "fx_head", "base", "outline"),
+                )
+                assertTrue("Частица живёт дольше реакции $kind", emit.at + emit.life <= reaction.ticks)
+            }
+            reaction.mouth?.frames?.forEach { frame ->
+                parts.species.forEach { assertNotNull("Нет рта $frame", art.sprite("${it.id}_mouth_$frame")) }
+            }
+        }
+        parts.species.forEach { species ->
+            stages.forEach { stage ->
+                assertTrue("Нет точки над головой", "fx_head" in art.anchors.getValue("${species.id}_$stage")[0])
+            }
+        }
+        assertNotNull("Нет слоя наклеек", art.sprite("tent_stickers"))
+    }
 }

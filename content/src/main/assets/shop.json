@@ -71,7 +71,8 @@
     "price": 4,
     "stat": "joy",
     "stat_delta": 5,
-    "effect": "Финни украсит домик"
+    "effect": "Финни украсит домик",
+    "unlocks_scenery": "stickers"
   },
   {
     "id": "scarf",

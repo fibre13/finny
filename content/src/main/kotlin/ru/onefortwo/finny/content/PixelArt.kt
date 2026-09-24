@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -72,12 +73,60 @@ data class PixelPoint(val x: Int, val y: Int)
  *
  * @property states состояние `idle`, `happy` или `tired` → его движения.
  * @property skyFrames кадры неба, сменяются раз в [skyTicks] тактов.
+ * @property reactions реакции на события игры: `eat`, `play`, `save`,
+ * `reward`, `grow`.
+ * @property fx кадры частиц по имени: `coin`, `heart`, `sparkle`, `note`,
+ * `crumb` — от яркого к тусклому.
  */
 class PixelAnimation(
     val tickMs: Long,
     val states: Map<String, PixelMotion>,
     val skyFrames: List<String>,
     val skyTicks: Int,
+    val reactions: Map<String, PixelReaction>,
+    val fx: Map<String, List<String>>,
+)
+
+/**
+ * Реакция длиной [ticks] тактов. Всё, что не задано, берётся из
+ * постоянного состояния питомца.
+ *
+ * @property eyes глаза на всю реакцию.
+ * @property mouth кадры рта на отрезке тактов.
+ * @property jumps прыжки: такт начала и смещения по тактам.
+ * @property flashAt такт светлой вспышки силуэта длиной [flashTicks].
+ * @property swapStage такт, с которого рисуется новая стадия (рост).
+ */
+class PixelReaction(
+    val ticks: Int,
+    val eyes: String?,
+    val mouth: PixelMouthTrack?,
+    val jumps: List<Pair<Int, IntArray>>,
+    val emits: List<PixelEmit>,
+    val flashAt: Int?,
+    val flashTicks: Int,
+    val swapStage: Int?,
+)
+
+/** Кадры рта [frames] сменяются каждые [ticks] тактов на отрезке [from]…[to). */
+class PixelMouthTrack(val from: Int, val to: Int, val frames: List<String>, val ticks: Int)
+
+/**
+ * Частица [fx], появляется на такте [at] у точки [from] (якорь, `base` или
+ * `outline` — точка [point] из [of] долей контура), сдвиг [dx], [dy],
+ * скорость [vx], [vy] клеток за такт, живёт [life] тактов.
+ */
+class PixelEmit(
+    val at: Int,
+    val fx: String,
+    val from: String,
+    val dx: Int,
+    val dy: Int,
+    val vx: Double,
+    val vy: Double,
+    val life: Int,
+    val point: Int,
+    val of: Int,
 )
 
 /**
@@ -171,6 +220,46 @@ object PixelArtParser {
             },
             skyFrames = sky.getValue("frames").jsonArray.map { it.jsonPrimitive.content },
             skyTicks = sky.int("ticks"),
+            reactions = obj.obj("reactions").mapValues { (_, value) -> parseReaction(value.jsonObject) },
+            fx = obj.obj("fx").mapValues { (_, frames) -> frames.jsonArray.map { it.jsonPrimitive.content } },
+        )
+    }
+
+    private fun parseReaction(obj: JsonObject): PixelReaction {
+        val mouth = obj["mouth"]?.jsonObject
+        val flash = obj["flash"]?.jsonObject
+        return PixelReaction(
+            ticks = obj.int("ticks"),
+            eyes = obj["eyes"]?.jsonPrimitive?.content,
+            mouth = mouth?.let {
+                PixelMouthTrack(
+                    from = it.int("from"),
+                    to = it.int("to"),
+                    frames = it.getValue("frames").jsonArray.map { f -> f.jsonPrimitive.content },
+                    ticks = it.int("ticks"),
+                )
+            },
+            jumps = obj["jump"]?.jsonArray?.map { j ->
+                j.jsonObject.int("at") to j.jsonObject.getValue("offsets").jsonArray.map { it.jsonPrimitive.int }.toIntArray()
+            }.orEmpty(),
+            emits = obj["emit"]?.jsonArray?.map { e ->
+                val emit = e.jsonObject
+                PixelEmit(
+                    at = emit.int("at"),
+                    fx = emit.str("fx"),
+                    from = emit.str("from"),
+                    dx = emit["dx"]?.jsonPrimitive?.int ?: 0,
+                    dy = emit["dy"]?.jsonPrimitive?.int ?: 0,
+                    vx = emit["vx"]?.jsonPrimitive?.double ?: 0.0,
+                    vy = emit["vy"]?.jsonPrimitive?.double ?: 0.0,
+                    life = emit.int("life"),
+                    point = emit["point"]?.jsonPrimitive?.int ?: 0,
+                    of = emit["of"]?.jsonPrimitive?.int ?: 1,
+                )
+            }.orEmpty(),
+            flashAt = flash?.int("at"),
+            flashTicks = flash?.int("ticks") ?: 0,
+            swapStage = obj["swap_stage"]?.jsonPrimitive?.int,
         )
     }
 

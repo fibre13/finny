@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.onefortwo.finny.content.ContentRepository
+import ru.onefortwo.finny.content.ItemCategory
 import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
@@ -20,6 +21,7 @@ import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.content.check
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.data.GameRepository
+import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.DepositResult
@@ -84,6 +86,26 @@ class GameViewModel(
 
     private val petName: String get() = _state.value.profile?.petName ?: "Финни"
 
+    /**
+     * Реакции питомца, ждущие возвращения на главный экран. Хранятся
+     * отдельно от [state]: это оформление, а не игровое состояние, и в
+     * сохранение не попадают.
+     */
+    private val _reactions = MutableStateFlow<List<PetReaction>>(emptyList())
+    val reactions: StateFlow<List<PetReaction>> = _reactions.asStateFlow()
+    private var reactionCount = 0L
+
+    private fun react(kind: String, stageBefore: GrowthStage? = null) {
+        _reactions.update { queued ->
+            (queued + PetReaction(kind, ++reactionCount, stageBefore)).takeLast(PetReactions.MAX_QUEUED)
+        }
+    }
+
+    /** Реакция проиграна или пропущена — убирается из очереди. */
+    fun reactionPlayed(id: Long) {
+        _reactions.update { queued -> queued.filterNot { it.id == id } }
+    }
+
     init {
         // Автосохранение включается до чтения с устройства, поэтому ни одно
         // изменение состояния не может пройти мимо записи (ТЗ 2.5.13).
@@ -127,6 +149,7 @@ class GameViewModel(
 
     /** Создаёт локальный профиль: игровое имя и внешность, без личных данных. */
     fun createProfile(petName: String, appearance: PetAppearance, difficulty: Difficulty) {
+        _reactions.value = emptyList()
         _state.value = freshProfile(
             petName = petName.trim(),
             appearance = appearance,
@@ -137,6 +160,7 @@ class GameViewModel(
 
     /** Полный сброс профиля; доступен взрослому (ТЗ 2.5.12, 3.5). */
     fun resetProfile() {
+        _reactions.value = emptyList()
         val previous = _state.value
         _state.value = AppState(
             isLoaded = true,
@@ -152,6 +176,7 @@ class GameViewModel(
      * проходился подряд без ожидания календарных сроков (ТЗ 2.5.13).
      */
     fun startDemo() {
+        _reactions.value = emptyList()
         val demo = freshProfile(
             petName = DEMO_PET_NAME,
             appearance = DEMO_APPEARANCE,
@@ -226,6 +251,7 @@ class GameViewModel(
 
         return when (val result = _state.value.game.confirmPlan(plan)) {
             is PlanConfirmation.Success -> {
+                if (result.movedToSavings.amount > 0) react(PetReactions.SAVE)
                 _state.update {
                     val moved = result.movedToSavings
                     it.copy(
@@ -275,30 +301,33 @@ class GameViewModel(
         val itemContent = content.shopItems().firstOrNull { it.id == itemId } ?: return
 
         when (val result = _state.value.game.buy(itemContent.toDomain())) {
-            is PurchaseResult.Success -> _state.update {
-                val unlocked = itemContent.unlocksAccessory
-                val scenery = itemContent.unlocksScenery
-                it.copy(
-                    game = result.state,
-                    ownedAccessories = if (unlocked != null) {
-                        it.ownedAccessories + unlocked
-                    } else {
-                        it.ownedAccessories
-                    },
-                    // Обстановка остаётся навсегда: покупка вещи, которая
-                    // видна на фоне, не отменяется сменой дня.
-                    ownedScenery = if (scenery != null) {
-                        it.ownedScenery + scenery
-                    } else {
-                        it.ownedScenery
-                    },
-                    message = Explanations.purchase(
-                        petName = petName,
-                        result = result,
-                        itemTitle = itemContent.title,
-                        unlockedWardrobe = unlocked != null,
-                    ),
-                )
+            is PurchaseResult.Success -> {
+                react(if (itemContent.category == ItemCategory.NEEDS) PetReactions.EAT else PetReactions.PLAY)
+                _state.update {
+                    val unlocked = itemContent.unlocksAccessory
+                    val scenery = itemContent.unlocksScenery
+                    it.copy(
+                        game = result.state,
+                        ownedAccessories = if (unlocked != null) {
+                            it.ownedAccessories + unlocked
+                        } else {
+                            it.ownedAccessories
+                        },
+                        // Обстановка остаётся навсегда: покупка вещи, которая
+                        // видна на фоне, не отменяется сменой дня.
+                        ownedScenery = if (scenery != null) {
+                            it.ownedScenery + scenery
+                        } else {
+                            it.ownedScenery
+                        },
+                        message = Explanations.purchase(
+                            petName = petName,
+                            result = result,
+                            itemTitle = itemContent.title,
+                            unlockedWardrobe = unlocked != null,
+                        ),
+                    )
+                }
             }
 
             is PurchaseResult.NotEnoughCoins -> _state.update {
@@ -351,14 +380,17 @@ class GameViewModel(
         if (amount <= 0) return
 
         when (val result = _state.value.game.deposit(Coins(amount))) {
-            is DepositResult.Success -> _state.update {
-                it.copy(
-                    game = result.state,
-                    message = FeedbackMessage(
-                        text = "В копилке стало ${Explanations.coins(result.savedAfter)}. " +
-                            Explanations.forecast(result.state.goalForecast()),
-                    ),
-                )
+            is DepositResult.Success -> {
+                react(PetReactions.SAVE)
+                _state.update {
+                    it.copy(
+                        game = result.state,
+                        message = FeedbackMessage(
+                            text = "В копилке стало ${Explanations.coins(result.savedAfter)}. " +
+                                Explanations.forecast(result.state.goalForecast()),
+                        ),
+                    )
+                }
             }
 
             is DepositResult.NotEnoughCoins -> showProblem(
@@ -427,6 +459,7 @@ class GameViewModel(
         val reward = if (repeat) check.reward.amount.half() else check.reward.amount
 
         val (game, event) = _state.value.game.earn(check.reward, reward)
+        if (event.amount.amount > 0) react(PetReactions.REWARD)
         _state.update {
             it.copy(
                 game = game,
@@ -447,15 +480,18 @@ class GameViewModel(
 
     fun finishPeriod() {
         when (val result = _state.value.game.finishPeriod()) {
-            is PeriodCompletion.Success -> _state.update {
-                it.copy(
-                    game = result.state,
-                    lastOutcome = result.outcome,
-                    // Дата нужна, чтобы второй игровой день не начинался
-                    // в те же сутки. В демонстрационном режиме не пишется.
-                    lastFinishedDate = if (it.isDemo) it.lastFinishedDate else dates.today(),
-                    message = Explanations.periodSummary(petName, result.outcome),
-                )
+            is PeriodCompletion.Success -> {
+                if (result.outcome.stageAdvanced) react(PetReactions.GROW, result.outcome.stageBefore)
+                _state.update {
+                    it.copy(
+                        game = result.state,
+                        lastOutcome = result.outcome,
+                        // Дата нужна, чтобы второй игровой день не начинался
+                        // в те же сутки. В демонстрационном режиме не пишется.
+                        lastFinishedDate = if (it.isDemo) it.lastFinishedDate else dates.today(),
+                        message = Explanations.periodSummary(petName, result.outcome),
+                    )
+                }
             }
 
             PeriodCompletion.PlanNotConfirmed -> showProblem(

@@ -15,9 +15,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.PixelArt
+import ru.onefortwo.finny.content.PixelPoint
 import ru.onefortwo.finny.content.PixelSprite
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.StatLevel
+import kotlin.math.atan2
 import kotlin.math.floor
 import kotlin.math.min
 
@@ -100,6 +102,10 @@ private class PixelCanvas(val width: Int, val height: Int) {
  * @param blink глаза закрыты — такт моргания.
  * @param dy смещение фигуры по вертикали при прыжке, в клетках (вверх —
  * отрицательное); тень остаётся на месте.
+ * @param reaction идущая реакция (`eat`, `play`, `save`, `reward`, `grow`)
+ * и её такт [reactionTick]: рот, глаза, вспышка и частицы по её описанию.
+ * @param stageBefore стадия до роста: реакция `grow` рисует её до такта
+ * смены.
  */
 fun composePet(
     art: PixelArt,
@@ -113,21 +119,34 @@ fun composePet(
     frame: Int = 0,
     blink: Boolean = false,
     dy: Int = 0,
+    reaction: String? = null,
+    reactionTick: Int = 0,
+    stageBefore: GrowthStage? = null,
 ): IntArray {
+    val spec = reaction?.let { art.animation.reactions[it] }
+    val swap = spec?.swapStage
+    fun stageAt(tick: Int) = if (swap != null && stageBefore != null && tick < swap) stageBefore else stage
+    val shownStage = stageAt(reactionTick)
+    val flash = spec?.flashAt?.let { reactionTick in it until it + spec.flashTicks } ?: false
+
     val base = argbOf(colorHex)
     val ramp = art.ramps.values.firstOrNull { it[0] == base } ?: art.ramps.values.first()
     val shadow = if (inScene) art.shadowInScene else art.shadowOnCard
+    val ink = art.indexOf('K')
+    val light = art.colors[art.indexOf('c')]
     val color: (Int) -> Int = { index ->
-        when (index) {
-            art.furIndices[0] -> ramp[0]
-            art.furIndices[1] -> ramp[1]
-            art.furIndices[2] -> ramp[2]
-            art.shadowIndex -> shadow
+        when {
+            index == art.shadowIndex -> shadow
+            // Вспышка роста: всё, кроме контура, светлым цветом карточки.
+            flash && index != ink -> light
+            index == art.furIndices[0] -> ramp[0]
+            index == art.furIndices[1] -> ramp[1]
+            index == art.furIndices[2] -> ramp[2]
             else -> art.colors[index]
         }
     }
 
-    val key = "${speciesId}_${stageId(stage)}"
+    val key = "${speciesId}_${stageId(shownStage)}"
     val canvas = PixelCanvas(art.petSize, art.petSize)
     val anchors = art.anchors[key]?.getOrNull(frame).orEmpty()
 
@@ -141,13 +160,70 @@ fun composePet(
     (art.sprite("${key}_$frame") ?: art.sprite("${key}_0"))?.let {
         canvas.draw(it, 0, 0, color, dy = dy, fixedIndex = art.shadowIndex)
     }
-    place("${speciesId}_eyes_${if (blink) "blink" else eyesFor(care, joy)}", "eyes")
-    place("${speciesId}_mouth_${mouthFor(joy)}", "mouth")
+    val eyes = spec?.eyes ?: if (blink) "blink" else eyesFor(care, joy)
+    val mouth = spec?.mouth
+        ?.takeIf { reactionTick in it.from until it.to }
+        ?.let { it.frames[((reactionTick - it.from) / it.ticks) % it.frames.size] }
+        ?: mouthFor(joy)
+    place("${speciesId}_eyes_$eyes", "eyes")
+    place("${speciesId}_mouth_$mouth", "mouth")
     when (accessoryId) {
         "bow" -> place("bow_$speciesId", "bow")
-        "scarf" -> place("scarf_${speciesId}_${stageId(stage)}", "scarf")
+        "scarf" -> place("scarf_${speciesId}_${stageId(shownStage)}", "scarf")
+    }
+
+    if (spec != null) {
+        val plain: (Int) -> Int = { art.colors[it] }
+        spec.emits.forEach { emit ->
+            val age = reactionTick - emit.at
+            if (age !in 0 until emit.life) return@forEach
+            val frames = art.animation.fx[emit.fx] ?: return@forEach
+            val spawnKey = "${speciesId}_${stageId(stageAt(emit.at))}"
+            val spawnDy = spec.jumps.firstNotNullOfOrNull { (at, offsets) -> offsets.getOrNull(emit.at - at) } ?: 0
+            val origin = when (emit.from) {
+                "outline" -> art.sprite("${spawnKey}_0")?.let { outlinePoint(art, it, emit.point, emit.of) }
+                "base" -> PixelPoint(art.petSize / 2, art.baseline)
+                else -> art.anchors[spawnKey]?.getOrNull(0)?.get(emit.from)?.let { it.copy(y = it.y + spawnDy) }
+            } ?: return@forEach
+            val x = floor(origin.x + emit.dx + emit.vx * age).toInt()
+            val y = floor(origin.y + emit.dy + emit.vy * age).toInt()
+            val sprite = art.sprite(frames[min(frames.size - 1, age * frames.size / emit.life)]) ?: return@forEach
+            canvas.draw(sprite, x - sprite.pivotX, y - sprite.pivotY, plain)
+        }
     }
     return canvas.pixels
+}
+
+/**
+ * Точка контура фигуры для частиц роста: клетки на границе с прозрачным,
+ * упорядоченные по углу от центра фигуры; берётся [point] из [of] равных
+ * долей.
+ */
+private fun outlinePoint(art: PixelArt, sprite: PixelSprite, point: Int, of: Int): PixelPoint? {
+    fun solid(x: Int, y: Int): Boolean {
+        if (x !in 0 until sprite.width || y !in 0 until sprite.height) return false
+        val index = sprite.pixels[y * sprite.width + x]
+        return index >= 0 && index != art.shadowIndex
+    }
+    val cells = ArrayList<Pair<Int, Int>>()
+    var sx = 0.0
+    var sy = 0.0
+    var total = 0
+    for (y in 0 until sprite.height) {
+        for (x in 0 until sprite.width) {
+            if (!solid(x, y)) continue
+            sx += x
+            sy += y
+            total++
+            if (!solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1)) cells += x to y
+        }
+    }
+    if (cells.isEmpty()) return null
+    val cx = sx / total
+    val cy = sy / total
+    cells.sortBy { (x, y) -> atan2(y - cy, x - cx) }
+    val (x, y) = cells[(point * cells.size / of.coerceAtLeast(1)).coerceIn(0, cells.size - 1)]
+    return PixelPoint(x, y)
 }
 
 /**
@@ -155,8 +231,16 @@ fun composePet(
  * полученной цели и питомец в правой части.
  *
  * @param skyFrame кадр неба: облака сдвинуты на клетку во втором.
+ * @param stickers наклейки на палатке (после покупки «Наклеек»).
  */
-fun composeScene(art: PixelArt, house: Boolean, goalId: String?, pet: IntArray, skyFrame: Int = 0): IntArray {
+fun composeScene(
+    art: PixelArt,
+    house: Boolean,
+    goalId: String?,
+    pet: IntArray,
+    skyFrame: Int = 0,
+    stickers: Boolean = false,
+): IntArray {
     val canvas = PixelCanvas(art.sceneWidth, art.sceneHeight)
     val plain: (Int) -> Int = { art.colors[it] }
 
@@ -166,6 +250,7 @@ fun composeScene(art: PixelArt, house: Boolean, goalId: String?, pet: IntArray, 
     if (house) {
         val at = art.sceneAnchors["tent"]
         art.sprite("tent")?.let { if (at != null) canvas.draw(it, at.x, at.y, plain) }
+        if (stickers) art.sprite("tent_stickers")?.let { if (at != null) canvas.draw(it, at.x, at.y, plain) }
     }
     if (goalId != null) {
         val at = art.sceneAnchors["goal"]

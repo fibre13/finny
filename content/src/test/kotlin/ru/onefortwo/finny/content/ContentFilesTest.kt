@@ -112,11 +112,15 @@ class ContentFilesTest {
         val scenery = shop.mapNotNull { it.unlocksScenery }.toSet()
 
         // Дом на фоне главного экрана — следствие покупки «Домика-палатки»,
-        // а не украшение интерфейса: без покупки его на экране нет.
-        assertEquals(setOf("house"), scenery)
+        // наклейки на нём — покупки «Наклеек», а не украшение интерфейса:
+        // без покупки их на экране нет.
+        assertEquals(setOf("house", "stickers"), scenery)
         val tent = shop.first { it.unlocksScenery == "house" }
         assertEquals("tent", tent.id)
         assertEquals(ItemCategory.WANTS, tent.category)
+        val stickers = shop.first { it.unlocksScenery == "stickers" }
+        assertEquals("stickers", stickers.id)
+        assertEquals(ItemCategory.WANTS, stickers.category)
     }
 
     @Test
