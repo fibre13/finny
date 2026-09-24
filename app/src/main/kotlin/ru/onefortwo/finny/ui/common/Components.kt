@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -26,7 +27,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -34,13 +34,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,13 +54,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import kotlin.math.roundToInt
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.StatLevel
 import ru.onefortwo.finny.ui.state.FeedbackMessage
@@ -467,7 +465,7 @@ fun AppliqueTextField(
     // при вводе уезжает на рамку и разрывает её: свою «ступеньку» Material
     // вырезает только в собственной рамке, а здесь рамка рисуется
     // оформлением поверх. Подпись сверху к тому же совпадает с остальными
-    // экранами — над ползунками и списками подписи тоже сверху.
+    // экранами — над кнопками шага и списками подписи тоже сверху.
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = label,
@@ -622,83 +620,163 @@ fun StatBar(
 }
 
 /**
- * Ползунок распределения монет.
+ * Выбор количества монет кнопками «−5», «−1», «+1», «+5».
  *
- * Дорожка и ручка собраны вручную и переданы `Slider` слотами: по
- * умолчанию Material красит незаполненную часть своей палитрой, не
- * связанной с нашей схемой, и контура у дорожки нет вовсе.
+ * Заменил ползунок. При бюджете 50 монет одно значение ползунка
+ * приходилось примерно на 5 dp хода — меньше миллиметра, — и точное
+ * число с первого раза не выставлялось (замечание тестировщика). Каждая
+ * кнопка — цель нажатия не меньше [MinTouchTarget] (ТЗ 3.6), число
+ * меняется предсказуемо, на известный шаг.
  *
- * Сам `Slider` остаётся — он приносит жесты, шаг и озвучивание для
- * программы чтения с экрана. Слоты отмечены экспериментальными: другого
- * способа задать своё оформление, сохранив это, нет. Версия Compose
- * закреплена в каталоге версий, смена API отследится сборкой.
+ * Значение не выходит за `0..max`: шаг у края урезается до края, а кнопка,
+ * которой двигаться некуда, выключается. При нулевом `max` кнопки остаются
+ * на месте выключенными, а не исчезают — иначе было бы непонятно, почему
+ * число нельзя изменить.
  *
- * @param color цвет заполненной части и ручки. На экране плана это цвет
- * направления, в задании — основной цвет схемы.
+ * Программа чтения с экрана произносит у каждой кнопки направление и
+ * действие: «Нужное: прибавить 5», а не только «+5».
+ *
+ * @param label название направления для программы чтения с экрана.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CoinSlider(
+fun CoinStepper(
+    label: String,
     value: Int,
     max: Int,
-    color: Color,
     onChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (max <= 0) return
-
-    val fraction = (value.toFloat() / max).coerceIn(0f, 1f)
-
-    Slider(
-        value = value.toFloat(),
-        onValueChange = { onChange(it.roundToInt()) },
-        valueRange = 0f..max.toFloat(),
-        // Шаг в одну монету: доли монеты не существует, и ручка
-        // не должна останавливаться между значениями.
-        steps = (max - 1).coerceAtLeast(0),
-        modifier = modifier.heightIn(min = MinTouchTarget),
-        thumb = { CoinSliderThumb(color) },
-        track = { CoinSliderTrack(fraction = fraction, color = color) },
-    )
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        STEPS.forEach { step ->
+            // «Плюс» только прибавляет, «минус» только убавляет. Через общий
+            // диапазон нельзя: если значение больше максимума — так бывает,
+            // когда бюджет уменьшился, — «+5» урезало бы его вниз.
+            val target = if (step > 0) {
+                minOf(value + step, max).coerceAtLeast(value)
+            } else {
+                maxOf(value + step, 0).coerceAtMost(value)
+            }
+            StepButton(
+                text = if (step < 0) "−${-step}" else "+$step",
+                description = if (step < 0) "$label: убавить на ${-step}" else "$label: прибавить $step",
+                enabled = target != value,
+                onClick = { onChange(target) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
 }
 
-/** Дорожка ползунка: контур 1b, незаполненная часть — чернила с прозрачностью. */
-@Composable
-private fun CoinSliderTrack(fraction: Float, color: Color) {
-    val ink = LocalAppliqueDecor.current.ink
-    val shape = RoundedCornerShape(7.dp)
+private val STEPS = listOf(-5, -1, 1, 5)
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(14.dp)
-            .clip(shape)
-            .background(ink.copy(alpha = 0.25f)),
+/**
+ * Экранная цифровая панель для числового ответа.
+ *
+ * Заменила системную клавиатуру: не нужно попадать в поле и ждать
+ * клавиатуру, а клавиши крупные и одинаковые на любом устройстве. Ответ
+ * ребёнок по-прежнему набирает сам — задание не превращается в выбор
+ * из готовых вариантов (ТЗ 2.5.8).
+ */
+@Composable
+fun DigitPad(
+    onDigit: (Int) -> Unit,
+    onErase: () -> Unit,
+    eraseEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(fraction)
-                .fillMaxHeight()
-                .background(color),
-        )
-        // Контур поверх заливок отдельным слоем: иначе заполненная часть
-        // закрашивает его внутреннюю половину и линия выходит тоньше.
-        Box(modifier = Modifier.matchParentSize().border(1.5.dp, ink, shape))
+        listOf(listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9)).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { digit ->
+                    StepButton(
+                        text = "$digit",
+                        description = null,
+                        enabled = true,
+                        onClick = { onDigit(digit) },
+                        modifier = Modifier.weight(1f),
+                        tall = true,
+                    )
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StepButton(
+                text = "0",
+                description = null,
+                enabled = true,
+                onClick = { onDigit(0) },
+                modifier = Modifier.weight(1f),
+                tall = true,
+            )
+            StepButton(
+                text = "Стереть",
+                description = null,
+                enabled = eraseEnabled,
+                onClick = onErase,
+                modifier = Modifier.weight(2f),
+                tall = true,
+            )
+        }
     }
 }
 
 /**
- * Ручка ползунка: 28 dp видимого размера при зоне нажатия 48 dp.
- * Крупнее дорожка становится толще контура карточки.
+ * Компактная кнопка шага или цифры: оформление вторичной кнопки, но с
+ * узкими боковыми отступами — в ряд из четырёх кнопок стандартные отступы
+ * по 24 dp не оставили бы места подписи при крупном шрифте.
  */
 @Composable
-private fun CoinSliderThumb(color: Color) {
-    Box(
-        modifier = Modifier
-            .size(28.dp)
-            .background(color, CircleShape)
-            .border(2.5.dp, LocalAppliqueDecor.current.ink, CircleShape),
-    )
+private fun StepButton(
+    text: String,
+    description: String?,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tall: Boolean = false,
+) {
+    val decor = LocalAppliqueDecor.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val shape = MaterialTheme.shapes.small
+    val minHeight = if (tall) maxOf(MinTouchTarget, 56.dp) else MinTouchTarget
+
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interaction,
+        shape = shape,
+        border = null,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = decor.disabledContainer,
+            disabledContentColor = decor.disabledContent,
+        ),
+        modifier = modifier
+            .heightIn(min = minHeight)
+            .applique(shape = shape, decor = decor, pressed = pressed, enabled = enabled),
+    ) {
+        // Описание заменяет подпись, а не добавляется к ней: программа
+        // чтения с экрана произносит «Нужное: прибавить 5, кнопка», а не
+        // ещё и «плюс пять» следом.
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            modifier = if (description != null) {
+                Modifier.clearAndSetSemantics { contentDescription = description }
+            } else {
+                Modifier
+            },
+        )
+    }
 }
 
 /** Простая полоса заполнения без зависимостей от версии библиотеки. */

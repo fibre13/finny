@@ -3,18 +3,18 @@ package ru.onefortwo.finny
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onNodeWithContentDescription
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -23,10 +23,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ru.onefortwo.finny.content.AllocateTask
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ChoiceTask
 import ru.onefortwo.finny.content.ContentRepository
+import ru.onefortwo.finny.content.NumberTask
 import ru.onefortwo.finny.content.PetAppearance
+import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.content.toDomain
@@ -239,9 +242,9 @@ class ScreenRenderTest {
             }
         }
 
-        // Третья дорожка — «Копилка». Значение выставляется через семантику,
-        // как это делает программа чтения с экрана.
-        sliders()[2].performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(8f) }
+        // Кнопка ищется по описанию для программы чтения с экрана:
+        // у трёх направлений одинаковые подписи «+5».
+        compose.onNodeWithContentDescription("Копилка: прибавить 5").performScrollTo().performClick()
 
         compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(
@@ -254,8 +257,8 @@ class ScreenRenderTest {
     @Test
     fun `суммы плана урезаются, если бюджет уменьшился, пока план открыт`() {
         // Из копилки поверх плана можно отложить монеты с баланса. Суммы,
-        // превысившие новый бюджет, должны урезаться: при нулевом бюджете
-        // ползунков нет, и уменьшить их было бы нечем.
+        // превысившие новый бюджет, должны урезаться, а не оставаться
+        // больше всего, что есть у ребёнка.
         val goal = content.goals().first { it.id == "scooter" }.toDomain()
         var game by mutableStateOf(GameState.newProfile().chooseGoal(goal))
         compose.setContent {
@@ -264,14 +267,14 @@ class ScreenRenderTest {
             }
         }
 
-        sliders()[0].performSemanticsAction(SemanticsActions.SetProgress) { it(19f) }
-        // «19 монет» выводится дважды: под «Нужное» и в строке «Распределено».
-        compose.onAllNodesWithText("19 монет").assertCountEquals(2)
+        repeat(4) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performClick() }
+        // «20 монет» выводится дважды: под «Нужное» и в строке «Распределено».
+        compose.onAllNodesWithText("20 монет").assertCountEquals(2)
 
         game = game.copy(balance = Coins.ZERO)
         compose.waitForIdle()
 
-        compose.onAllNodesWithText("19 монет").assertCountEquals(0)
+        compose.onAllNodesWithText("20 монет").assertCountEquals(0)
         compose.onNodeWithText("Лишние монеты").assertDoesNotExist()
     }
 
@@ -316,9 +319,132 @@ class ScreenRenderTest {
         compose.onNodeWithText("можно составить план", substring = true).assertDoesNotExist()
     }
 
-    /** Ползунки экрана по порядку: у них нет текста, только диапазон значений. */
-    private fun sliders() =
-        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+    @Test
+    fun `кнопки шага не выводят сумму за пределы бюджета`() {
+        // Бюджет нового профиля — 50 монет.
+        compose.setContent {
+            FinnyTheme {
+                PlanScreen(game = GameState.newProfile(), onConfirm = { _, _, _ -> }, onBack = {})
+            }
+        }
+
+        // У нуля убавлять некуда: кнопки «минус» выключены.
+        compose.onNodeWithContentDescription("Нужное: убавить на 1").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Нужное: убавить на 5").assertIsNotEnabled()
+
+        repeat(10) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performClick() }
+        compose.onAllNodesWithText("50 монет").assertCountEquals(2)
+        // Весь бюджет: прибавлять некуда.
+        compose.onNodeWithContentDescription("Нужное: прибавить 5").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Нужное: прибавить 1").assertIsNotEnabled()
+
+        compose.onNodeWithContentDescription("Нужное: убавить на 1").performClick()
+        compose.onAllNodesWithText("49 монет").assertCountEquals(2)
+    }
+
+    @Test
+    fun `задание на распределение решается кнопками шага`() {
+        // Базовая сумма задания — 10 монет, без переменных чисел.
+        val task = content.task("plan_split_easy") as AllocateTask
+        var answer: TaskAnswer? = null
+        compose.setContent {
+            FinnyTheme {
+                TaskDetailScreen(
+                    task = task,
+                    onAnswer = {
+                        answer = it
+                        AnsweredTask(
+                            check = TaskCheck(true, "Объяснение", reward = IncomeSource.TASK_CORRECT),
+                            credited = Coins(10),
+                            isRepeat = false,
+                        )
+                    },
+                    onBack = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("Ответить").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Хочу: прибавить 1").performScrollTo().performClick()
+        repeat(4) {
+            compose.onNodeWithContentDescription("Копилка: прибавить 1").performScrollTo().performClick()
+        }
+
+        compose.onNodeWithText("Все монеты распределены.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Ответить").performScrollTo().performClick()
+        assertEquals(TaskAnswer.Allocation(needs = 5, wants = 1, savings = 4), answer)
+    }
+
+    @Test
+    fun `числовой ответ набирается экранной цифровой панелью`() {
+        val task = content.task("save_gap_easy") as NumberTask
+        var answer: TaskAnswer? = null
+        compose.setContent {
+            FinnyTheme {
+                TaskDetailScreen(
+                    task = task,
+                    onAnswer = {
+                        answer = it
+                        AnsweredTask(
+                            check = TaskCheck(true, "Объяснение", reward = IncomeSource.TASK_CORRECT),
+                            credited = Coins(10),
+                            isRepeat = false,
+                        )
+                    },
+                    onBack = {},
+                )
+            }
+        }
+
+        // Системного поля ввода нет: ответ набирается кнопками.
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        compose.onNodeWithText("Ответить").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Стереть").performScrollTo().assertIsNotEnabled()
+
+        compose.onNodeWithText("5").performScrollTo().performClick()
+        compose.onNodeWithText("7").performScrollTo().performClick()
+        compose.onNodeWithText("57").assertIsDisplayed()
+
+        compose.onNodeWithText("Стереть").performScrollTo().performClick()
+        // «5» теперь и на клавише, и в строке ответа.
+        compose.onAllNodesWithText("5").assertCountEquals(2)
+        compose.onNodeWithText("3").performScrollTo().performClick()
+
+        compose.onNodeWithText("Ответить").performScrollTo().performClick()
+        assertEquals(TaskAnswer.Number(53), answer)
+    }
+
+    @Test
+    fun `ведущий ноль в ответе не копится`() {
+        val task = content.task("save_gap_easy") as NumberTask
+        var answer: TaskAnswer? = null
+        compose.setContent {
+            FinnyTheme {
+                TaskDetailScreen(
+                    task = task,
+                    onAnswer = {
+                        answer = it
+                        AnsweredTask(
+                            check = TaskCheck(true, "Объяснение", reward = IncomeSource.TASK_CORRECT),
+                            credited = Coins(10),
+                            isRepeat = false,
+                        )
+                    },
+                    onBack = {},
+                )
+            }
+        }
+
+        // Без защиты строка стала бы «000», а «8» отсеклась бы пределом в три цифры.
+        repeat(3) { compose.onNode(hasText("0") and hasClickAction()).performScrollTo().performClick() }
+        compose.onNodeWithText("8").performScrollTo().performClick()
+        // «8» видно дважды: на клавише и в строке ответа; «08» и «008» нет.
+        compose.onAllNodesWithText("8").assertCountEquals(2)
+        compose.onNodeWithText("08").assertDoesNotExist()
+        compose.onNodeWithText("Ответить").performScrollTo().performClick()
+        assertEquals(TaskAnswer.Number(8), answer)
+    }
 
     @Test
     fun `с выбранной целью план не предлагает выбирать её снова`() {
@@ -455,6 +581,44 @@ class ScreenRenderTest {
         }
 
         compose.onNodeWithText("Выбери цель").assertIsDisplayed()
+    }
+
+    @Test
+    fun `в копилке сумма выставляется кнопками в пределах баланса и накопленного`() {
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        val deposits = mutableListOf<Int>()
+        compose.setContent {
+            FinnyTheme {
+                SavingsScreen(
+                    game = GameState.newProfile().chooseGoal(goal),
+                    goals = content.goals(),
+                    message = null,
+                    onDismissMessage = {},
+                    onChooseGoal = {},
+                    onClaimGoal = {},
+                    onDeposit = { deposits += it },
+                    onPreviewWithdrawal = { GameState.newProfile().previewWithdrawal(Coins(0)) },
+                    onWithdraw = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        // Системного поля ввода нет: сумма выставляется кнопками шага.
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        compose.onNodeWithText("Отложить в копилку").performScrollTo().assertIsNotEnabled()
+        repeat(2) {
+            compose.onNodeWithContentDescription("Сколько отложить: прибавить 5")
+                .performScrollTo().performClick()
+        }
+        compose.onNodeWithText("Отложить в копилку").performScrollTo().performClick()
+        assertEquals(listOf(10), deposits)
+
+        // Копилка пуста: забирать нечего, кнопки выключены, причина названа.
+        compose.onNodeWithContentDescription("Сколько забрать: прибавить 1")
+            .performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("В копилке пока пусто — забирать нечего.")
+            .performScrollTo().assertIsDisplayed()
     }
 
     @Test

@@ -7,12 +7,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,9 +23,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.AllocateTask
 import ru.onefortwo.finny.content.ChoiceTask
@@ -40,7 +40,8 @@ import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.IncomeSource
-import ru.onefortwo.finny.ui.common.CoinSlider
+import ru.onefortwo.finny.ui.common.CoinStepper
+import ru.onefortwo.finny.ui.common.DigitPad
 import ru.onefortwo.finny.ui.common.MinTouchTarget
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
@@ -166,17 +167,17 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
     val left = task.amount - (needs + wants + savings)
 
     Column {
-        TaskSlider("Нужное", needs, task.amount) { needs = it }
-        TaskSlider("Хочу", wants, task.amount) { wants = it }
-        TaskSlider("Копилка", savings, task.amount) { savings = it }
+        TaskAmount("Нужное", needs, task.amount) { needs = it }
+        TaskAmount("Хочу", wants, task.amount) { wants = it }
+        TaskAmount("Копилка", savings, task.amount) { savings = it }
 
         Text(
             text = if (left == 0) {
                 "Все монеты распределены."
             } else if (left > 0) {
-                "Осталось распределить ${Explanations.coins(left)}."
+                "Осталось распределить ${Explanations.coinsAccusative(left)}."
             } else {
-                "Ты раздал больше, чем есть, на ${Explanations.coins(-left)}."
+                "Ты раздал больше, чем есть, на ${Explanations.coinsAccusative(-left)}."
             },
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(vertical = 12.dp),
@@ -190,23 +191,26 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
     }
 }
 
+/**
+ * Сумма одного направления в задании на распределение: подпись с числом
+ * и кнопки шага. Число объявляется программой чтения с экрана при каждом
+ * изменении.
+ */
 @Composable
-private fun TaskSlider(label: String, value: Int, max: Int, onChange: (Int) -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+private fun TaskAmount(label: String, value: Int, max: Int, onChange: (Int) -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
         Text(
             text = "$label: ${Explanations.coins(value)}",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
-        CoinSlider(
+        CoinStepper(
+            label = label,
             value = value,
             max = max,
-            // Направления здесь названы подписью над дорожкой, но сами
-            // карточки направлений на этом экране не показываются:
-            // цвет берётся основной, а не по направлению.
-            color = MaterialTheme.colorScheme.primary,
             onChange = onChange,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }
@@ -260,19 +264,39 @@ private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
     }
 }
 
-/** Ввод числового ответа. */
+/**
+ * Ввод числового ответа экранной цифровой панелью.
+ *
+ * Ответ ребёнок набирает сам, поэтому задание остаётся вычислением, а не
+ * выбором из готовых вариантов (ТЗ 2.5.8). Системная клавиатура не нужна:
+ * не приходится попадать в поле, а клавиши крупные на любом устройстве.
+ * Ответы в заданиях не превышают сотни, поэтому набирается до трёх цифр.
+ */
 @Composable
 private fun NumberForm(task: NumberTask, onSubmit: (TaskAnswer) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
 
     Column {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { input -> text = input.filter { it.isDigit() }.take(4) },
-            label = { Text("Ответ, ${task.unit}", style = MaterialTheme.typography.bodyMedium) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
+        Text("Ответ, ${task.unit}:", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = text.ifEmpty { "—" },
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .padding(vertical = 8.dp)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    if (text.isEmpty()) contentDescription = "Ответ ещё не набран"
+                },
+        )
+
+        DigitPad(
+            onDigit = { digit ->
+                // Ведущий ноль не копится: «0», затем «7» дают «7».
+                text = if (text == "0") "$digit" else (text + digit).take(MAX_ANSWER_DIGITS)
+            },
+            onErase = { text = text.dropLast(1) },
+            eraseEnabled = text.isNotEmpty(),
         )
 
         PrimaryButton(
@@ -283,6 +307,8 @@ private fun NumberForm(task: NumberTask, onSubmit: (TaskAnswer) -> Unit) {
         )
     }
 }
+
+private const val MAX_ANSWER_DIGITS = 3
 
 /** Выбор решения с описанными последствиями. */
 @Composable

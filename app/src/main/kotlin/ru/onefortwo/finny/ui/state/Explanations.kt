@@ -35,6 +35,15 @@ object Explanations {
 
     fun coins(value: Coins): String = coins(value.amount)
 
+    /**
+     * «Монета» в винительном падеже: «распределить 1 монету», «на 21 монету».
+     * Отличается от [coins] только формой для единицы.
+     */
+    fun coinsAccusative(amount: Int): String {
+        val tail = amount % 100
+        return if (amount % 10 == 1 && tail != 11) "$amount монету" else coins(amount)
+    }
+
     /** Склонение слова «день» для числа игровых периодов. */
     fun days(count: Int): String {
         val tail = count % 100

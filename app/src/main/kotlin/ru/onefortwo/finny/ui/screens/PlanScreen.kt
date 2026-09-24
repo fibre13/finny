@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -32,7 +34,7 @@ import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.PeriodOutcome
 import ru.onefortwo.finny.ui.common.BudgetDirectionIcon
-import ru.onefortwo.finny.ui.common.CoinSlider
+import ru.onefortwo.finny.ui.common.CoinStepper
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.MinTouchTarget
 import ru.onefortwo.finny.ui.common.PrimaryButton
@@ -141,8 +143,8 @@ private fun PlanEditor(
 
     // Бюджет может уменьшиться, пока экран плана лежит в стеке под копилкой:
     // из копилки можно отложить монеты с баланса. Суммы, превышающие новый
-    // бюджет, урезаются до него. Иначе при нулевом бюджете ползунки не
-    // выводятся, и уменьшить лишние суммы было бы нечем.
+    // бюджет, урезаются до него сразу, чтобы ребёнок не видел направление
+    // с суммой больше всего, что у него есть.
     LaunchedEffect(available) {
         needs = needs.coerceAtMost(available)
         wants = wants.coerceAtMost(available)
@@ -168,11 +170,11 @@ private fun PlanEditor(
             icon = { BudgetDirectionIcon(BudgetCategory.NEEDS) },
             edgeColor = budget.needs,
         ) {
-            AmountSlider(
+            AmountStepper(
                 hint = "Корм, вода, уход. Это покупают в первую очередь.",
                 value = needs,
                 max = available,
-                color = budget.needs,
+                label = BudgetCategory.NEEDS.displayName,
                 onChange = { needs = it },
             )
         }
@@ -182,11 +184,11 @@ private fun PlanEditor(
             icon = { BudgetDirectionIcon(BudgetCategory.WANTS) },
             edgeColor = budget.wants,
         ) {
-            AmountSlider(
+            AmountStepper(
                 hint = "Игрушки и украшения. Можно отложить на завтра.",
                 value = wants,
                 max = available,
-                color = budget.wants,
+                label = BudgetCategory.WANTS.displayName,
                 onChange = { wants = it },
             )
         }
@@ -197,7 +199,7 @@ private fun PlanEditor(
             edgeColor = budget.savings,
         ) {
             Column {
-                AmountSlider(
+                AmountStepper(
                     hint = if (hasGoal) {
                         "Эти монеты сразу уйдут в копилку на твою цель."
                     } else {
@@ -205,7 +207,7 @@ private fun PlanEditor(
                     },
                     value = savings,
                     max = available,
-                    color = budget.savings,
+                    label = BudgetCategory.SAVINGS.displayName,
                     onChange = { savings = it },
                 )
                 if (!hasGoal) {
@@ -250,29 +252,36 @@ private fun PlanEditor(
     }
 }
 
-/** Ползунок суммы с подписью и подсказкой. */
+/**
+ * Сумма направления с подсказкой и кнопками шага.
+ *
+ * Сумма выводится крупно и объявляется программой чтения с экрана при
+ * каждом изменении: кнопки шага меняют число, которое видно над ними.
+ */
 @Composable
-private fun AmountSlider(
+private fun AmountStepper(
     hint: String,
     value: Int,
     max: Int,
-    color: Color,
+    label: String,
     onChange: (Int) -> Unit,
 ) {
     Column {
         Text(hint, style = MaterialTheme.typography.bodyMedium)
         Text(
             text = Explanations.coins(value),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         )
-        CoinSlider(
+        CoinStepper(
+            label = label,
             value = value,
             max = max,
-            color = color,
             onChange = onChange,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
 }

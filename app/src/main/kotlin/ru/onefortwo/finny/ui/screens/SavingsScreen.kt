@@ -3,24 +3,26 @@ package ru.onefortwo.finny.ui.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.GoalContent
 import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.WithdrawalPreview
 import ru.onefortwo.finny.ui.common.AppliqueDialog
-import ru.onefortwo.finny.ui.common.AppliqueTextField
+import ru.onefortwo.finny.ui.common.CoinStepper
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
@@ -51,8 +53,10 @@ fun SavingsScreen(
     onWithdraw: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
-    var depositText by rememberSaveable { mutableStateOf("") }
-    var withdrawText by rememberSaveable { mutableStateOf("") }
+    // Суммы выставляются кнопками шага, как на экране плана: печатать
+    // число с клавиатуры не нужно (замечание тестировщика о вводе).
+    var depositAmount by rememberSaveable { mutableIntStateOf(0) }
+    var withdrawAmount by rememberSaveable { mutableIntStateOf(0) }
     // Хранится сумма, а не объект предпросмотра: примитив переживает
     // поворот экрана, а сам предпросмотр пересчитывается из неё.
     var previewAmount by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -118,26 +122,33 @@ fun SavingsScreen(
                 SectionCard(title = "Отложить монеты") {
                     Column {
                         LabeledValue("Можно потратить", Explanations.coins(game.balance))
-                        AmountField(
+                        // Больше баланса отложить нельзя: верхняя граница — баланс.
+                        val depositMax = game.balance.amount
+                        val deposit = depositAmount.coerceAtMost(depositMax)
+                        AmountPicker(
                             label = "Сколько отложить",
-                            value = depositText,
-                            onChange = { depositText = it },
+                            value = deposit,
+                            max = depositMax,
+                            onChange = { depositAmount = it },
                         )
-                        val canDeposit = depositText.toIntOrNull()?.let { it > 0 } == true
                         PrimaryButton(
                             text = "Отложить в копилку",
-                            enabled = canDeposit,
+                            enabled = deposit > 0,
                             onClick = {
-                                depositText.toIntOrNull()?.let(onDeposit)
-                                depositText = ""
+                                onDeposit(deposit)
+                                depositAmount = 0
                             },
                             modifier = Modifier.padding(top = 12.dp),
                         )
                         // Причина недоступности названа текстом: по одному
                         // виду кнопки непонятно, чего она ждёт.
-                        if (!canDeposit) {
+                        if (deposit == 0) {
                             Text(
-                                "Впиши число, и кнопка станет доступной.",
+                                text = if (depositMax > 0) {
+                                    "Выбери сумму кнопками, и кнопка станет доступной."
+                                } else {
+                                    "Монет на балансе нет — откладывать пока нечего."
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
@@ -151,23 +162,28 @@ fun SavingsScreen(
                             "Монеты из копилки можно забрать, но цель станет дальше.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        AmountField(
+                        // Забрать можно не больше, чем накоплено.
+                        val withdrawMax = game.savings.saved.amount
+                        val withdraw = withdrawAmount.coerceAtMost(withdrawMax)
+                        AmountPicker(
                             label = "Сколько забрать",
-                            value = withdrawText,
-                            onChange = { withdrawText = it },
+                            value = withdraw,
+                            max = withdrawMax,
+                            onChange = { withdrawAmount = it },
                         )
-                        val canWithdraw = withdrawText.toIntOrNull()?.let { it > 0 } == true
                         SecondaryButton(
                             text = "Посмотреть, что изменится",
-                            enabled = canWithdraw,
-                            onClick = {
-                                withdrawText.toIntOrNull()?.let { previewAmount = it }
-                            },
+                            enabled = withdraw > 0,
+                            onClick = { previewAmount = withdraw },
                             modifier = Modifier.padding(top = 12.dp),
                         )
-                        if (!canWithdraw) {
+                        if (withdraw == 0) {
                             Text(
-                                "Впиши число, и кнопка станет доступной.",
+                                text = if (withdrawMax > 0) {
+                                    "Выбери сумму кнопками, и кнопка станет доступной."
+                                } else {
+                                    "В копилке пока пусто — забирать нечего."
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
@@ -183,7 +199,7 @@ fun SavingsScreen(
             preview = onPreviewWithdrawal(amount),
             onConfirm = {
                 onWithdraw(amount)
-                withdrawText = ""
+                withdrawAmount = 0
                 previewAmount = null
             },
             onCancel = { previewAmount = null },
@@ -191,20 +207,35 @@ fun SavingsScreen(
     }
 }
 
-/** Поле ввода суммы: только цифры. */
+/**
+ * Сумма кнопками шага: подпись, крупное число и «−5», «−1», «+1», «+5».
+ * Число объявляется программой чтения с экрана при каждом изменении.
+ */
 @Composable
-private fun AmountField(
+private fun AmountPicker(
     label: String,
-    value: String,
-    onChange: (String) -> Unit,
+    value: Int,
+    max: Int,
+    onChange: (Int) -> Unit,
 ) {
-    AppliqueTextField(
-        value = value,
-        onValueChange = { text -> onChange(text.filter { it.isDigit() }.take(4)) },
-        label = label,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.padding(top = 8.dp),
-    )
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = Explanations.coins(value),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        CoinStepper(
+            label = label,
+            value = value,
+            max = max,
+            onChange = onChange,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
 }
 
 /**
