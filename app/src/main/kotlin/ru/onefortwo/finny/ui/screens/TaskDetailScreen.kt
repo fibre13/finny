@@ -1,15 +1,19 @@
 package ru.onefortwo.finny.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -40,14 +45,19 @@ import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.IncomeSource
+import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.CoinStepper
+import ru.onefortwo.finny.ui.common.ControlHeight
 import ru.onefortwo.finny.ui.common.DigitPad
 import ru.onefortwo.finny.ui.common.MinTouchTarget
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
+import ru.onefortwo.finny.ui.common.SelectButton
+import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.TaskResultIcon
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.Explanations
 
@@ -69,15 +79,25 @@ fun TaskDetailScreen(
      */
     nextTask: TaskContent? = null,
     onNextTask: () -> Unit = {},
+    balance: Coins? = null,
 ) {
     var result by rememberSaveable(stateSaver = AnsweredTaskSaver) {
         mutableStateOf<AnsweredTask?>(null)
     }
 
-    ScreenScaffold(title = task.title, onBack = onBack) {
+    ScreenScaffold(
+        eyebrow = task.topic.displayName,
+        title = task.title,
+        balance = balance,
+        onBack = onBack,
+    ) {
         Column {
-            SectionCard(title = task.topic.displayName) {
-                Text(task.prompt, style = MaterialTheme.typography.bodyMedium)
+            SectionCard(tone = CardTone.Sage) {
+                Text(
+                    text = task.prompt,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                )
             }
 
             val current = result
@@ -121,35 +141,43 @@ private fun ResultCard(
     Column {
         SectionCard(
             title = if (check.isCorrect) "Верно" else "Почти",
+            tone = if (check.isCorrect) CardTone.Success else CardTone.Warning,
             icon = { TaskResultIcon(correct = check.isCorrect) },
         ) {
             Column {
-                if (check.outcome != null) {
-                    Text(
-                        text = check.outcome!!,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
-                Text(check.explanation, style = MaterialTheme.typography.bodyMedium)
                 Text(
                     text = Explanations.reward(
                         source = check.reward,
                         amount = answered.credited,
                         repeat = answered.isRepeat,
                     ) + ".",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 12.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (check.isCorrect) {
+                        FinnyTheme.colors.successText
+                    } else {
+                        FinnyTheme.colors.warningText
+                    },
+                    modifier = Modifier.padding(bottom = 10.dp),
                 )
+                if (check.outcome != null) {
+                    Text(
+                        text = check.outcome!!,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                }
+                SupportingText(check.explanation)
             }
         }
         if (nextTask != null) {
+            SectionCard(eyebrow = "Следующее задание", title = nextTask.title) {
+                SupportingText(nextTask.topic.displayName)
+            }
             PrimaryButton(text = "Следующее задание: ${nextTask.title}", onClick = onNextTask)
             SecondaryButton(
                 text = "Готово",
                 onClick = onBack,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 10.dp),
             )
         } else {
             PrimaryButton(text = "Готово", onClick = onBack)
@@ -171,7 +199,7 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
         TaskAmount("Хочу", wants, task.amount) { wants = it }
         TaskAmount("Копилка", savings, task.amount) { savings = it }
 
-        Text(
+        SupportingText(
             text = if (left == 0) {
                 "Все монеты распределены."
             } else if (left > 0) {
@@ -179,7 +207,6 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
             } else {
                 "Ты раздал больше, чем есть, на ${Explanations.coinsAccusative(-left)}."
             },
-            style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(vertical = 12.dp),
         )
 
@@ -198,11 +225,10 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
  */
 @Composable
 private fun TaskAmount(label: String, value: Int, max: Int, onChange: (Int) -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
         Text(
             text = "$label: ${Explanations.coins(value)}",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
         CoinStepper(
@@ -220,13 +246,22 @@ private fun TaskAmount(label: String, value: Int, max: Int, onChange: (Int) -> U
 private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
     val picked = rememberSaveable { mutableStateListOf<String>() }
 
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val colors = FinnyTheme.colors
+        val shape = MaterialTheme.shapes.small
         task.options.forEach { option ->
             val checked = option.id in picked
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = MinTouchTarget)
+                    .heightIn(min = maxOf(MinTouchTarget, ControlHeight))
+                    .clip(shape)
+                    .background(if (checked) colors.selectedContainer else colors.surface)
+                    .border(
+                        width = if (checked) 2.dp else 1.5.dp,
+                        color = if (checked) colors.primary else colors.outline,
+                        shape = shape,
+                    )
                     // Нажатие принимает вся строка, а не только квадратик:
                     // попасть по нему пальцем на телефоне трудно, а подпись
                     // рядом выглядит частью того же переключателя.
@@ -237,19 +272,26 @@ private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
                             if (checked) picked.remove(option.id) else picked.add(option.id)
                         },
                     )
-                    .padding(vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Обработчик снят: нажатие обрабатывает строка целиком,
                 // иначе программа чтения с экрана объявит два элемента.
-                Checkbox(checked = checked, onCheckedChange = null)
+                Checkbox(
+                    checked = checked,
+                    onCheckedChange = null,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = colors.primary,
+                        uncheckedColor = colors.primary,
+                    ),
+                )
                 Text(
                     text = if (option.price != null) {
                         "${option.title} — ${Explanations.coins(option.price!!)}"
                     } else {
                         option.title
                     },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
@@ -276,14 +318,23 @@ private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
 private fun NumberForm(task: NumberTask, onSubmit: (TaskAnswer) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
 
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.small
+
     Column {
-        Text("Ответ, ${task.unit}:", style = MaterialTheme.typography.bodyMedium)
+        Text("Ответ, ${task.unit}:", style = MaterialTheme.typography.titleMedium)
+        // Набранное число стоит в рамке поля: видно, куда идёт ввод.
         Text(
             text = text.ifEmpty { "—" },
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .padding(vertical = 8.dp)
+                .padding(top = 8.dp, bottom = 12.dp)
+                .fillMaxWidth()
+                .heightIn(min = 60.dp)
+                .clip(shape)
+                .background(colors.surface)
+                .border(2.dp, colors.primary, shape)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
                     if (text.isEmpty()) contentDescription = "Ответ ещё не набран"
@@ -315,27 +366,13 @@ private const val MAX_ANSWER_DIGITS = 3
 private fun ChoiceForm(task: ChoiceTask, onSubmit: (TaskAnswer) -> Unit) {
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
 
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         task.options.forEach { option ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MinTouchTarget)
-                    .selectable(
-                        selected = selected == option.id,
-                        role = Role.RadioButton,
-                        onClick = { selected = option.id },
-                    )
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = selected == option.id, onClick = null)
-                Text(
-                    text = option.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
+            SelectButton(
+                text = option.title,
+                selected = selected == option.id,
+                onClick = { selected = option.id },
+            )
         }
 
         PrimaryButton(

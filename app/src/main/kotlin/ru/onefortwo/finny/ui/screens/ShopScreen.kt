@@ -19,15 +19,19 @@ import ru.onefortwo.finny.content.ShopItemContent
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.PetState
-import ru.onefortwo.finny.ui.common.AppliqueDialog
+import ru.onefortwo.finny.economy.BudgetCategory
+import ru.onefortwo.finny.ui.common.BudgetDirectionIcon
+import ru.onefortwo.finny.ui.common.CardTone
+import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
+import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.FeedbackMessage
-import ru.onefortwo.finny.ui.theme.LocalBudgetColors
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
  * Каталог покупок (ТЗ 2.5.6).
@@ -52,7 +56,9 @@ fun ShopScreen(
     var pendingId by rememberSaveable { mutableStateOf<String?>(null) }
 
     ScreenScaffold(
+        eyebrow = "Для питомца",
         title = "Покупки",
+        balance = balance,
         onBack = onBack,
         message = message,
         onDismissMessage = onDismissMessage,
@@ -64,13 +70,12 @@ fun ShopScreen(
 
             Text(
                 text = "Нужное",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
             )
-            Text(
+            SupportingText(
                 text = "Без этого питомец грустит. Покупай это в первую очередь.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
             items.filter { it.category == ItemCategory.NEEDS }.forEach { item ->
                 ShopItemCard(item = item, balance = balance, onClick = { pendingId = item.id })
@@ -78,13 +83,12 @@ fun ShopScreen(
 
             Text(
                 text = "Хочу",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
             )
-            Text(
+            SupportingText(
                 text = "Это радует питомца. Можно купить сейчас, а можно отложить на завтра.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
             items.filter { it.category == ItemCategory.WANTS }.forEach { item ->
                 ShopItemCard(item = item, balance = balance, onClick = { pendingId = item.id })
@@ -115,35 +119,44 @@ private fun ShopItemCard(
     onClick: () -> Unit,
 ) {
     val affordable = balance.amount >= item.price
-    val palette = LocalBudgetColors.current
-    // Кромка обозначает учебную категорию. Подпись «Это — нужное»
-    // в карточке остаётся: цвет только помогает её узнать (ТЗ 3.6).
-    val edge = when (item.category) {
-        ItemCategory.NEEDS -> palette.needs
-        ItemCategory.WANTS -> palette.wants
-    }
+    val needs = item.category == ItemCategory.NEEDS
 
-    SectionCard(title = item.title, edgeColor = edge) {
+    // Подложка обозначает учебную категорию; подпись «Это — нужное»
+    // в карточке остаётся: цвет только помогает её узнать (ТЗ 3.6).
+    SectionCard(
+        title = item.title,
+        tone = if (needs) CardTone.Sage else CardTone.Coin,
+        trailing = {
+            BudgetDirectionIcon(
+                category = if (needs) BudgetCategory.NEEDS else BudgetCategory.WANTS,
+                size = 32.dp,
+            )
+        },
+    ) {
         Column {
-            LabeledValue("Цена", Explanations.coins(item.price))
+            Text(
+                text = Explanations.coins(item.price),
+                style = MaterialTheme.typography.headlineSmall,
+            )
             LabeledValue(
                 label = "Это",
-                value = if (item.category == ItemCategory.NEEDS) "нужное" else "желаемое",
+                value = if (needs) "нужное" else "желаемое",
             )
-            Text(item.effect, style = MaterialTheme.typography.bodyMedium)
+            SupportingText(item.effect)
 
             if (!affordable) {
                 Text(
                     text = "Не хватает ${Explanations.coins(item.price - balance.amount)}.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 4.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = FinnyTheme.colors.warningText,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
 
-            SecondaryButton(
+            PrimaryButton(
                 text = "Купить",
                 onClick = onClick,
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 14.dp),
             )
         }
     }
@@ -163,7 +176,7 @@ private fun PurchaseConfirmation(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    AppliqueDialog(
+    FinnyDialog(
         title = "Купить «${item.title}»?",
         onDismiss = onCancel,
         content = {
@@ -185,6 +198,7 @@ private fun PurchaseConfirmation(
                     text = "Но этот показатель у Финни уже полный: монеты " +
                         "потратятся, а лучше не станет.",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = FinnyTheme.colors.warningText,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }

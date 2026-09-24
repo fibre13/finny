@@ -6,50 +6,88 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.content.TaskQueue
+import ru.onefortwo.finny.economy.Coins
+import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.PrimaryButton
+import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
+import ru.onefortwo.finny.ui.common.SupportingText
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
- * Список финансовых заданий (ТЗ 2.5.8).
+ * Список финансовых заданий (ТЗ 2.5.8). Открывается вкладкой «Задания».
  *
  * Все задания доступны сразу, без привязки к реальному времени. Порядок
  * задаёт [TaskQueue]: сверху новые задания в порядке выдачи, первое из них
  * выделено основной кнопкой; ниже — уже решённые, их можно решить ещё раз;
  * в конце — задание восстановления, которое пригождается после неудачного
  * дня. Тема каждого задания подписана на его карточке.
+ *
+ * @param onBack возврат; `null`, когда экран открыт вкладкой.
  */
 @Composable
 fun TasksScreen(
     tasks: List<TaskContent>,
     completedIds: Set<String>,
     onOpenTask: (String) -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
+    balance: Coins? = null,
 ) {
     val sections = TaskQueue.sections(tasks, completedIds)
+    // Счёт тот же, что на вкладке «Прогресс»: все задания, включая
+    // задание восстановления.
+    val total = tasks.size
+    val solved = tasks.count { it.id in completedIds }
 
-    ScreenScaffold(title = "Задания", onBack = onBack) {
+    ScreenScaffold(
+        eyebrow = "Учимся с монетами",
+        title = "Задания",
+        balance = balance,
+        onBack = onBack,
+    ) {
         Column {
-            Text(
-                text = "За каждое задание дают монеты. Даже если ошибёшься, монеты всё равно дадут " +
-                    "и подскажут, как было правильно.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
+            SectionCard(
+                title = "Решено",
+                tone = CardTone.Primary,
+                trailing = {
+                    Text(
+                        text = "$solved из $total",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = FinnyTheme.colors.coin,
+                    )
+                },
+            ) {
+                Column {
+                    Text(
+                        text = "За каждое задание дают монеты. Даже если ошибёшься, монеты всё равно дадут " +
+                            "и подскажут, как было правильно.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    ProgressBar(
+                        fraction = if (total > 0) solved.toFloat() / total else 0f,
+                        color = FinnyTheme.colors.coin,
+                        trackColor = FinnyTheme.colors.onPrimary.copy(alpha = 0.22f),
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
 
             SectionTitle("Новые задания")
             if (sections.fresh.isEmpty()) {
-                SectionCard(title = "Новых заданий нет") {
-                    Text(
+                SectionCard(title = "Новых заданий нет", tone = CardTone.Sage) {
+                    SupportingText(
                         // Не «все задания»: задание восстановления в очередь не
                         // входит и может оставаться нерешённым ниже на этом же экране.
                         text = "Новые задания закончились. Любое из тех, что уже решал, " +
                             "можно решить ещё раз — они ниже.",
-                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             } else {
@@ -81,11 +119,10 @@ fun TasksScreen(
 
             if (sections.recovery.isNotEmpty()) {
                 SectionTitle("Если день не удался")
-                Text(
+                SupportingText(
                     text = "Это задание помогает питомцу, когда день прошёл неудачно. " +
                         "После такого дня кнопка на экране итогов откроет его сразу.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = 10.dp),
                 )
                 sections.recovery.forEach { task ->
                     val done = task.id in completedIds
@@ -107,7 +144,9 @@ private fun SectionTitle(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+        modifier = Modifier
+            .padding(top = 8.dp, bottom = 12.dp)
+            .semantics { heading() },
     )
 }
 
@@ -122,29 +161,27 @@ private fun TaskCard(
 ) {
     SectionCard(title = task.title) {
         Column {
-            Text(
-                text = task.topic.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            SupportingText(task.topic.displayName)
             Text(
                 // Отметка означает, что задание уже решали, а не что ответ
                 // был верным: в решённые попадает любой ответ. Поэтому «уже
                 // решал», а не «выполнено».
                 text = status,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 6.dp),
             )
             if (primary) {
                 PrimaryButton(
                     text = buttonText,
                     onClick = onOpen,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = 14.dp),
                 )
             } else {
                 SecondaryButton(
                     text = buttonText,
                     onClick = onOpen,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = 14.dp),
                 )
             }
         }

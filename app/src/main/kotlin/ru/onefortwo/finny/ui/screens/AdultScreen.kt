@@ -2,12 +2,11 @@ package ru.onefortwo.finny.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,18 +20,19 @@ import androidx.compose.ui.unit.dp
 import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.economy.GameState
-import ru.onefortwo.finny.ui.common.AppliqueDialog
-import ru.onefortwo.finny.ui.common.AppliqueTextField
+import ru.onefortwo.finny.ui.common.CardTone
+import ru.onefortwo.finny.ui.common.FinnyDialog
+import ru.onefortwo.finny.ui.common.FinnyTextField
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
-import ru.onefortwo.finny.ui.common.SelectButton
+import ru.onefortwo.finny.ui.common.StatusPill
+import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.state.ScreenTime
-import ru.onefortwo.finny.ui.theme.DisplaySettings
-import ru.onefortwo.finny.ui.theme.ThemeMode
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
  * Раздел для взрослого (ТЗ 2.5.12).
@@ -48,8 +48,6 @@ fun AdultScreen(
     tasks: List<TaskContent>,
     completedIds: Set<String>,
     isDemo: Boolean,
-    display: DisplaySettings,
-    onDisplay: (DisplaySettings) -> Unit,
     timeLimitEnabled: Boolean,
     minutesUsedToday: Int,
     onResetProfile: () -> Unit,
@@ -69,8 +67,6 @@ fun AdultScreen(
             tasks = tasks,
             completedIds = completedIds,
             isDemo = isDemo,
-            display = display,
-            onDisplay = onDisplay,
             timeLimitEnabled = timeLimitEnabled,
             minutesUsedToday = minutesUsedToday,
             onResetProfile = onResetProfile,
@@ -91,20 +87,17 @@ private fun AdultGate(onUnlock: () -> Unit, onBack: () -> Unit) {
     var answer by rememberSaveable { mutableStateOf("") }
     var wrong by rememberSaveable { mutableStateOf(false) }
 
-    ScreenScaffold(title = "Раздел для взрослого", onBack = onBack) {
+    ScreenScaffold(eyebrow = "Только для взрослых", title = "Раздел для взрослого", onBack = onBack) {
         Column {
             SectionCard(title = "Подтвердите, что вы взрослый") {
                 Column {
-                    Text(
-                        text = "Решите пример, чтобы продолжить.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    SupportingText("Решите пример, чтобы продолжить.")
                     Text(
                         text = "$first × $second = ?",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineMedium,
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
-                    AppliqueTextField(
+                    FinnyTextField(
                         value = answer,
                         onValueChange = { input ->
                             answer = input.filter { it.isDigit() }.take(3)
@@ -117,6 +110,7 @@ private fun AdultGate(onUnlock: () -> Unit, onBack: () -> Unit) {
                         Text(
                             text = "Ответ неверный, попробуйте ещё раз.",
                             style = MaterialTheme.typography.bodyMedium,
+                            color = FinnyTheme.colors.errorText,
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
@@ -131,9 +125,8 @@ private fun AdultGate(onUnlock: () -> Unit, onBack: () -> Unit) {
                     // Причина недоступности названа текстом: по одному
                     // виду кнопки непонятно, чего она ждёт.
                     if (answer.isBlank()) {
-                        Text(
+                        SupportingText(
                             "Впишите ответ, и кнопка станет доступной.",
-                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
@@ -150,8 +143,6 @@ private fun AdultContent(
     tasks: List<TaskContent>,
     completedIds: Set<String>,
     isDemo: Boolean,
-    display: DisplaySettings,
-    onDisplay: (DisplaySettings) -> Unit,
     timeLimitEnabled: Boolean,
     minutesUsedToday: Int,
     onResetProfile: () -> Unit,
@@ -161,17 +152,18 @@ private fun AdultContent(
     onResetTodayUsage: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val colors = FinnyTheme.colors
     var confirmReset by rememberSaveable { mutableStateOf(false) }
     var confirmDemo by rememberSaveable { mutableStateOf(false) }
 
-    ScreenScaffold(title = "Раздел для взрослого", onBack = onBack) {
+    ScreenScaffold(eyebrow = "Спокойно о прогрессе", title = "Раздел для взрослого", onBack = onBack) {
         Column {
-            SectionCard(title = "Чему учит приложение") {
+            SectionCard(eyebrow = "Чему учит приложение", tone = CardTone.Primary) {
                 Column {
                     Text(
                         text = "Приложение знакомит ребёнка 7–11 лет с основами управления " +
                             "личными финансами в игровой форме.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                     listOf(
                         "Различать обязательные и необязательные расходы",
@@ -182,7 +174,7 @@ private fun AdultContent(
                         Text(
                             text = "— $item",
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = 6.dp),
                         )
                     }
                 }
@@ -195,17 +187,20 @@ private fun AdultContent(
                         .distinct()
 
                     if (topics.isEmpty()) {
-                        Text(
-                            "Ребёнок ещё не решал ни одного задания.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        SupportingText("Ребёнок ещё не решал ни одного задания.")
                     } else {
-                        topics.forEach { topic ->
-                            Text(
-                                text = "— $topic",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(vertical = 2.dp),
-                            )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            topics.forEach { topic ->
+                                StatusPill(
+                                    text = "✓ $topic",
+                                    container = colors.selectedContainer,
+                                    content = colors.successText,
+                                    uppercase = false,
+                                )
+                            }
                         }
                     }
                 }
@@ -216,16 +211,15 @@ private fun AdultContent(
                     LabeledValue("Завершено игровых дней", (game.period.number - 1).toString())
                     LabeledValue("Пройдено заданий", "${completedIds.size} из ${tasks.size}")
                     LabeledValue("Стадия развития питомца", game.stage.displayName)
-                    Text(
+                    SupportingText(
                         text = "Прогресс показан без оценок: приложение не сравнивает ребёнка " +
                             "с другими и не выставляет отметок.",
-                        style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
             }
 
-            SectionCard(title = "Данные и приватность") {
+            SectionCard(title = "Данные и приватность", tone = CardTone.Sage) {
                 Column {
                     Text(
                         text = "Приложение не запрашивает персональные данные, не использует " +
@@ -237,68 +231,22 @@ private fun AdultContent(
                 }
             }
 
-            SectionCard(title = "Оформление") {
+            SectionCard(
+                title = "Экранное время",
+                tone = CardTone.Coin,
+                trailing = {
+                    Text(
+                        text = "$minutesUsedToday мин",
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                },
+            ) {
                 Column {
-                    Text(
-                        text = "Те же настройки предлагаются на первом экране при " +
-                            "создании профиля. Сброс профиля их не затрагивает.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    Text(
-                        text = "Тема",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                    ThemeMode.entries.forEach { mode ->
-                        SelectButton(
-                            text = mode.displayName,
-                            selected = mode == display.themeMode,
-                            onClick = { onDisplay(display.copy(themeMode = mode)) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                        )
-                    }
-                    if (display.highContrast) {
-                        Text(
-                            text = "Пока включён чёрно-белый режим, пара не видна. " +
-                                "Выбор сохранится и вернётся, когда режим выключат.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
-                    Text(
-                        text = "Чёрно-белый режим",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-                    )
-                    Text(
-                        text = "Чёрный текст на белом, толще контуры, крупнее текст " +
-                            "и кнопки. Направления плана различаются штриховкой, " +
-                            "а не цветом.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    SelectButton(
-                        text = if (display.highContrast) "Включён" else "Выключен",
-                        selected = display.highContrast,
-                        onClick = {
-                            onDisplay(display.copy(highContrast = !display.highContrast))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-
-            SectionCard(title = "Экранное время") {
-                Column {
-                    Text(
+                    SupportingText(
                         text = "Ограничение в 20 минут в день соответствует санитарным " +
                             "требованиям к непрерывной работе с планшетом для начальной школы. " +
                             "Приложение не обрывает начатое действие: оно предупреждает заранее " +
                             "и не начинает новый игровой день.",
-                        style = MaterialTheme.typography.bodyMedium,
                     )
                     LabeledValue(
                         "Сегодня использовано",
@@ -313,12 +261,13 @@ private fun AdultContent(
                     ProgressBar(
                         fraction = minutesUsedToday.toFloat() /
                             ScreenTime.DAILY_LIMIT_MINUTES,
+                        color = colors.attention,
+                        trackColor = colors.surface,
                         modifier = Modifier.padding(top = 8.dp),
                     )
-                    Text(
+                    SupportingText(
                         text = "В обычном режиме за календарные сутки проходится один игровой " +
                             "день. В демонстрационном режиме оба ограничения не действуют.",
-                        style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     SecondaryButton(
@@ -336,19 +285,17 @@ private fun AdultContent(
 
             SectionCard(title = "Демонстрационный режим") {
                 Column {
-                    Text(
+                    SupportingText(
                         text = if (isDemo) {
                             "Демонстрационный режим включён: сейчас используется тестовый профиль."
                         } else {
                             "Режим для экспертной проверки. Создаётся тестовый профиль с " +
                                 "фиксированными данными и выбранной целью."
                         },
-                        style = MaterialTheme.typography.bodyMedium,
                     )
-                    Text(
+                    SupportingText(
                         text = "Игровые дни не привязаны к календарю: все этапы проходятся " +
                             "подряд, ждать реального времени не нужно. Все задания доступны сразу.",
-                        style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     SecondaryButton(
@@ -359,12 +306,11 @@ private fun AdultContent(
                 }
             }
 
-            SectionCard(title = "Управление профилем") {
+            SectionCard(title = "Управление профилем", tone = CardTone.Error) {
                 Column {
-                    Text(
+                    SupportingText(
                         text = "Сброс удалит игровой прогресс: профиль питомца, монеты, " +
                             "копилку и отметки о решённых заданиях.",
-                        style = MaterialTheme.typography.bodyMedium,
                     )
                     SecondaryButton(
                         text = "Сбросить профиль",
@@ -378,7 +324,7 @@ private fun AdultContent(
 
     if (confirmDemo) {
         val resetting = isDemo
-        AppliqueDialog(
+        FinnyDialog(
             title = if (resetting) {
                 "Сбросить тестовый профиль?"
             } else {
@@ -417,7 +363,7 @@ private fun AdultContent(
     }
 
     if (confirmReset) {
-        AppliqueDialog(
+        FinnyDialog(
             title = "Сбросить профиль?",
             onDismiss = { confirmReset = false },
             content = {

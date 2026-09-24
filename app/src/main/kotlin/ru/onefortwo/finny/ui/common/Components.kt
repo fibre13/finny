@@ -1,76 +1,95 @@
 package ru.onefortwo.finny.ui.common
 
 import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.FeedbackMessage
-import ru.onefortwo.finny.ui.theme.LocalAppliqueDecor
-import ru.onefortwo.finny.ui.theme.LocalHighContrast
-import ru.onefortwo.finny.ui.theme.LocalNightScene
+import ru.onefortwo.finny.ui.theme.FinnyTheme
+import ru.onefortwo.finny.ui.theme.LightFinnyColors
 import ru.onefortwo.finny.ui.theme.LocalSceneColors
+import ru.onefortwo.finny.ui.theme.PillShape
 
 /**
- * Общие элементы интерфейса.
+ * Общие элементы интерфейса по спецификации оформления (Figma,
+ * «Спецификация Compose»): каркас экрана, кнопки, карточки, поля,
+ * кнопки шага, полосы и показатели.
  *
  * Требования доступности (ТЗ 3.6): интерактивные элементы не меньше 48 dp,
  * основной текст не меньше 16 sp, состояние передаётся текстом и знаком,
@@ -80,179 +99,353 @@ import ru.onefortwo.finny.ui.theme.LocalSceneColors
 /**
  * Минимальный размер интерактивного элемента.
  *
- * Поднимается с 48 до 56 dp при системном увеличении шрифта и в
- * чёрно-белом режиме. Причина в обоих случаях одна и не в самом шрифте:
- * их включают те, кому трудно попадать в мелкие элементы, и запас зоны
- * нажатия нужен им по той же причине, по которой нужен крупный текст.
+ * Поднимается с 48 до 56 dp при системном увеличении шрифта: его включают
+ * те, кому трудно попадать в мелкие элементы, и запас зоны нажатия нужен
+ * им по той же причине, по которой нужен крупный текст.
  */
 val MinTouchTarget: Dp
-    @Composable get() = if (
-        LocalDensity.current.fontScale >= 1.3f || LocalHighContrast.current
-    ) {
-        56.dp
-    } else {
-        48.dp
-    }
+    @Composable get() = if (LocalDensity.current.fontScale >= 1.3f) 56.dp else 48.dp
+
+/** Высота основного элемента управления: кнопки и поля ввода. */
+val ControlHeight = 54.dp
 
 /**
  * Предельная ширина колонки содержимого.
  *
- * На телефоне колонка занимает всю ширину экрана. На планшете и в альбомной
- * ориентации она ограничивается этим значением и центрируется: иначе строки
- * текста растягиваются на всю ширину и перестают читаться, а кнопки
- * превращаются в полосы во весь экран (ТЗ 3.1, поддержка планшетов).
+ * На телефоне колонка занимает всю ширину экрана за вычетом полей. На
+ * планшете и в альбомной ориентации она ограничивается и центрируется:
+ * иначе строки текста растягиваются на всю ширину и перестают читаться,
+ * а кнопки превращаются в полосы во весь экран (ТЗ 3.1).
  */
 val MaxContentWidth = 640.dp
 
+/** Боковые поля экрана телефона. */
+val ScreenPadding = 18.dp
+
+/** Расстояние между карточками. */
+val CardSpacing = 14.dp
+
 /**
- * Каркас экрана: заголовок, кнопка возврата в одном и том же месте
- * и прокручиваемое содержимое, ограниченное по ширине на широких экранах.
+ * Цвет вспомогательного текста внутри текущей карточки. На тёмной
+ * карточке он светлый, на остальных — приглушённый тёмный.
+ */
+val LocalMutedColor = compositionLocalOf { LightFinnyColors.onSurfaceMuted }
+
+/**
+ * Мягкая тень карточек и кнопок: размытая, со смещением вниз, цвета
+ * основного с малой прозрачностью — как в макете.
+ */
+fun Modifier.softShadow(shape: Shape, lift: Boolean = true): Modifier = dropShadow(
+    shape = shape,
+    shadow = Shadow(
+        radius = if (lift) 18.dp else 8.dp,
+        color = LightFinnyColors.shadow,
+        offset = DpOffset(0.dp, if (lift) 6.dp else 2.dp),
+    ),
+)
+
+/** Вспомогательный текст: пояснение, подпись, подсказка. */
+@Composable
+fun SupportingText(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = LocalMutedColor.current,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Надзаголовок прописными: «Задание дня», «Не хватает монет». Цвет
+ * по умолчанию — затемнённый коралловый, он проходит порог 4,5:1.
+ */
+@Composable
+fun Eyebrow(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = FinnyTheme.colors.attentionText,
+) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Каркас экрана: шапка с кнопкой возврата, надзаголовком, заголовком
+ * и балансом монет, ниже — прокручиваемое содержимое, ограниченное
+ * по ширине на широких экранах.
+ *
+ * Кнопка возврата всегда на одном месте — слева в шапке (ТЗ 3.6).
  *
  * Отклик на действие ([message]) закрепляется у нижнего края и не уезжает
  * вместе с прокруткой. Раньше он выводился первым блоком содержимого,
  * и на длинных экранах — покупки, копилка — оказывался выше видимой
- * части: кнопка действия внизу, ответ на неё вверху. Проверка на телефоне
- * показала, что после покупки на экране не менялось ничего, хотя монеты
- * списывались. Требование ТЗ 2.5.9 — увидеть изменение после действия.
+ * части: кнопка действия внизу, ответ на неё вверху. Требование ТЗ 2.5.9 —
+ * увидеть изменение после действия.
+ *
+ * @param eyebrow строка над заголовком: откуда экран или к чему относится.
+ * @param balance баланс монет в правом углу шапки; `null` — не показывать.
+ * @param top содержимое над шапкой, например шаги знакомства.
  */
 @Composable
 fun ScreenScaffold(
     title: String,
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    eyebrow: String? = null,
+    balance: Coins? = null,
     message: FeedbackMessage? = null,
     onDismissMessage: () -> Unit = {},
+    top: (@Composable () -> Unit)? = null,
+    /** Смена значения возвращает прокрутку к началу экрана. */
+    scrollKey: Any? = null,
     content: @Composable () -> Unit,
 ) {
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+    val colors = FinnyTheme.colors
+    val scroll = key(scrollKey) { rememberScrollState() }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.appBackground)
+            // Отступы от системных панелей и экранной клавиатуры: поле
+            // ввода не уходит под клавиатуру, последняя кнопка — под
+            // панель жестов.
+            .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-      Box(modifier = Modifier.fillMaxSize()) {
-        // Высота закреплённого отклика замеряется, а не задаётся числом:
-        // при увеличенном шрифте карточка выше, и содержимое под ней
-        // иначе осталось бы недоступным.
-        var messageHeight by remember { mutableStateOf(0.dp) }
-        val density = LocalDensity.current
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            contentAlignment = Alignment.TopCenter,
+        CompositionLocalProvider(
+            LocalContentColor provides colors.onSurface,
+            LocalMutedColor provides colors.onSurfaceMuted,
         ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = MaxContentWidth)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    // Запас снизу нужен, только пока отклик показан:
-                    // замеренная высота сама не обнуляется, когда карточка
-                    // исчезает, и внизу оставалась бы пустая полоса.
-                    .padding(bottom = 24.dp + if (message != null) messageHeight else 0.dp),
-            ) {
-                if (onBack != null) {
-                    val decor = LocalAppliqueDecor.current
-                    val backInteraction = remember { MutableInteractionSource() }
-                    val backPressed by backInteraction.collectIsPressedAsState()
-                    val backShape = MaterialTheme.shapes.small
+            // Высота закреплённого отклика замеряется, а не задаётся числом:
+            // при увеличенном шрифте карточка выше, и содержимое под ней
+            // иначе осталось бы недоступным.
+            var messageHeight by remember { mutableStateOf(0.dp) }
+            val density = LocalDensity.current
 
-                    OutlinedButton(
-                        onClick = onBack,
-                        interactionSource = backInteraction,
-                        shape = backShape,
-                        border = null,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .heightIn(min = MinTouchTarget)
-                            .applique(shape = backShape, decor = decor, pressed = backPressed),
-                    ) {
-                        Text("Назад", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 18.dp),
-                )
-
-                content()
-            }
-        }
-
-        if (message != null) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .onSizeChanged { size ->
-                        messageHeight = with(density) { size.height.toDp() }
-                    },
-                contentAlignment = Alignment.BottomCenter,
+                    .fillMaxSize()
+                    .verticalScroll(scroll),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                Box(
+                Column(
                     modifier = Modifier
                         .widthIn(max = MaxContentWidth)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 8.dp),
+                        .padding(horizontal = ScreenPadding)
+                        // Запас снизу нужен, только пока отклик показан:
+                        // замеренная высота сама не обнуляется, когда карточка
+                        // исчезает, и внизу оставалась бы пустая полоса.
+                        .padding(bottom = 28.dp + if (message != null) messageHeight else 0.dp),
                 ) {
-                    FeedbackCard(message = message, onDismiss = onDismissMessage)
+                    if (top != null) {
+                        Box(modifier = Modifier.padding(top = 16.dp)) { top() }
+                    }
+                    ScreenHeader(
+                        title = title,
+                        eyebrow = eyebrow,
+                        balance = balance,
+                        onBack = onBack,
+                    )
+                    content()
+                }
+            }
+
+            if (message != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(colors.appBackground)
+                        .onSizeChanged { size ->
+                            messageHeight = with(density) { size.height.toDp() }
+                        },
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = MaxContentWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = ScreenPadding)
+                            .padding(top = 8.dp, bottom = 4.dp),
+                    ) {
+                        FeedbackCard(message = message, onDismiss = onDismissMessage)
+                    }
                 }
             }
         }
-      }
     }
 }
 
-/** Крупная основная кнопка. */
+/**
+ * Шапка экрана. Заголовок переносится по словам, а баланс не сжимается:
+ * при увеличенном шрифте заголовок уходит на вторую строку, число монет
+ * остаётся читаемым целиком.
+ */
+@Composable
+private fun ScreenHeader(
+    title: String,
+    eyebrow: String?,
+    balance: Coins?,
+    onBack: (() -> Unit)?,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onBack != null) {
+            BackButton(onClick = onBack)
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            if (eyebrow != null) {
+                Text(
+                    text = eyebrow,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LocalMutedColor.current,
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        if (balance != null) {
+            Spacer(modifier = Modifier.width(12.dp))
+            CoinBalance(amount = balance)
+        }
+    }
+}
+
+/** Кнопка возврата: стрелка в квадрате со скруглением, подписана «Назад». */
+@Composable
+private fun BackButton(onClick: () -> Unit) {
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.small
+    val size = maxOf(MinTouchTarget, 48.dp)
+
+    Box(
+        modifier = Modifier
+            .size(size)
+            .softShadow(shape, lift = false)
+            .clip(shape)
+            .background(colors.surface)
+            .border(1.dp, colors.divider, shape)
+            .clickable(role = Role.Button, onClickLabel = null, onClick = onClick)
+            .semantics { contentDescription = "Назад" },
+        contentAlignment = Alignment.Center,
+    ) {
+        ArrowBackIcon(color = colors.onSurface)
+    }
+}
+
+/**
+ * Баланс монет: круглая монета и число. Баланс не передаётся одним цветом:
+ * число написано, а программа чтения с экрана произносит «Баланс: 120 монет».
+ */
+@Composable
+fun CoinBalance(
+    amount: Coins,
+    modifier: Modifier = Modifier,
+) {
+    val colors = FinnyTheme.colors
+    val description = "Баланс: ${Explanations.coins(amount)}"
+
+    Row(
+        modifier = modifier
+            .softShadow(PillShape, lift = false)
+            .clip(PillShape)
+            .background(colors.surface)
+            .heightIn(min = 44.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .clearAndSetSemantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(colors.coin),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = amount.amount.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.onSurface,
+        )
+    }
+}
+
+// --- Кнопки ----------------------------------------------------------------
+
+/** Заливка основной кнопки. */
+enum class ButtonTone {
+    /** Тёмно-зелёная: основное действие экрана. */
+    Primary,
+
+    /** Жёлтая: действие внутри жёлтой карточки отклика. */
+    Coin,
+
+    /** Светлая: действие на тёмной карточке. */
+    Light,
+}
+
+/**
+ * Основная кнопка: «таблетка» высотой 54 dp.
+ *
+ * Неактивная сохраняет подпись и становится серой; причину недоступности
+ * экран пишет текстом рядом. При нажатии кнопка чуть уменьшается.
+ */
 @Composable
 fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    tone: ButtonTone = ButtonTone.Primary,
 ) {
-    val decor = LocalAppliqueDecor.current
+    val colors = FinnyTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = MaterialTheme.shapes.small
+    val (container, content) = when (tone) {
+        ButtonTone.Primary -> colors.primary to colors.onPrimary
+        ButtonTone.Coin -> colors.coin to colors.onSurface
+        ButtonTone.Light -> colors.surface to colors.onSurface
+    }
 
     Button(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
-        // Кнопка Material 3 по умолчанию скругляется полностью и тему
-        // не читает, поэтому форма передаётся явно.
-        shape = shape,
-        // Собственная тень Material убирается: в направлении 1b её роль
-        // играет сплошное смещение.
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 0.dp,
-            pressedElevation = 0.dp,
-        ),
+        shape = PillShape,
+        elevation = null,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         colors = ButtonDefaults.buttonColors(
-            disabledContainerColor = decor.disabledContainer,
-            disabledContentColor = decor.disabledContent,
+            containerColor = container,
+            contentColor = content,
+            disabledContainerColor = colors.disabledContainer,
+            disabledContentColor = colors.disabledContent,
         ),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = MinTouchTarget)
-            .applique(shape = shape, decor = decor, pressed = pressed, enabled = enabled),
+            .heightIn(min = maxOf(ControlHeight, MinTouchTarget))
+            .pressScale(pressed),
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge)
+        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
     }
 }
 
-/** Вторичная кнопка того же размера. */
+/** Вторичная кнопка того же размера: светлая заливка и контур. */
 @Composable
 fun SecondaryButton(
     text: String,
@@ -261,55 +454,51 @@ fun SecondaryButton(
     enabled: Boolean = true,
     /**
      * Пиктограмма перед подписью. Ничего не заменяет: подпись читается
-     * сама по себе, рисунок помогает узнать раздел в списке однотипных
-     * кнопок (ТЗ 3.6). Программе чтения с экрана пиктограмма не мешает —
-     * собственного описания у неё нет, произносится подпись.
+     * сама по себе, рисунок помогает узнать раздел (ТЗ 3.6).
      */
     icon: (@Composable () -> Unit)? = null,
 ) {
-    val decor = LocalAppliqueDecor.current
+    val colors = FinnyTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = MaterialTheme.shapes.small
 
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
-        shape = shape,
-        // Контур рисуется оформлением, собственная рамка не нужна.
-        border = null,
-        // Заливка непрозрачная: у OutlinedButton фон по умолчанию
-        // прозрачный, и смещённая тень просвечивала бы сквозь кнопку.
+        shape = PillShape,
+        border = if (enabled) BorderStroke(1.5.dp, colors.outline) else null,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = decor.disabledContainer,
-            disabledContentColor = decor.disabledContent,
+            containerColor = colors.surface,
+            contentColor = colors.onSurface,
+            disabledContainerColor = colors.disabledContainer,
+            disabledContentColor = colors.disabledContent,
         ),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = MinTouchTarget)
-            .applique(shape = shape, decor = decor, pressed = pressed, enabled = enabled),
+            .heightIn(min = maxOf(ControlHeight, MinTouchTarget))
+            .pressScale(pressed),
     ) {
-        if (icon == null) {
-            Text(text, style = MaterialTheme.typography.labelLarge)
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                icon()
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(text, style = MaterialTheme.typography.labelLarge)
-            }
+        if (icon != null) {
+            icon()
+            Spacer(modifier = Modifier.width(10.dp))
         }
+        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
     }
 }
 
+/** Нажатый элемент чуть уменьшается: отклик виден без анимации цвета. */
+private fun Modifier.pressScale(pressed: Boolean): Modifier =
+    if (pressed) graphicsLayer(scaleX = 0.98f, scaleY = 0.98f) else this
+
 /**
- * Кнопка выбора одного варианта из нескольких.
+ * Вариант выбора: строка с отметкой. Выбранный выделен фоном, обводкой,
+ * знаком ✓ и словом «выбрано» — состояние читается без цвета (ТЗ 3.6).
+ * Для программы чтения с экрана это переключатель с состоянием.
  *
- * Выбранное помечается словом, а не только заливкой: состояние обязано
- * читаться текстом (ТЗ 3.6). Слово подставляется по месту — в гардеробе
- * это «надето», в остальных случаях «выбрано».
+ * @param selectedSuffix слово выбранного состояния: в гардеробе «надето».
+ * @param supporting пояснение под названием.
  */
 @Composable
 fun SelectButton(
@@ -319,81 +508,368 @@ fun SelectButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selectedSuffix: String = "выбрано",
+    supporting: String? = null,
+    leading: (@Composable () -> Unit)? = null,
 ) {
-    val label = if (selected) "$text — $selectedSuffix" else text
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.small
 
-    if (selected) {
-        PrimaryButton(text = label, onClick = onClick, enabled = enabled, modifier = modifier)
-    } else {
-        SecondaryButton(text = label, onClick = onClick, enabled = enabled, modifier = modifier)
-    }
-}
-
-/** Карточка с заголовком и содержимым. */
-@Composable
-fun SectionCard(
-    modifier: Modifier = Modifier,
-    title: String? = null,
-    /**
-     * Пиктограмма слева от заголовка. Ничего не заменяет: раздел назван
-     * словом, а рисунок помогает его узнать (ТЗ 3.6).
-     */
-    icon: (@Composable () -> Unit)? = null,
-    /**
-     * Цветная кромка по левому краю карточки: обозначение учебной
-     * категории. Как и пиктограмма, ничего не заменяет — категория
-     * названа словом в заголовке или подписи рядом (ТЗ 3.6).
-     */
-    edgeColor: Color? = null,
-    content: @Composable () -> Unit,
-) {
-    val shape = MaterialTheme.shapes.medium
-
-    Card(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 18.dp)
-            .applique(shape = shape, decor = LocalAppliqueDecor.current),
-        shape = shape,
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            .heightIn(min = maxOf(ControlHeight, MinTouchTarget))
+            .clip(shape)
+            .background(
+                when {
+                    !enabled -> colors.disabledContainer
+                    selected -> colors.selectedContainer
+                    else -> colors.surface
+                },
+            )
+            .border(
+                width = if (selected) 2.dp else 1.5.dp,
+                color = when {
+                    !enabled -> colors.disabledContainer
+                    selected -> colors.primary
+                    else -> colors.outline
+                },
+                shape = shape,
+            )
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .semantics { stateDescription = if (selected) selectedSuffix else "не $selectedSuffix" }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Высота ряда берётся по содержимому, иначе кромка растянула бы
-        // карточку на всю доступную высоту.
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            if (edgeColor != null) {
-                Box(
-                    modifier = Modifier
-                        .width(8.dp)
-                        .fillMaxHeight()
-                        .background(edgeColor),
-                )
+        SelectionMark(selected = selected, enabled = enabled)
+        Spacer(modifier = Modifier.width(12.dp))
+        if (leading != null) {
+            leading()
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (enabled) colors.onSurface else colors.disabledContent,
+            )
+            if (supporting != null) {
+                SupportingText(supporting)
             }
-            Column(modifier = Modifier.padding(16.dp)) {
-                if (title != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    ) {
-                        if (icon != null) {
-                            Box(modifier = Modifier.padding(end = 8.dp)) { icon() }
-                        }
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-                content()
+            if (selected) {
+                Text(
+                    text = "✓ $selectedSuffix",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.successText,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
             }
         }
     }
 }
 
 /**
- * Сообщение обратной связи. Затруднение помечается словом и знаком,
- * а не только цветом (ТЗ 3.6).
+ * Плитка выбора для сетки: образец сверху, название и состояние снизу.
+ * Используется для окраса и украшений, где рядом нужен образец цвета.
+ *
+ * @param status строка состояния для невыбранной плитки: «есть»,
+ * «не куплено». У выбранной вместо неё «✓ выбрано».
+ */
+@Composable
+fun OptionTile(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    selectedSuffix: String = "выбрано",
+    status: String? = null,
+    swatch: (@Composable () -> Unit)? = null,
+) {
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.small
+
+    Column(
+        modifier = modifier
+            .heightIn(min = MinTouchTarget)
+            .clip(shape)
+            .background(
+                when {
+                    !enabled -> colors.disabledContainer
+                    selected -> colors.selectedContainer
+                    else -> colors.surface
+                },
+            )
+            .border(
+                width = if (selected) 2.dp else 1.5.dp,
+                color = when {
+                    !enabled -> colors.disabledContainer
+                    selected -> colors.primary
+                    else -> colors.outline
+                },
+                shape = shape,
+            )
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .semantics { stateDescription = if (selected) selectedSuffix else (status ?: "не $selectedSuffix") }
+            .padding(horizontal = 10.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (swatch != null) {
+            swatch()
+            Spacer(modifier = Modifier.size(10.dp))
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            color = if (enabled) colors.onSurface else colors.disabledContent,
+        )
+        val line = if (selected) "✓ $selectedSuffix" else status
+        if (line != null) {
+            Text(
+                text = line,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                color = when {
+                    selected -> colors.successText
+                    !enabled -> colors.disabledContent
+                    else -> colors.onSurfaceMuted
+                },
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .clearAndSetSemantics { },
+            )
+        }
+    }
+}
+
+/** Круглая отметка выбора: пустая или с галочкой. */
+@Composable
+private fun SelectionMark(selected: Boolean, enabled: Boolean) {
+    val colors = FinnyTheme.colors
+    Box(
+        modifier = Modifier
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(if (selected) colors.primary else colors.surface)
+            .border(2.dp, if (enabled) colors.primary else colors.disabledContent, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) CheckIcon(color = colors.onPrimary, size = 16.dp)
+    }
+}
+
+/** Образец цвета для плитки выбора окраса. */
+@Composable
+fun ColorSwatch(color: Color, size: Dp = 36.dp) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color)
+            // Контур у образца: светлый окрас иначе теряется на подложке.
+            .border(1.5.dp, FinnyTheme.colors.outline, CircleShape),
+    )
+}
+
+/**
+ * Сетка, которая сама подбирает число колонок по ширине: не меньше
+ * [minItemWidth] на ячейку, с учётом масштаба шрифта. Так плитки выбора
+ * не рвут слова посередине: при нехватке места колонок становится меньше.
+ */
+@Composable
+fun AdaptiveGrid(
+    count: Int,
+    modifier: Modifier = Modifier,
+    minItemWidth: Dp = 150.dp,
+    spacing: Dp = 10.dp,
+    item: @Composable RowScope.(index: Int) -> Unit,
+) {
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val cell = minItemWidth * fontScale
+        val columns = ((maxWidth + spacing) / (cell + spacing)).toInt().coerceIn(1, count.coerceAtLeast(1))
+        Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+            (0 until count).chunked(columns).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                ) {
+                    row.forEach { index -> item(index) }
+                    // Пустые ячейки держат ширину плиток в неполном ряду.
+                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+// --- Карточки ----------------------------------------------------------------
+
+/** Подложка карточки. Смысл карточки всегда назван заголовком, а не тоном. */
+enum class CardTone {
+    /** Светлая с мягкой тенью — по умолчанию. */
+    Surface,
+
+    /** Салатовая: нужное, питомец, спокойное пояснение. */
+    Sage,
+
+    /** Жёлтая: желаемое, задание, напоминание. */
+    Coin,
+
+    /** Тёмно-зелёная со светлым текстом: сводка, цель, главное число. */
+    Primary,
+    Success,
+    Warning,
+    Error,
+}
+
+/**
+ * Карточка раздела: необязательные пиктограмма, надзаголовок, заголовок
+ * и содержимое. Скругление 24 dp, высота по содержимому.
+ *
+ * @param trailing элемент справа от заголовка: плашка состояния, число.
+ */
+@Composable
+fun SectionCard(
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    tone: CardTone = CardTone.Surface,
+    eyebrow: String? = null,
+    /**
+     * Пиктограмма в плитке над заголовком. Ничего не заменяет: раздел
+     * назван словом, а рисунок помогает его узнать (ТЗ 3.6).
+     */
+    icon: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.medium
+    val dark = tone == CardTone.Primary
+    val container = when (tone) {
+        CardTone.Surface -> colors.surface
+        CardTone.Sage -> colors.selectedContainer
+        CardTone.Coin -> colors.coinContainer
+        CardTone.Primary -> colors.primary
+        CardTone.Success -> colors.successContainer
+        CardTone.Warning -> colors.warningContainer
+        CardTone.Error -> colors.errorContainer
+    }
+    val contentColor = if (dark) colors.onPrimary else colors.onSurface
+    val muted = if (dark) colors.onPrimary.copy(alpha = 0.82f) else colors.onSurfaceMuted
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = CardSpacing)
+            .then(if (tone == CardTone.Surface) Modifier.softShadow(shape) else Modifier)
+            .clip(shape)
+            .background(container)
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+    ) {
+        CompositionLocalProvider(
+            LocalContentColor provides contentColor,
+            LocalMutedColor provides muted,
+        ) {
+            if (icon != null) {
+                IconTile(modifier = Modifier.padding(bottom = 12.dp)) { icon() }
+            }
+            if (title != null || trailing != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (eyebrow != null) {
+                            Eyebrow(
+                                text = eyebrow,
+                                color = if (dark) colors.coin else colors.attentionText,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
+                        if (title != null) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.semantics { heading() },
+                            )
+                        }
+                    }
+                    if (trailing != null) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        trailing()
+                    }
+                }
+            } else if (eyebrow != null) {
+                Eyebrow(
+                    text = eyebrow,
+                    color = if (dark) colors.coin else colors.attentionText,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+            content()
+        }
+    }
+}
+
+/** Светлая плитка под пиктограмму. */
+@Composable
+fun IconTile(
+    modifier: Modifier = Modifier,
+    size: Dp = 46.dp,
+    container: Color = FinnyTheme.colors.surface,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(MaterialTheme.shapes.small)
+            .background(container),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+/**
+ * Плашка состояния: «В порядке», «Готово». Текст обязателен — плашка
+ * не передаёт состояние одним цветом.
+ */
+@Composable
+fun StatusPill(
+    text: String,
+    modifier: Modifier = Modifier,
+    container: Color = FinnyTheme.colors.coin,
+    content: Color = FinnyTheme.colors.onSurface,
+    uppercase: Boolean = true,
+) {
+    Text(
+        text = if (uppercase) text.uppercase() else text,
+        style = MaterialTheme.typography.labelSmall,
+        color = content,
+        modifier = modifier
+            .clip(PillShape)
+            .background(container)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
+/**
+ * Сообщение обратной связи. Затруднение помечается знаком «!» и словом
+ * «Внимание», удача — знаком «✓», а не только цветом (ТЗ 3.6).
  */
 @Composable
 fun FeedbackCard(
@@ -401,154 +877,183 @@ fun FeedbackCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(bottom = 18.dp)
-            .applique(shape = MaterialTheme.shapes.medium, decor = LocalAppliqueDecor.current),
-        shape = MaterialTheme.shapes.medium,
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (message.isProblem) {
-                MaterialTheme.colorScheme.secondary
-            } else {
-                MaterialTheme.colorScheme.surface
-            },
-        ),
+    val colors = FinnyTheme.colors
+    val problem = message.isProblem
+
+    SectionCard(
+        modifier = modifier,
+        tone = if (problem) CardTone.Warning else CardTone.Success,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = if (message.isProblem) "Внимание" else "Что произошло",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = message.text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            if (message.nextStep != null) {
-                Text(
-                    text = "Что дальше: ${message.nextStep}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp),
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(size = 38.dp) {
+                    Text(
+                        text = if (problem) "!" else "✓",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (problem) colors.warningText else colors.successText,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Eyebrow(
+                    text = if (problem) "Внимание" else "Что произошло",
+                    color = if (problem) colors.warningText else colors.successText,
                 )
             }
-            SecondaryButton(
+            Text(
+                text = message.text,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            if (message.nextStep != null) {
+                SupportingText(
+                    text = "Что дальше: ${message.nextStep}",
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            PrimaryButton(
                 text = "Понятно",
                 onClick = onDismiss,
-                modifier = Modifier.padding(top = 12.dp),
+                tone = if (problem) ButtonTone.Coin else ButtonTone.Primary,
+                modifier = Modifier.padding(top = 14.dp),
             )
         }
     }
 }
 
+// --- Поля и диалоги ----------------------------------------------------------
+
 /**
- * Поле ввода в оформлении направления 1b.
+ * Поле ввода. Подпись стоит над полем, а не внутри него: плавающая подпись
+ * при вводе уезжает вверх и мелчает, а над кнопками шага и списками подписи
+ * тоже сверху.
  *
- * Контур тот же, что у карточек и кнопок, а смещённой тени нет: поле
- * лежит на странице, а не приподнято над ней. Собственная рамка
- * Material убрана — иначе их было бы две.
+ * Высота не меньше 54 dp; в фокусе обводка 2 dp основным цветом, при
+ * ошибке — цветом ошибки и с текстом ошибки под полем.
+ *
+ * @param maxLength предел длины; если задан, в поле виден счётчик «5 / 12».
  */
 @Composable
-fun AppliqueTextField(
+fun FinnyTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+    supportingText: String? = null,
+    errorText: String? = null,
+    maxLength: Int? = null,
 ) {
-    val decor = LocalAppliqueDecor.current
-    val shape = MaterialTheme.shapes.small
+    val colors = FinnyTheme.colors
+    val focusManager = LocalFocusManager.current
 
-    // Подпись стоит над полем, а не внутри него. Плавающая подпись Material
-    // при вводе уезжает на рамку и разрывает её: свою «ступеньку» Material
-    // вырезает только в собственной рамке, а здесь рамка рисуется
-    // оформлением поверх. Подпись сверху к тому же совпадает с остальными
-    // экранами — над кнопками шага и списками подписи тоже сверху.
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 4.dp),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp),
         )
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            shape = shape,
-            keyboardOptions = keyboardOptions,
+            isError = errorText != null,
+            shape = MaterialTheme.shapes.small,
+            textStyle = MaterialTheme.typography.titleMedium,
+            // «Готово» на клавиатуре убирает её: иначе клавиатура закрывает
+            // кнопку, ради которой поле заполняли.
+            keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            trailingIcon = maxLength?.let {
+                {
+                    Text(
+                        text = "${value.length} / $it",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.onSurfaceMuted,
+                        modifier = Modifier.padding(end = 12.dp),
+                    )
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent,
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedBorderColor = colors.primary,
+                unfocusedBorderColor = colors.outline,
+                errorBorderColor = colors.error,
+                focusedContainerColor = colors.surface,
+                unfocusedContainerColor = colors.surface,
+                errorContainerColor = colors.surface,
+                cursorColor = colors.primary,
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = MinTouchTarget)
-                .border(width = decor.strokeWidth, color = decor.ink, shape = shape),
+                .heightIn(min = maxOf(ControlHeight, MinTouchTarget)),
         )
+        if (errorText != null) {
+            Text(
+                text = errorText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.errorText,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        } else if (supportingText != null) {
+            SupportingText(supportingText, modifier = Modifier.padding(top = 6.dp))
+        }
     }
 }
 
 /**
- * Диалог в оформлении направления 1b.
- *
- * Собран из тех же частей, что карточки и кнопки, а не взят готовым:
- * `AlertDialog` приносит своё скругление, свои отступы и текстовые
- * кнопки без контура, и на фоне остальных экранов выглядел бы чужим.
- *
- * Затемнение под диалогом рисует система; здесь — только сама карточка.
+ * Диалог подтверждения. Собран из тех же частей, что карточки и кнопки:
+ * `AlertDialog` приносит свои отступы и текстовые кнопки без заливки
+ * и выглядел бы чужим.
  *
  * @param actions кнопки внизу. Передаются целиком, потому что их число
- * и расположение зависят от вопроса: в одном случае две в строке,
- * в другом две в столбец.
+ * и расположение зависят от вопроса.
  */
 @Composable
-fun AppliqueDialog(
+fun FinnyDialog(
     title: String,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
     actions: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = MaterialTheme.shapes.medium
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.extraLarge
 
     Dialog(onDismissRequest = onDismiss) {
-        // Цвет текста задаётся явно. Диалог вызывается вне каркаса экрана,
-        // то есть вне Surface, который обычно его и назначает; без этого
-        // текст берёт значение по умолчанию — чёрный, и на тёмной паре
-        // оказывается чёрным по тёмному.
-        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        // Цвет текста задаётся явно: диалог вызывается вне каркаса экрана.
+        CompositionLocalProvider(
+            LocalContentColor provides colors.onSurface,
+            LocalMutedColor provides colors.onSurfaceMuted,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .applique(shape = shape, decor = LocalAppliqueDecor.current)
                     .clip(shape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(20.dp),
+                    .background(colors.surface)
+                    .padding(24.dp),
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 12.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .padding(bottom = 12.dp)
+                        .semantics { heading() },
                 )
                 content()
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.size(20.dp))
                 actions()
             }
         }
     }
 }
 
+// --- Значения и показатели ---------------------------------------------------
+
 /**
  * Строка «подпись — значение» для показа сумм.
  *
  * Когда подпись и значение перестают помещаться рядом, значение уходит
- * на вторую строку целиком, а не сжимает подпись. При увеличении шрифта
- * до 1,5× подпись в узкой колонке разрывалась бы на три строки, и пара
- * переставала читаться как одна запись.
+ * на вторую строку целиком, а не сжимает подпись: при шрифте 1,5× подпись
+ * в узкой колонке разрывалась бы на три строки.
  */
 @Composable
 fun LabeledValue(
@@ -563,12 +1068,8 @@ fun LabeledValue(
         horizontalArrangement = Arrangement.SpaceBetween,
         maxItemsInEachRow = 2,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = LocalMutedColor.current)
+        Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -584,37 +1085,63 @@ fun StatBar(
     level: StatLevel,
     modifier: Modifier = Modifier,
 ) {
+    val colors = FinnyTheme.colors
+
     Column(
         modifier = modifier
             .padding(vertical = 6.dp)
-            // Программа чтения с экрана озвучивает показатель одной фразой,
-            // а не набором разрозненных фрагментов.
+            // Программа чтения с экрана озвучивает показатель одной фразой.
             .semantics(mergeDescendants = true) {
                 contentDescription = "$name: $label, $value из 100"
             },
     ) {
-        // Значение уходит на вторую строку целиком, когда перестаёт
-        // помещаться рядом с подписью, — так же, как в «подпись — значение».
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.Center,
             maxItemsInEachRow = 2,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Пиктограмма только помогает узнать уровень: он уже назван
-                // словом в подписи рядом и озвучивается программой чтения.
+                // словом в подписи рядом.
                 StatLevelIcon(level = level, modifier = Modifier.padding(end = 8.dp))
                 Text("$name: $label", style = MaterialTheme.typography.bodyMedium)
             }
-            Text(
-                "$value из 100",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Text("$value из 100", style = MaterialTheme.typography.titleMedium)
         }
         ProgressBar(
             fraction = value / 100f,
-            modifier = Modifier.padding(top = 4.dp),
+            color = when (level) {
+                StatLevel.LOW -> colors.attention
+                StatLevel.MEDIUM -> colors.success
+                StatLevel.HIGH -> colors.success
+            },
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/** Полоса заполнения: дорожка 10 dp со скруглёнными краями. */
+@Composable
+fun ProgressBar(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    color: Color = FinnyTheme.colors.success,
+    trackColor: Color = FinnyTheme.colors.track,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .sizeIn(minHeight = 10.dp)
+            .clip(PillShape)
+            .background(trackColor),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                .sizeIn(minHeight = 10.dp)
+                .clip(PillShape)
+                .background(color),
         )
     }
 }
@@ -622,16 +1149,14 @@ fun StatBar(
 /**
  * Выбор количества монет кнопками «−5», «−1», «+1», «+5».
  *
- * Заменил ползунок. При бюджете 50 монет одно значение ползунка
- * приходилось примерно на 5 dp хода — меньше миллиметра, — и точное
- * число с первого раза не выставлялось (замечание тестировщика). Каждая
- * кнопка — цель нажатия не меньше [MinTouchTarget] (ТЗ 3.6), число
- * меняется предсказуемо, на известный шаг.
+ * Заменил ползунок: при бюджете 50 монет одно значение ползунка
+ * приходилось примерно на 5 dp хода, и точное число с первого раза
+ * не выставлялось (замечание тестировщика). Каждая кнопка — цель нажатия
+ * не меньше [MinTouchTarget] (ТЗ 3.6), число меняется на известный шаг.
  *
  * Значение не выходит за `0..max`: шаг у края урезается до края, а кнопка,
  * которой двигаться некуда, выключается. При нулевом `max` кнопки остаются
- * на месте выключенными, а не исчезают — иначе было бы непонятно, почему
- * число нельзя изменить.
+ * на месте выключенными, а не исчезают.
  *
  * Программа чтения с экрана произносит у каждой кнопки направление и
  * действие: «Нужное: прибавить 5», а не только «+5».
@@ -651,9 +1176,9 @@ fun CoinStepper(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         STEPS.forEach { step ->
-            // «Плюс» только прибавляет, «минус» только убавляет. Через общий
-            // диапазон нельзя: если значение больше максимума — так бывает,
-            // когда бюджет уменьшился, — «+5» урезало бы его вниз.
+            // «Плюс» только прибавляет, «минус» только убавляет: если
+            // значение больше максимума — так бывает, когда бюджет
+            // уменьшился, — «+5» не должно урезать его вниз.
             val target = if (step > 0) {
                 minOf(value + step, max).coerceAtLeast(value)
             } else {
@@ -677,8 +1202,7 @@ private val STEPS = listOf(-5, -1, 1, 5)
  *
  * Заменила системную клавиатуру: не нужно попадать в поле и ждать
  * клавиатуру, а клавиши крупные и одинаковые на любом устройстве. Ответ
- * ребёнок по-прежнему набирает сам — задание не превращается в выбор
- * из готовых вариантов (ТЗ 2.5.8).
+ * ребёнок по-прежнему набирает сам (ТЗ 2.5.8).
  */
 @Composable
 fun DigitPad(
@@ -727,9 +1251,9 @@ fun DigitPad(
 }
 
 /**
- * Компактная кнопка шага или цифры: оформление вторичной кнопки, но с
- * узкими боковыми отступами — в ряд из четырёх кнопок стандартные отступы
- * по 24 dp не оставили бы места подписи при крупном шрифте.
+ * Компактная кнопка шага или цифры: светлая плитка со скруглением 18 dp
+ * и контуром, узкие боковые отступы — в ряд из четырёх кнопок стандартные
+ * отступы не оставили бы места подписи при крупном шрифте.
  */
 @Composable
 private fun StepButton(
@@ -740,32 +1264,30 @@ private fun StepButton(
     modifier: Modifier = Modifier,
     tall: Boolean = false,
 ) {
-    val decor = LocalAppliqueDecor.current
+    val colors = FinnyTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = MaterialTheme.shapes.small
-    val minHeight = if (tall) maxOf(MinTouchTarget, 56.dp) else MinTouchTarget
+    val minHeight = if (tall) maxOf(MinTouchTarget, 56.dp) else maxOf(MinTouchTarget, 52.dp)
 
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
-        shape = shape,
-        border = null,
+        shape = MaterialTheme.shapes.small,
+        border = if (enabled) BorderStroke(1.5.dp, colors.outline) else null,
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = decor.disabledContainer,
-            disabledContentColor = decor.disabledContent,
+            containerColor = colors.surface,
+            contentColor = colors.onSurface,
+            disabledContainerColor = colors.disabledContainer,
+            disabledContentColor = colors.disabledContent,
         ),
         modifier = modifier
             .heightIn(min = minHeight)
-            .applique(shape = shape, decor = decor, pressed = pressed, enabled = enabled),
+            .pressScale(pressed),
     ) {
         // Описание заменяет подпись, а не добавляется к ней: программа
-        // чтения с экрана произносит «Нужное: прибавить 5, кнопка», а не
-        // ещё и «плюс пять» следом.
+        // чтения с экрана произносит «Нужное: прибавить 5, кнопка».
         Text(
             text = text,
             style = MaterialTheme.typography.titleLarge,
@@ -779,38 +1301,11 @@ private fun StepButton(
     }
 }
 
-/** Простая полоса заполнения без зависимостей от версии библиотеки. */
-@Composable
-fun ProgressBar(
-    fraction: Float,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
-) {
-    val shape = RoundedCornerShape(6.dp)
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .sizeIn(minHeight = 12.dp)
-            // Контур у полосы: её край виден и тогда, когда заполнение
-            // почти пустое, а подложка сливается с фоном карточки.
-            .border(width = 1.5.dp, color = LocalAppliqueDecor.current.ink, shape = shape)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .sizeIn(minHeight = 12.dp)
-                .clip(shape)
-                .background(color),
-        )
-    }
-}
+// --- Питомец -----------------------------------------------------------------
 
 /**
- * Изображение питомца. На текущем этапе это цветная фигура с подписью;
- * финальная графика добавляется позже.
+ * Изображение питомца. Сам рисунок и сцена — существующая графика
+ * приложения и не меняются; здесь только рамка вокруг них.
  */
 @Composable
 fun PetFigure(
@@ -832,59 +1327,49 @@ fun PetFigure(
     scene: Boolean = false,
     /**
      * Показывать дом питомца на фоне. Появляется после покупки
-     * «Домика-палатки» и остаётся навсегда: это вещь, а не состояние,
-     * поэтому подписи рядом с ней нет — покупка уже подписана в каталоге.
+     * «Домика-палатки» и остаётся навсегда.
      */
     house: Boolean = false,
-    size: androidx.compose.ui.unit.Dp = 140.dp,
+    size: Dp = 140.dp,
+    /** Подписи с именем и стадией под рисунком. */
+    caption: Boolean = true,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val base = parseColor(colorHex)
-        // Контур фигуры берётся у пары, а не у оформления карточек:
-        // чёрно-белому режиму рисунок не подчиняется по тем же причинам,
-        // что и сцена, — сплошные чернила превращают его в пятно.
-        val petInk = LocalSceneColors.current.ink
+        val sceneColors = LocalSceneColors.current
 
-        // Фигура озвучивается одной фразой, а не набором фрагментов: для
-        // программы чтения с экрана это один объект.
+        // Фигура озвучивается одной фразой: для программы чтения с экрана
+        // это один объект.
         val describePet = Modifier.semantics(mergeDescendants = true) {
             contentDescription = "$speciesTitle, $accessoryTitle"
         }
 
         if (scene) {
             // Питомец стоит внутри сцены, а не поверх неё: дом занимает
-            // левую часть, дерево середину, питомец правую. Отдельной
-            // фигуры при этом нет — иначе дерево оказывалось бы за ней.
-            val scene = LocalSceneColors.current
-            val night = LocalNightScene.current
-            // В альбомной ориентации высота экрана мала, и сцена берётся
-            // окном без верхней полосы неба: фигуры остаются прежними.
+            // левую часть, дерево середину, питомец правую.
             val landscape = LocalConfiguration.current.orientation ==
                 Configuration.ORIENTATION_LANDSCAPE
             val topCrop = if (landscape) SCENE_TOP_CROP_LANDSCAPE else 0f
+            val shape = MaterialTheme.shapes.medium
 
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(sceneAspect(topCrop))
-                    .applique(
-                        shape = MaterialTheme.shapes.medium,
-                        decor = LocalAppliqueDecor.current,
-                    )
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.background)
+                    .clip(shape)
+                    .background(FinnyTheme.colors.appBackground)
                     .then(describePet),
             ) {
                 drawScene(
-                    primary = scene.primary,
-                    secondary = scene.secondary,
-                    surface = scene.surface,
-                    onBackground = scene.onBackground,
-                    ink = scene.ink,
-                    night = night,
+                    primary = sceneColors.primary,
+                    secondary = sceneColors.secondary,
+                    surface = sceneColors.surface,
+                    onBackground = sceneColors.onBackground,
+                    ink = sceneColors.ink,
+                    night = false,
                     house = house,
                     topCrop = topCrop,
                 ) {
@@ -896,26 +1381,22 @@ fun PetFigure(
                         care = care,
                         joy = joy,
                         fitToCanvas = false,
-                        outlineColor = scene.ink,
+                        outlineColor = sceneColors.ink,
                     )
                 }
             }
         } else {
-            // Вне сцены фигура стоит в рамке того же оформления, что
-            // и карточки: без неё она висит на бумаге без опоры.
-            val petShape = MaterialTheme.shapes.extraLarge
+            val petShape = MaterialTheme.shapes.large
 
             Box(
                 modifier = Modifier
                     .size(size)
-                    .applique(shape = petShape, decor = LocalAppliqueDecor.current)
                     .clip(petShape)
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(FinnyTheme.colors.surface)
                     .then(describePet),
                 contentAlignment = Alignment.Center,
             ) {
-                // Доля 118 к 140 взята из канвы: фигура не упирается
-                // в рамку.
+                // Доля 118 к 140 взята из канвы: фигура не упирается в рамку.
                 Canvas(modifier = Modifier.size(size * 0.84f)) {
                     drawPet(
                         speciesId = speciesId,
@@ -924,24 +1405,29 @@ fun PetFigure(
                         stage = stage,
                         care = care,
                         joy = joy,
-                        outlineColor = petInk,
+                        outlineColor = sceneColors.ink,
                     )
                 }
             }
         }
-        Text(
-            text = petName,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            text = "${stage.displayName}, $accessoryTitle".lowercase()
-                .replaceFirstChar { it.uppercase() },
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (caption) {
+            Text(
+                text = petName,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            Text(
+                text = petCaption(stage, accessoryTitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = LocalMutedColor.current,
+            )
+        }
     }
 }
+
+/** Подпись питомца: «Малыш · бантик». */
+fun petCaption(stage: GrowthStage, accessoryTitle: String): String =
+    "${stage.displayName} · ${accessoryTitle.lowercase()}"
 
 /** Переводит цвет вида «#RRGGBB» в значение Compose. */
 fun parseColor(hex: String): Color =

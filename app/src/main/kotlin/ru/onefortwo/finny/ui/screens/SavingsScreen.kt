@@ -16,22 +16,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.GoalContent
+import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.WithdrawalPreview
-import ru.onefortwo.finny.ui.common.AppliqueDialog
+import ru.onefortwo.finny.ui.common.ButtonTone
+import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.CoinStepper
+import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.LabeledValue
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
+import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.FeedbackMessage
-import ru.onefortwo.finny.ui.theme.LocalBudgetColors
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
  * Копилка и финансовая цель (ТЗ 2.5.7).
@@ -52,6 +55,7 @@ fun SavingsScreen(
     onPreviewWithdrawal: (Int) -> WithdrawalPreview,
     onWithdraw: (Int) -> Unit,
     onBack: () -> Unit,
+    balance: Coins? = null,
 ) {
     // Суммы выставляются кнопками шага, как на экране плана: печатать
     // число с клавиатуры не нужно (замечание тестировщика о вводе).
@@ -65,46 +69,49 @@ fun SavingsScreen(
     val goalTitle = goals.firstOrNull { it.id == goal?.id }?.title
 
     ScreenScaffold(
+        eyebrow = "Моя цель",
         title = "Копилка",
+        balance = balance,
         onBack = onBack,
         message = message,
         onDismissMessage = onDismissMessage,
     ) {
         Column {
             if (goal == null) {
-                SectionCard(title = "Выбери цель") {
+                SectionCard(title = "Выбери цель", tone = CardTone.Sage) {
                     Column {
-                        Text(
+                        SupportingText(
                             "Цель — это то, ради чего копят. Выбери, что хочешь накопить.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 8.dp),
+                            modifier = Modifier.padding(bottom = 12.dp),
                         )
                         goals.forEach { option ->
                             SecondaryButton(
                                 text = "${option.title} — ${Explanations.coins(option.price)}",
                                 onClick = { onChooseGoal(option.id) },
-                                modifier = Modifier.padding(bottom = 8.dp),
+                                modifier = Modifier.padding(bottom = 10.dp),
                             )
                         }
                     }
                 }
             } else {
                 SectionCard(
-                    title = goalTitle ?: "Моя цель",
-                    edgeColor = LocalBudgetColors.current.savings,
+                    eyebrow = goalTitle ?: "Моя цель",
+                    title = "${game.savings.saved.amount} из ${Explanations.coins(goal.price)}",
+                    tone = CardTone.Primary,
                 ) {
                     Column {
+                        ProgressBar(
+                            fraction = game.savings.saved.amount.toFloat() / goal.price.amount,
+                            color = FinnyTheme.colors.coin,
+                            trackColor = FinnyTheme.colors.onPrimary.copy(alpha = 0.22f),
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
                         LabeledValue("Стоимость", Explanations.coins(goal.price))
                         LabeledValue("Уже накоплено", Explanations.coins(game.savings.saved))
                         LabeledValue("Осталось накопить", Explanations.coins(game.savings.remaining))
-                        ProgressBar(
-                            fraction = game.savings.saved.amount.toFloat() / goal.price.amount,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            color = LocalBudgetColors.current.savings,
-                        )
-                        Text(
+                        SupportingText(
                             text = Explanations.forecast(game.goalForecast()),
-                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 8.dp),
                         )
                         // Накопленную цель нужно получить, иначе экран
                         // становится тупиковым: копилка растёт, а выбрать
@@ -112,6 +119,7 @@ fun SavingsScreen(
                         if (game.savings.saved >= goal.price) {
                             PrimaryButton(
                                 text = "Получить: ${goalTitle ?: "цель"}",
+                                tone = ButtonTone.Coin,
                                 onClick = onClaimGoal,
                                 modifier = Modifier.padding(top = 12.dp),
                             )
@@ -119,7 +127,7 @@ fun SavingsScreen(
                     }
                 }
 
-                SectionCard(title = "Отложить монеты") {
+                SectionCard(title = "Отложить монеты", tone = CardTone.Coin) {
                     Column {
                         LabeledValue("Можно потратить", Explanations.coins(game.balance))
                         // Больше баланса отложить нельзя: верхняя граница — баланс.
@@ -143,13 +151,12 @@ fun SavingsScreen(
                         // Причина недоступности названа текстом: по одному
                         // виду кнопки непонятно, чего она ждёт.
                         if (deposit == 0) {
-                            Text(
+                            SupportingText(
                                 text = if (depositMax > 0) {
                                     "Выбери сумму кнопками, и кнопка станет доступной."
                                 } else {
                                     "Монет на балансе нет — откладывать пока нечего."
                                 },
-                                style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
                         }
@@ -158,10 +165,7 @@ fun SavingsScreen(
 
                 SectionCard(title = "Взять из копилки") {
                     Column {
-                        Text(
-                            "Монеты из копилки можно забрать, но цель станет дальше.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        SupportingText("Монеты из копилки можно забрать, но цель станет дальше.")
                         // Забрать можно не больше, чем накоплено.
                         val withdrawMax = game.savings.saved.amount
                         val withdraw = withdrawAmount.coerceAtMost(withdrawMax)
@@ -178,13 +182,12 @@ fun SavingsScreen(
                             modifier = Modifier.padding(top = 12.dp),
                         )
                         if (withdraw == 0) {
-                            Text(
+                            SupportingText(
                                 text = if (withdrawMax > 0) {
                                     "Выбери сумму кнопками, и кнопка станет доступной."
                                 } else {
                                     "В копилке пока пусто — забирать нечего."
                                 },
-                                style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
                         }
@@ -218,14 +221,13 @@ private fun AmountPicker(
     max: Int,
     onChange: (Int) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+    Column(modifier = Modifier.padding(top = 10.dp)) {
+        SupportingText(label)
         Text(
             text = Explanations.coins(value),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier
-                .padding(top = 4.dp)
+                .padding(top = 2.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite },
         )
         CoinStepper(
@@ -248,7 +250,7 @@ private fun WithdrawalConfirmation(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    AppliqueDialog(
+    FinnyDialog(
         title = "Забрать ${Explanations.coins(preview.amount)} из копилки?",
         onDismiss = onCancel,
         content = {

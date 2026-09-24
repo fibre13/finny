@@ -20,7 +20,6 @@ import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.content.check
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.data.GameRepository
-import ru.onefortwo.finny.data.SavedDisplaySettings
 import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.DepositResult
@@ -41,8 +40,6 @@ import ru.onefortwo.finny.economy.earn
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
 import ru.onefortwo.finny.economy.withdraw
-import ru.onefortwo.finny.ui.theme.DisplaySettings
-import ru.onefortwo.finny.ui.theme.ThemeMode
 
 /**
  * Связывает экраны с правилами экономики и учебным контентом.
@@ -85,15 +82,6 @@ class GameViewModel(
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
 
-    private val _display = MutableStateFlow(DisplaySettings())
-
-    /**
-     * Настройки отображения. Живут отдельно от состояния игры: их
-     * выбирают на экране знакомства, когда профиля ещё нет, и сброс
-     * профиля их не затрагивает.
-     */
-    val display: StateFlow<DisplaySettings> = _display.asStateFlow()
-
     private val petName: String get() = _state.value.profile?.petName ?: "Финни"
 
     init {
@@ -121,18 +109,6 @@ class GameViewModel(
         }
 
         viewModelScope.launch {
-            repository?.observeDisplaySettings()?.collect { saved ->
-                if (saved != null) {
-                    _display.value = DisplaySettings(
-                        themeMode = runCatching { ThemeMode.valueOf(saved.themeMode) }
-                            .getOrDefault(ThemeMode.SYSTEM),
-                        highContrast = saved.highContrast,
-                    )
-                }
-            }
-        }
-
-        viewModelScope.launch {
             val saved = repository?.load()
 
             _state.update { current ->
@@ -144,22 +120,6 @@ class GameViewModel(
                     else -> current.copy(isLoaded = true)
                 }
             }
-        }
-    }
-
-    /**
-     * Меняет настройки отображения. Применяются сразу и записываются
-     * на устройство: выбор взрослого не должен теряться при перезапуске.
-     */
-    fun setDisplaySettings(settings: DisplaySettings) {
-        _display.value = settings
-        viewModelScope.launch {
-            repository?.saveDisplaySettings(
-                SavedDisplaySettings(
-                    themeMode = settings.themeMode.name,
-                    highContrast = settings.highContrast,
-                ),
-            )
         }
     }
 

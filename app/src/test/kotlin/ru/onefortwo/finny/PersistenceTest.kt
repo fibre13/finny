@@ -32,8 +32,6 @@ import ru.onefortwo.finny.data.GameRepository
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.ui.state.GameViewModel
-import ru.onefortwo.finny.ui.theme.DisplaySettings
-import ru.onefortwo.finny.ui.theme.ThemeMode
 
 /**
  * Проверка сохранения состояния между запусками (ТЗ 2.5.13,
@@ -371,33 +369,6 @@ class PersistenceTest {
 
         assertEquals("white", model.state.value.profile?.appearance?.colorId)
         assertEquals("white", viewModel().state.value.profile?.appearance?.colorId)
-    }
-
-    @Test
-    fun `настройки отображения сохраняются и переживают сброс профиля`() = runBlocking {
-        val model = viewModel()
-        model.setDisplaySettings(
-            DisplaySettings(themeMode = ThemeMode.DARK, highContrast = true),
-        )
-        model.createProfile("Тест", PetAppearance("cat", "ginger", "none"), Difficulty.SIMPLE)
-
-        // Сброс профиля стирает игру, но не оформление: взрослому не нужно
-        // настраивать режим заново после сброса.
-        model.resetProfile()
-
-        val saved = repository.observeDisplaySettings().first()
-
-        assertNotNull(saved)
-        assertEquals("DARK", saved!!.themeMode)
-        assertTrue(saved.highContrast)
-        assertNull(repository.load())
-    }
-
-    @Test
-    fun `до выбора действуют значения по умолчанию`() = runBlocking {
-        assertNull(repository.observeDisplaySettings().first())
-        assertEquals(ThemeMode.SYSTEM, viewModel().display.value.themeMode)
-        assertFalse(viewModel().display.value.highContrast)
     }
 
     @Test

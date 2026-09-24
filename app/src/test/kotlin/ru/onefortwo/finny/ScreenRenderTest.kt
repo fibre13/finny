@@ -47,7 +47,6 @@ import ru.onefortwo.finny.economy.previewWithdrawal
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
-import ru.onefortwo.finny.ui.screens.OnboardingSetup
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
 import ru.onefortwo.finny.ui.screens.PlanScreen
@@ -58,7 +57,6 @@ import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.Profile
-import ru.onefortwo.finny.ui.theme.DisplaySettings
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
@@ -96,28 +94,22 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `экран знакомства спрашивает сложность и оформление до создания питомца`() {
+    fun `знакомство спрашивает сложность и имя до создания питомца`() {
         compose.setContent {
-            FinnyTheme {
-                OnboardingScreen(
-                    onContinue = {},
-                    setup = OnboardingSetup(
-                        difficulty = null,
-                        onDifficulty = {},
-                        display = DisplaySettings(),
-                        onDisplay = {},
-                    ),
-                )
-            }
+            FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }) }
         }
+
+        // Шаг 2 — внешность, шаг 3 — сложность заданий и имя.
+        compose.onNodeWithText("Выбрать").performScrollTo().performClick()
 
         compose.onNodeWithText("Какие задания тебе по силам")
             .performScrollTo()
             .assertIsDisplayed()
-        compose.onNodeWithText("Для взрослого").performScrollTo().assertIsDisplayed()
-        // Пока сложность не выбрана, дальше пройти нельзя: задания
+        compose.onNodeWithText("Как назовём").performScrollTo().assertIsDisplayed()
+        // Пока сложность и имя не выбраны, дальше пройти нельзя: задания
         // начинаются сразу после создания питомца.
-        compose.onNodeWithText("Выбери сложность, и кнопка станет доступной.")
+        compose.onNodeWithText("Проверить выбор").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Выбери задания и придумай имя, и кнопка станет доступной.")
             .performScrollTo()
             .assertIsDisplayed()
     }
@@ -125,11 +117,12 @@ class ScreenRenderTest {
     @Test
     fun `экран создания питомца показывает варианты внешности`() {
         compose.setContent {
-            FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _ -> }) }
+            FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }) }
         }
 
-        compose.onNodeWithText("Кто это").assertIsDisplayed()
-        compose.onNodeWithText("Как назовём").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Кто это").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Какого цвета").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Украшение").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -147,13 +140,10 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onOpenPlan = {},
                     onOpenShop = {},
-                    onOpenTasks = {},
                     onOpenSavings = {},
-                    onOpenHistory = {},
                     onOpenGlossary = {},
                     onOpenHelp = {},
                     onOpenAdult = {},
-                    onOpenWardrobe = {},
                     onFinishPeriod = {},
                     today = "2026-09-15",
                 )
@@ -193,13 +183,10 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onOpenPlan = {},
                     onOpenShop = {},
-                    onOpenTasks = {},
                     onOpenSavings = {},
-                    onOpenHistory = {},
                     onOpenGlossary = {},
                     onOpenHelp = {},
                     onOpenAdult = {},
-                    onOpenWardrobe = {},
                     onFinishPeriod = {},
                     today = "2026-09-15",
                 )
@@ -267,7 +254,7 @@ class ScreenRenderTest {
             }
         }
 
-        repeat(4) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performClick() }
+        repeat(4) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
         // «20 монет» выводится дважды: под «Нужное» и в строке «Распределено».
         compose.onAllNodesWithText("20 монет").assertCountEquals(2)
 
@@ -301,13 +288,10 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onOpenPlan = {},
                     onOpenShop = {},
-                    onOpenTasks = {},
                     onOpenSavings = {},
-                    onOpenHistory = {},
                     onOpenGlossary = {},
                     onOpenHelp = {},
                     onOpenAdult = {},
-                    onOpenWardrobe = {},
                     onFinishPeriod = {},
                     today = "2026-09-15",
                 )
@@ -332,13 +316,13 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Нужное: убавить на 1").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Нужное: убавить на 5").assertIsNotEnabled()
 
-        repeat(10) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performClick() }
+        repeat(10) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
         compose.onAllNodesWithText("50 монет").assertCountEquals(2)
         // Весь бюджет: прибавлять некуда.
         compose.onNodeWithContentDescription("Нужное: прибавить 5").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Нужное: прибавить 1").assertIsNotEnabled()
 
-        compose.onNodeWithContentDescription("Нужное: убавить на 1").performClick()
+        compose.onNodeWithContentDescription("Нужное: убавить на 1").performScrollTo().performClick()
         compose.onAllNodesWithText("49 монет").assertCountEquals(2)
     }
 
@@ -735,13 +719,10 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onOpenPlan = {},
                     onOpenShop = {},
-                    onOpenTasks = {},
                     onOpenSavings = {},
-                    onOpenHistory = {},
                     onOpenGlossary = {},
                     onOpenHelp = {},
                     onOpenAdult = {},
-                    onOpenWardrobe = {},
                     onFinishPeriod = {},
                     today = "2026-09-15",
                     onOpenTask = { opened += it },
@@ -773,13 +754,10 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onOpenPlan = {},
                     onOpenShop = {},
-                    onOpenTasks = {},
                     onOpenSavings = {},
-                    onOpenHistory = {},
                     onOpenGlossary = {},
                     onOpenHelp = {},
                     onOpenAdult = {},
-                    onOpenWardrobe = {},
                     onFinishPeriod = {},
                     today = "2026-09-15",
                 )

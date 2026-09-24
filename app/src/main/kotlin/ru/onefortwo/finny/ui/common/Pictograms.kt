@@ -2,7 +2,6 @@ package ru.onefortwo.finny.ui.common
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -17,16 +16,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.StatLevel
-import ru.onefortwo.finny.ui.theme.LocalAppliqueDecor
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.theme.LocalBudgetColors
-import ru.onefortwo.finny.ui.theme.LocalHighContrast
 
 /**
  * Пиктограммы направлений, уровней показателя и результата задания.
@@ -43,7 +39,8 @@ import ru.onefortwo.finny.ui.theme.LocalHighContrast
  * подпись, а не описание рисунка.
  */
 
-/** Цвет монеты. Один и тот же в счётчике баланса и в копилке. */
+
+/** Цвет монеты в прорези копилки. */
 private val Gold = Color(0xFFF2B705)
 
 /**
@@ -65,14 +62,13 @@ private val PiggyPink = Color(0xFFE07B96)
 private const val GRID = 24f
 
 /**
- * Толщина обводки пиктограммы на экране. Совпадает с контуром направления
- * 1b, поэтому пиктограмма не выглядит ни легче, ни тяжелее рамки рядом.
+ * Толщина обводки пиктограммы на экране.
  *
  * Задана в dp, а не в единицах сетки: пиктограммы выводятся в двух
  * размерах, и постоянная в единицах сетки давала бы на крупной вдвое
  * более толстую линию — звезда и копилка расплывались в пятно.
  */
-private val StrokeWidth = 2.5.dp
+private val StrokeWidth = 2.dp
 
 /** Размер пиктограммы в строке текста: рядом с подписью показателя. */
 val PictogramSize = 28.dp
@@ -92,8 +88,7 @@ val MenuPictogramSize = 26.dp
 /**
  * Разделы главного экрана. Пиктограмма помогает узнать раздел, но ничего
  * не заменяет: подпись на кнопке остаётся и читается сама по себе
- * (ТЗ 3.6). Рисунки построены одними чернилами, без заливки цветом,
- * поэтому одинаково работают в обеих парах и в чёрно-белом режиме.
+ * (ТЗ 3.6). Рисунки построены одной линией, без заливки цветом.
  */
 enum class MenuSection {
     PLAN,
@@ -112,8 +107,9 @@ fun MenuIcon(
     section: MenuSection,
     modifier: Modifier = Modifier,
     size: Dp = MenuPictogramSize,
+    tint: Color = FinnyTheme.colors.attention,
 ) {
-    val ink = LocalAppliqueDecor.current.ink
+    val ink = tint
 
     Canvas(modifier = modifier.size(size)) {
         onGrid { stroke ->
@@ -288,7 +284,7 @@ private fun DrawScope.drawLock(ink: Color, outline: Stroke) {
  */
 @Composable
 fun StatLevelIcon(level: StatLevel, modifier: Modifier = Modifier, size: Dp = PictogramSize) {
-    val ink = LocalAppliqueDecor.current.ink
+    val ink = FinnyTheme.colors.onSurface
 
     Canvas(modifier = modifier.size(size)) {
         onGrid { stroke ->
@@ -323,9 +319,7 @@ fun BudgetDirectionIcon(
     size: Dp = DirectionPictogramSize,
 ) {
     val palette = LocalBudgetColors.current
-    val ink = LocalAppliqueDecor.current.ink
-    val paper = MaterialTheme.colorScheme.surface
-    val hatched = LocalHighContrast.current
+    val ink = FinnyTheme.colors.onSurface
     val fill = when (category) {
         BudgetCategory.NEEDS -> palette.needs
         BudgetCategory.WANTS -> palette.wants
@@ -334,78 +328,19 @@ fun BudgetDirectionIcon(
 
     Canvas(modifier = modifier.size(size)) {
         onGrid { stroke ->
-            // В чёрно-белом режиме цвет направления не различает: все три
-            // чёрные. Различает штриховка — и подпись рядом, как всегда.
-            if (hatched) {
-                drawHatch(category, ink, paper, stroke)
-            } else {
-                when (category) {
-                    BudgetCategory.NEEDS -> drawBowl(fill, ink, stroke)
-                    BudgetCategory.WANTS -> drawStar(fill, ink, stroke)
-                    BudgetCategory.SAVINGS -> drawPiggy(ink, stroke)
-                }
+            when (category) {
+                BudgetCategory.NEEDS -> drawBowl(fill, ink, stroke)
+                BudgetCategory.WANTS -> drawStar(fill, ink, stroke)
+                BudgetCategory.SAVINGS -> drawPiggy(ink, stroke)
             }
         }
     }
-}
-
-/**
- * Обозначение направления штриховкой: квадрат с наклоном линий, своим
- * для каждого направления. Нужное — вправо вверх, Хочу — вправо вниз,
- * Копилка — вертикально.
- *
- * Вместо рисунка, а не поверх него: при предельном контуре и одном цвете
- * миска, звезда и копилка перестают различаться силуэтом.
- */
-private fun DrawScope.drawHatch(
-    category: BudgetCategory,
-    ink: Color,
-    paper: Color,
-    stroke: Float,
-) {
-    val box = Path().apply {
-        addRoundRect(
-            RoundRect(
-                left = 2f,
-                top = 2f,
-                right = 22f,
-                bottom = 22f,
-                cornerRadius = CornerRadius(5f, 5f),
-            ),
-        )
-    }
-    drawPath(box, paper)
-
-    val degrees = when (category) {
-        BudgetCategory.NEEDS -> -45f
-        BudgetCategory.WANTS -> 45f
-        BudgetCategory.SAVINGS -> 0f
-    }
-
-    clipPath(box) {
-        rotate(degrees = degrees, pivot = Offset(12f, 12f)) {
-            // Линии ведутся с запасом в обе стороны: после поворота
-            // квадрат выходит за прежние границы.
-            var x = -8f
-            while (x <= 32f) {
-                drawLine(
-                    color = ink,
-                    start = Offset(x, -8f),
-                    end = Offset(x, 32f),
-                    strokeWidth = stroke,
-                )
-                x += 4.6f
-            }
-        }
-    }
-
-    drawPath(box, ink, style = Stroke(width = stroke))
 }
 
 /** Итог задания: галочка при верном решении, знак внимания при ошибке. */
 @Composable
 fun TaskResultIcon(correct: Boolean, modifier: Modifier = Modifier, size: Dp = PictogramSize) {
-    val ink = LocalAppliqueDecor.current.ink
+    val ink = if (correct) FinnyTheme.colors.successText else FinnyTheme.colors.warningText
 
     Canvas(modifier = modifier.size(size)) {
         onGrid { stroke ->
@@ -435,14 +370,8 @@ fun TaskResultIcon(correct: Boolean, modifier: Modifier = Modifier, size: Dp = P
 /** Монета: круг с внутренним кругом. */
 @Composable
 fun CoinIcon(modifier: Modifier = Modifier, size: Dp = PictogramSize) {
-    val ink = LocalAppliqueDecor.current.ink
-    // В чёрно-белом режиме золотой заливки нет: контраст жёлтого к белому
-    // ниже порога, и монета читалась бы одним контуром.
-    val gold = if (LocalHighContrast.current) {
-        MaterialTheme.colorScheme.surface
-    } else {
-        Gold
-    }
+    val ink = FinnyTheme.colors.warning
+    val gold = FinnyTheme.colors.coin
 
     Canvas(modifier = modifier.size(size)) {
         onGrid { stroke ->
@@ -610,4 +539,141 @@ private fun DrawScope.onGrid(block: DrawScope.(stroke: Float) -> Unit) {
 private fun arc(cx: Float, cy: Float, halfWidth: Float, rise: Float): Path = Path().apply {
     moveTo(cx - halfWidth, cy)
     quadraticTo(cx, cy + rise * 2f, cx + halfWidth, cy)
+}
+
+// --- Навигация и служебные знаки -----------------------------------------
+
+/** Стрелка «назад». Описание задаёт кнопка, сама стрелка не озвучивается. */
+@Composable
+fun ArrowBackIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
+    Canvas(modifier = modifier.size(size)) {
+        onGrid { stroke ->
+            val outline = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            drawLine(color, Offset(19f, 12f), Offset(5f, 12f), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawPath(
+                Path().apply {
+                    moveTo(11f, 6f)
+                    lineTo(5f, 12f)
+                    lineTo(11f, 18f)
+                },
+                color,
+                style = outline,
+            )
+        }
+    }
+}
+
+/** Галочка: отметка выбранного варианта. */
+@Composable
+fun CheckIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
+    Canvas(modifier = modifier.size(size)) {
+        onGrid { stroke ->
+            drawPath(
+                Path().apply {
+                    moveTo(5f, 12.6f)
+                    lineTo(10f, 17.4f)
+                    lineTo(19f, 7f)
+                },
+                color,
+                style = Stroke(width = stroke * 1.4f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
+        }
+    }
+}
+
+/** Шеврон «открыть» в конце строки меню. */
+@Composable
+fun ChevronIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
+    Canvas(modifier = modifier.size(size)) {
+        onGrid { stroke ->
+            drawPath(
+                Path().apply {
+                    moveTo(9f, 5.5f)
+                    lineTo(15.5f, 12f)
+                    lineTo(9f, 18.5f)
+                },
+                color,
+                style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
+        }
+    }
+}
+
+/** Вкладки нижней навигации. */
+enum class NavSection {
+    HOME,
+    TASKS,
+    PET,
+    PROGRESS,
+}
+
+/**
+ * Пиктограмма вкладки. Подпись вкладки видна всегда, рисунок её не
+ * заменяет (ТЗ 3.6).
+ */
+@Composable
+fun NavIcon(section: NavSection, color: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
+    Canvas(modifier = modifier.size(size)) {
+        onGrid { stroke ->
+            val outline = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            when (section) {
+                NavSection.HOME -> drawHouse(color, outline)
+                NavSection.TASKS -> drawOpenBook(color, outline)
+                NavSection.PET -> drawPaw(color, outline)
+                NavSection.PROGRESS -> drawGrowingBars(color, outline)
+            }
+        }
+    }
+}
+
+/** Главная: дом с дверью. */
+private fun DrawScope.drawHouse(ink: Color, outline: Stroke) {
+    drawPath(
+        Path().apply {
+            moveTo(3.5f, 11f)
+            lineTo(12f, 4f)
+            lineTo(20.5f, 11f)
+        },
+        ink,
+        style = outline,
+    )
+    drawPath(
+        Path().apply {
+            moveTo(5.5f, 9.5f)
+            lineTo(5.5f, 20f)
+            lineTo(18.5f, 20f)
+            lineTo(18.5f, 9.5f)
+        },
+        ink,
+        style = outline,
+    )
+    drawPath(
+        Path().apply {
+            moveTo(10f, 20f)
+            lineTo(10f, 14.5f)
+            lineTo(14f, 14.5f)
+            lineTo(14f, 20f)
+        },
+        ink,
+        style = outline,
+    )
+}
+
+/** Питомец: отпечаток лапы. */
+private fun DrawScope.drawPaw(ink: Color, outline: Stroke) {
+    drawPath(
+        Path().apply {
+            addOval(Rect(Offset(7f, 11.5f), Size(10f, 8.5f)))
+        },
+        ink,
+        style = outline,
+    )
+    listOf(
+        Offset(5f, 9f),
+        Offset(9.3f, 5.6f),
+        Offset(14.7f, 5.6f),
+        Offset(19f, 9f),
+    ).forEach { center ->
+        drawCircle(ink, radius = 1.9f, center = center, style = outline)
+    }
 }

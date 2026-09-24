@@ -1,10 +1,11 @@
 package ru.onefortwo.finny
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.onefortwo.finny.ui.state.GameViewModel
 import ru.onefortwo.finny.ui.theme.FinnyTheme
@@ -16,15 +17,18 @@ import ru.onefortwo.finny.ui.theme.FinnyTheme
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Содержимое рисуется под системными панелями, а отступы от них
+        // задаёт каркас экрана. Тема светлая, поэтому значки системных
+        // панелей тёмные при любой теме устройства.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         setContent {
-            // Модель создаётся до темы, а не внутри неё: оформление
-            // выбирается взрослым и хранится на устройстве, поэтому тема
-            // зависит от прочитанных настроек.
             val model: GameViewModel = viewModel(factory = GameViewModel.Factory(this))
-            val display by model.display.collectAsStateWithLifecycle()
 
-            FinnyTheme(settings = display) {
+            FinnyTheme {
                 FinnyApp(viewModel = model)
             }
         }

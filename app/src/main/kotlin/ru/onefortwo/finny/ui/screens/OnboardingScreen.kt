@@ -1,219 +1,147 @@
 package ru.onefortwo.finny.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
-import ru.onefortwo.finny.economy.Difficulty
+import ru.onefortwo.finny.economy.BudgetCategory
+import ru.onefortwo.finny.ui.common.BudgetDirectionIcon
+import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SectionCard
-import ru.onefortwo.finny.ui.common.SelectButton
-import ru.onefortwo.finny.ui.theme.DisplaySettings
-import ru.onefortwo.finny.ui.theme.ThemeMode
+import ru.onefortwo.finny.ui.common.SupportingText
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 
-/**
- * Выбор сложности и настроек отображения на экране знакомства.
- *
- * Передаётся только при первом запуске. С главного экрана тот же экран
- * открывается как подсказка «Как играть»: сложность там уже выбрана,
- * а настройки отображения лежат в разделе для взрослого.
- */
-data class OnboardingSetup(
-    /** Выбранная сложность либо `null`, пока выбора не было. */
-    val difficulty: Difficulty?,
-    val onDifficulty: (Difficulty) -> Unit,
-    val display: DisplaySettings,
-    val onDisplay: (DisplaySettings) -> Unit,
-)
+/** Число шагов знакомства: правила, питомец, задания и имя, проверка. */
+const val ONBOARDING_STEPS = 4
 
 /**
  * Знакомство с целью игры и тремя типами решений (ТЗ 2.5.1).
  *
- * При первом запуске здесь же выбирается сложность заданий: задания
- * начинаются сразу после создания питомца, значит выбор обязан быть
- * сделан раньше. Рядом стоят настройки отображения:
- * взрослый включает тёмную пару или чёрно-белый режим до того, как
- * ребёнок начнёт играть, а не после.
+ * При первом запуске это первый из четырёх шагов знакомства. Экран
+ * доступен и позже, с главного экрана, как подсказка «Как играть»:
+ * тогда шагов над заголовком нет, а внизу кнопка возврата.
  *
- * Экран доступен и позже, с главного экрана: к подсказке можно вернуться
- * в любой момент.
+ * @param step номер шага знакомства либо `null`, если экран открыт
+ * как подсказка.
  */
 @Composable
 fun OnboardingScreen(
     onContinue: () -> Unit,
     onBack: (() -> Unit)? = null,
     continueText: String = "Дальше",
-    setup: OnboardingSetup? = null,
+    step: Int? = null,
 ) {
-    ScreenScaffold(title = "Как играть", onBack = onBack) {
+    ScreenScaffold(
+        title = "Как играть",
+        onBack = onBack,
+        top = step?.let { { StepProgress(step = it) } },
+    ) {
         Column {
-            Text(
+            SupportingText(
                 text = "У тебя есть питомец Финни и монеты на каждый день. " +
                     "Монет мало, а хочется многого — поэтому каждый день ты решаешь, на что их потратить.",
-                style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
-            if (setup != null) {
-                DifficultyCard(selected = setup.difficulty, onSelect = setup.onDifficulty)
-            }
-
-            SectionCard(title = "Решение 1. Купить нужное") {
-                Text(
+            SectionCard(
+                title = "Решение 1. Купить нужное",
+                tone = CardTone.Sage,
+                icon = { BudgetDirectionIcon(BudgetCategory.NEEDS, size = 32.dp) },
+            ) {
+                SupportingText(
                     "Корм, вода, уход. Без этого Финни грустит и голодает. " +
                         "Нужное покупают первым.",
-                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
 
-            SectionCard(title = "Решение 2. Купить желаемое") {
-                Text(
+            SectionCard(
+                title = "Решение 2. Купить желаемое",
+                tone = CardTone.Coin,
+                icon = { BudgetDirectionIcon(BudgetCategory.WANTS, size = 32.dp) },
+            ) {
+                SupportingText(
                     "Игрушки и украшения. Они радуют Финни. " +
                         "Если монет мало, желаемое можно отложить на завтра — это не ошибка.",
-                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
 
-            SectionCard(title = "Решение 3. Отложить в копилку") {
-                Text(
+            SectionCard(
+                title = "Решение 3. Отложить в копилку",
+                icon = { BudgetDirectionIcon(BudgetCategory.SAVINGS, size = 32.dp) },
+            ) {
+                SupportingText(
                     "Копилка растёт понемногу и приближает цель — например, самокат для Финни.",
-                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
 
-            Text(
-                text = "Ошибиться не страшно: прогресс не пропадёт, а исправить всё можно на следующий день.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
-
-            if (setup != null) {
-                DisplayCard(settings = setup.display, onChange = setup.onDisplay)
+            SectionCard(tone = CardTone.Primary) {
+                Text(
+                    text = "Ошибиться не страшно: прогресс не пропадёт, а исправить всё можно " +
+                        "на следующий день.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
 
             PrimaryButton(
                 text = continueText,
-                enabled = setup == null || setup.difficulty != null,
                 onClick = onContinue,
+                modifier = Modifier.padding(top = 4.dp),
             )
-
-            // Причина недоступности названа текстом: по одному виду кнопки
-            // непонятно, чего она ждёт.
-            if (setup != null && setup.difficulty == null) {
-                Text(
-                    text = "Выбери сложность, и кнопка станет доступной.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
         }
     }
 }
 
 /**
- * Выбор сложности заданий (ТЗ 2.5.8).
- *
- * Спрашивается сложность, а не класс и не возраст: для подбора заданий
- * этого достаточно, и тогда приложение не собирает о ребёнке никаких
- * сведений. Выбор можно поменять в разделе для взрослого.
+ * Шаги знакомства: полоски по числу шагов и надпись «2/4». Программа
+ * чтения с экрана произносит «Шаг 2 из 4».
  */
 @Composable
-private fun DifficultyCard(selected: Difficulty?, onSelect: (Difficulty) -> Unit) {
-    SectionCard(title = "Какие задания тебе по силам") {
-        Column {
-            Text(
-                text = "Выбери, с каких начать. Это можно поменять потом — " +
-                    "ничего о тебе мы не спрашиваем.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            Difficulty.entries.forEach { option ->
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    SelectButton(
-                        text = option.displayName,
-                        selected = option == selected,
-                        onClick = { onSelect(option) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        text = option.hint,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-            }
-        }
-    }
-}
+fun StepProgress(step: Int, total: Int = ONBOARDING_STEPS) {
+    val colors = FinnyTheme.colors
 
-/**
- * Настройки отображения для взрослого.
- *
- * Стоят на первом экране, а не только в разделе для взрослого: ребёнку,
- * которому нужен чёрно-белый режим, он нужен с самого начала, а не после
- * того, как он пройдёт создание питомца в неподходящем оформлении.
- */
-@Composable
-private fun DisplayCard(settings: DisplaySettings, onChange: (DisplaySettings) -> Unit) {
-    SectionCard(title = "Для взрослого") {
-        Column {
-            Text(
-                text = "Оформление можно поменять сейчас или позже — в разделе для взрослого.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-
-            Text(
-                text = "Тема",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
-            )
-            ThemeMode.entries.forEach { mode ->
-                SelectButton(
-                    text = mode.displayName,
-                    selected = mode == settings.themeMode,
-                    onClick = { onChange(settings.copy(themeMode = mode)) },
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = "Шаг $step из $total" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            repeat(total) { index ->
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .weight(1f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (index < step) colors.primary else colors.track),
                 )
             }
-
-            // Выбор пары остаётся доступным и в чёрно-белом режиме: он
-            // сохраняется и вернётся, когда режим выключат. Неактивным
-            // его делать нельзя — пунктирный контур означает «нажать
-            // нельзя», а рядом стоит подпись «выбрано».
-            if (settings.highContrast) {
-                Text(
-                    text = "Пока включён чёрно-белый режим, пара не видна. " +
-                        "Выбор сохранится и вернётся, когда режим выключат.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-
-            Text(
-                text = "Чёрно-белый режим",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-            )
-            Text(
-                text = "Чёрный текст на белом, толще контуры, крупнее текст и кнопки. " +
-                    "Направления плана различаются штриховкой, а не цветом.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            SelectButton(
-                text = if (settings.highContrast) "Включён" else "Выключен",
-                selected = settings.highContrast,
-                onClick = { onChange(settings.copy(highContrast = !settings.highContrast)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "$step/$total",
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.onSurfaceMuted,
+        )
     }
 }

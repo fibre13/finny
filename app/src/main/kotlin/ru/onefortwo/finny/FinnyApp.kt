@@ -1,34 +1,44 @@
 package ru.onefortwo.finny
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.content.withNumbers
-import ru.onefortwo.finny.economy.Difficulty
+import ru.onefortwo.finny.ui.common.FinnyNavigationBar
+import ru.onefortwo.finny.ui.common.FinnyNavigationRail
+import ru.onefortwo.finny.ui.common.NavSection
 import ru.onefortwo.finny.ui.screens.AdultScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.HistoryScreen
 import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
-import ru.onefortwo.finny.ui.screens.OnboardingSetup
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
 import ru.onefortwo.finny.ui.screens.PlanScreen
@@ -38,6 +48,7 @@ import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.screens.WardrobeScreen
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /** Маршруты навигации. */
 private object Routes {
@@ -60,26 +71,52 @@ private object Routes {
 /** Задание восстановления после неудачного дня (ТЗ 2.5.9); есть на обоих уровнях. */
 private const val RECOVERY_TASK_ID = "recover_help"
 
+/** Маршрут вкладки навигации. */
+private fun NavSection.route(): String = when (this) {
+    NavSection.HOME -> Routes.MAIN
+    NavSection.TASKS -> Routes.TASKS
+    NavSection.PET -> Routes.WARDROBE
+    NavSection.PROGRESS -> Routes.HISTORY
+}
+
+/** Вкладка, к которой относится маршрут, либо `null` для вложенного экрана. */
+private fun tabOf(route: String?): NavSection? = when (route) {
+    Routes.MAIN -> NavSection.HOME
+    Routes.TASKS -> NavSection.TASKS
+    Routes.WARDROBE -> NavSection.PET
+    Routes.HISTORY -> NavSection.PROGRESS
+    else -> null
+}
+
+/**
+ * Переход на вкладку. Стек не растёт от переключения вкладок: под любой
+ * вкладкой лежит только главный экран, и системная кнопка «Назад» ведёт
+ * на него, а с него — из приложения.
+ */
+private fun NavController.openTab(section: NavSection) {
+    navigate(section.route()) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+/** Ширина, начиная с которой навигация переходит в боковую колонку. */
+private const val EXPANDED_WIDTH_DP = 840
+
 /**
  * Навигация приложения. Последовательность экранов повторяет сквозной
  * сценарий из Приложения А: знакомство, создание питомца, главный экран,
  * план, задания, покупки, копилка, итоги дня.
+ *
+ * Четыре раздела — главная, задания, питомец, прогресс — открываются
+ * вкладками навигации. Остальные экраны вложены и открываются поверх
+ * вкладки с кнопкой возврата.
  */
 @Composable
 fun FinnyApp(viewModel: GameViewModel) {
     val navController = rememberNavController()
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val display by viewModel.display.collectAsStateWithLifecycle()
-
-    // Класс выбирается на экране знакомства, а профиль создаётся на
-    // следующем: выбор держится здесь, между этими двумя шагами. Хранится
-    // номером — перечисление в состояние навигации не кладётся.
-    // Имя перечисления переживает поворот экрана: rememberSaveable хранит
-    // только простые типы, а сам Difficulty в Bundle не кладётся.
-    var chosenDifficultyName by rememberSaveable { mutableStateOf<String?>(null) }
-    val chosenDifficulty = chosenDifficultyName?.let(Difficulty::ofName)
-    val content = viewModel.content
-    val today = viewModel.today()
 
     // Счётчик экранного времени идёт только пока приложение на переднем плане.
     LifecycleResumeEffect(Unit) {
@@ -93,6 +130,55 @@ fun FinnyApp(viewModel: GameViewModel) {
         return
     }
 
+    val backStack by navController.currentBackStackEntryAsState()
+    val tab = tabOf(backStack?.destination?.route)
+    val windowWidthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp().value }
+    val expanded = windowWidthDp >= EXPANDED_WIDTH_DP
+    val onSelectTab: (NavSection) -> Unit = { navController.openTab(it) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(FinnyTheme.colors.appBackground),
+    ) {
+        if (tab != null && state.hasProfile && expanded) {
+            FinnyNavigationRail(selected = tab, onSelect = onSelectTab)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            val bottomBar = tab != null && state.hasProfile && !expanded
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    // Отступ от системной панели внизу уже взяла панель
+                    // навигации: экраны не должны прибавлять его ещё раз.
+                    .then(
+                        if (bottomBar) {
+                            Modifier.consumeWindowInsets(WindowInsets.navigationBars)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
+                AppNavHost(navController = navController, viewModel = viewModel)
+            }
+            if (bottomBar && tab != null) {
+                FinnyNavigationBar(selected = tab, onSelect = onSelectTab)
+            }
+        }
+    }
+}
+
+/** Граф экранов. */
+@Composable
+private fun AppNavHost(
+    navController: NavHostController,
+    viewModel: GameViewModel,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val content = viewModel.content
+    val today = viewModel.today()
+    val balance = state.game.balance
+
     NavHost(
         navController = navController,
         // Если профиль уже сохранён, приложение открывается сразу на главном
@@ -102,12 +188,7 @@ fun FinnyApp(viewModel: GameViewModel) {
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onContinue = { navController.navigate(Routes.PET_SETUP) },
-                setup = OnboardingSetup(
-                    difficulty = chosenDifficulty,
-                    onDifficulty = { chosenDifficultyName = it.name },
-                    display = display,
-                    onDisplay = viewModel::setDisplaySettings,
-                ),
+                step = 1,
             )
         }
 
@@ -119,15 +200,17 @@ fun FinnyApp(viewModel: GameViewModel) {
             )
         }
 
+        // Шаги 2–4 знакомства: питомец, уровень заданий и имя, проверка
+        // выбора. Выбор держится внутри экрана и переживает поворот.
         composable(Routes.PET_SETUP) {
             PetSetupScreen(
                 parts = content.petParts(),
                 onBack = { navController.popBackStack() },
-                onDone = { name, appearance ->
+                onDone = { name, appearance, difficulty ->
                     viewModel.createProfile(
                         petName = name,
                         appearance = appearance,
-                        difficulty = chosenDifficulty ?: Difficulty.SIMPLE,
+                        difficulty = difficulty,
                     )
                     navController.navigate(Routes.MAIN) {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
@@ -156,13 +239,10 @@ fun FinnyApp(viewModel: GameViewModel) {
                 onDismissMessage = viewModel::dismissMessage,
                 onOpenPlan = { navController.navigate(Routes.PLAN) },
                 onOpenShop = { navController.navigate(Routes.SHOP) },
-                onOpenTasks = { navController.navigate(Routes.TASKS) },
                 onOpenSavings = { navController.navigate(Routes.SAVINGS) },
-                onOpenHistory = { navController.navigate(Routes.HISTORY) },
                 onOpenGlossary = { navController.navigate(Routes.GLOSSARY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenAdult = { navController.navigate(Routes.ADULT) },
-                onOpenWardrobe = { navController.navigate(Routes.WARDROBE) },
                 today = today,
                 onFinishPeriod = {
                     viewModel.finishPeriod()
@@ -175,6 +255,7 @@ fun FinnyApp(viewModel: GameViewModel) {
         composable(Routes.PLAN) {
             PlanScreen(
                 game = state.game,
+                balance = balance,
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
                 onBack = { navController.popBackStack() },
@@ -196,7 +277,7 @@ fun FinnyApp(viewModel: GameViewModel) {
             ShopScreen(
                 items = content.shopItems(),
                 pet = state.game.pet,
-                balance = state.game.balance,
+                balance = balance,
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
                 onBuy = viewModel::buy,
@@ -208,8 +289,8 @@ fun FinnyApp(viewModel: GameViewModel) {
             TasksScreen(
                 tasks = content.tasks(state.difficulty),
                 completedIds = state.completedTaskIds,
+                balance = balance,
                 onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
-                onBack = { navController.popBackStack() },
             )
         }
 
@@ -243,6 +324,7 @@ fun FinnyApp(viewModel: GameViewModel) {
                 )
                 TaskDetailScreen(
                     task = task,
+                    balance = balance,
                     onAnswer = { answer -> viewModel.answerTask(task, answer) },
                     onBack = { navController.popBackStack() },
                     nextTask = nextTask,
@@ -263,6 +345,7 @@ fun FinnyApp(viewModel: GameViewModel) {
         composable(Routes.SAVINGS) {
             SavingsScreen(
                 game = state.game,
+                balance = balance,
                 goals = content.goals(),
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
@@ -308,13 +391,14 @@ fun FinnyApp(viewModel: GameViewModel) {
 
             HistoryScreen(
                 game = state.game,
+                petName = state.profile?.petName ?: "Финни",
+                balance = balance,
                 tasks = content.tasks(state.difficulty),
                 completedIds = state.completedTaskIds,
                 goalTitle = goalTitle,
                 achievedGoalTitles = content.goals()
                     .filter { it.id in state.achievedGoalIds }
                     .map { it.title },
-                onBack = { navController.popBackStack() },
             )
         }
 
@@ -322,14 +406,14 @@ fun FinnyApp(viewModel: GameViewModel) {
             WardrobeScreen(
                 state = state,
                 parts = content.petParts(),
+                // Образ применён — питомец в новом виде показывается на главной.
                 onApply = { colorId, accessoryId ->
                     viewModel.changeAppearance(colorId, accessoryId)
-                    navController.popBackStack()
+                    navController.openTab(NavSection.HOME)
                 },
                 onOpenShop = {
                     navController.navigate(Routes.SHOP) { popUpTo(Routes.MAIN) }
                 },
-                onBack = { navController.popBackStack() },
             )
         }
 
@@ -346,8 +430,6 @@ fun FinnyApp(viewModel: GameViewModel) {
                 tasks = content.tasks(state.difficulty),
                 completedIds = state.completedTaskIds,
                 isDemo = state.isDemo,
-                display = display,
-                onDisplay = viewModel::setDisplaySettings,
                 timeLimitEnabled = state.timeLimitEnabled,
                 minutesUsedToday = state.minutesUsed(today),
                 onSetTimeLimit = viewModel::setTimeLimitEnabled,
@@ -379,12 +461,12 @@ fun FinnyApp(viewModel: GameViewModel) {
 /** Заставка на время чтения сохранённого состояния. */
 @Composable
 private fun LoadingScreen() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(FinnyTheme.colors.appBackground),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text("Питомец Финни", style = MaterialTheme.typography.titleLarge)
-        }
+        Text("Питомец Финни", style = MaterialTheme.typography.headlineMedium)
     }
 }
