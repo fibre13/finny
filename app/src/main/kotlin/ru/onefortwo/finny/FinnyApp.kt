@@ -20,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlin.random.Random
+import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.ui.screens.AdultScreen
@@ -140,14 +141,11 @@ fun FinnyApp(viewModel: GameViewModel) {
                 content.goals().firstOrNull { it.id == goal.id }?.title
             }
             val availableTasks = content.tasks(state.difficulty)
-            // Пока есть невыполненные, предлагается следующее из них.
-            // Когда пройдены все, задания идут по кругу, по одному на день:
-            // числа при каждом открытии берутся заново, поэтому повтор
-            // остаётся упражнением, а не повторением известного ответа.
-            val activeTask = availableTasks.firstOrNull { it.id !in state.completedTaskIds }
-                ?: availableTasks.getOrNull(
-                    state.game.period.number % availableTasks.size.coerceAtLeast(1),
-                )
+            // Пока есть новые, предлагается следующее по очереди. Когда новых
+            // не осталось, предлагается решить одно из пройденных ещё раз —
+            // каждый день другое. Порядок задаёт TaskQueue.
+            val activeTask = TaskQueue.next(availableTasks, state.completedTaskIds)
+                ?: TaskQueue.repeatSuggestion(availableTasks, state.game.period.number)
 
             MainScreen(
                 state = state,
@@ -170,6 +168,7 @@ fun FinnyApp(viewModel: GameViewModel) {
                     viewModel.finishPeriod()
                     navController.navigate(Routes.RESULT)
                 },
+                onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
             )
         }
 
@@ -231,10 +230,32 @@ fun FinnyApp(viewModel: GameViewModel) {
                 // Навигация выполняется как эффект, а не во время композиции.
                 LaunchedEffect(Unit) { navController.popBackStack() }
             } else {
+                // Следующее новое задание предлагается сразу после ответа.
+                // Когда экранное время на сегодня вышло, не предлагается:
+                // приложение не подталкивает продолжать сверх предела
+                // (ТЗ 8.1: этичность мотивации, отсутствие давления;
+                // основание предела — docs/01, раздел «Экранное время»).
+                val nextTask = TaskQueue.nextAfterAnswer(
+                    tasks = content.tasks(state.difficulty),
+                    solved = state.completedTaskIds,
+                    answeredId = task.id,
+                    allowed = !state.isTimeUp(today),
+                )
                 TaskDetailScreen(
                     task = task,
                     onAnswer = { answer -> viewModel.answerTask(task, answer) },
                     onBack = { navController.popBackStack() },
+                    nextTask = nextTask,
+                    // Текущее задание заменяется следующим, а не остаётся под
+                    // ним в стеке: «Назад» из следующего ведёт туда, откуда
+                    // пришли, а не к уже решённому заданию.
+                    onNextTask = {
+                        nextTask?.let { next ->
+                            navController.navigate("${Routes.TASK}/${next.id}") {
+                                popUpTo("${Routes.TASK}/{taskId}") { inclusive = true }
+                            }
+                        }
+                    },
                 )
             }
         }

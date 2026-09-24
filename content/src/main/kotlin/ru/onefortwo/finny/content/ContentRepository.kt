@@ -64,7 +64,7 @@ class ContentRepository(private val source: AssetSource) {
     fun tasks(topic: TaskTopic): List<TaskContent> = tasksCache.filter { it.topic == topic }
 
     /**
-     * Задания, подходящие ребёнку из указанного класса (ТЗ 2.5.8:
+     * Задания выбранного уровня сложности (ТЗ 2.5.8:
      * сложность вычислений соответствует возрасту).
      */
     fun tasks(difficulty: Difficulty): List<TaskContent> =

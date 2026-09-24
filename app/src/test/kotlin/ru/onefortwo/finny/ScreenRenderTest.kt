@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -27,9 +28,11 @@ import ru.onefortwo.finny.content.ChoiceTask
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskCheck
+import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
+import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.IncomeSource
 import ru.onefortwo.finny.economy.PeriodCompletion
@@ -459,7 +462,7 @@ class ScreenRenderTest {
         compose.setContent {
             FinnyTheme {
                 TasksScreen(
-                    tasks = content.tasks(),
+                    tasks = simpleTasks,
                     completedIds = emptySet(),
                     onOpenTask = {},
                     onBack = {},
@@ -467,9 +470,165 @@ class ScreenRenderTest {
             }
         }
 
-        compose.onNodeWithText("Планирование бюджета").assertIsDisplayed()
-        compose.onNodeWithText("Формирование сбережений").performScrollTo().assertIsDisplayed()
+        // Тема подписана на каждой карточке; первые три новых задания —
+        // по одному на каждую обязательную тему.
+        compose.onNodeWithText("Новые задания").assertIsDisplayed()
+        compose.onAllNodesWithText("Планирование бюджета").assertCountEquals(2)
+        compose.onAllNodesWithText("Формирование сбережений").assertCountEquals(2)
+        compose.onAllNodesWithText("Платежи и покупки").assertCountEquals(2)
     }
+
+    @Test
+    fun `решённые задания уходят из новых в отдельный раздел`() {
+        val queue = TaskQueue.ordered(simpleTasks)
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            FinnyTheme {
+                TasksScreen(
+                    tasks = simpleTasks,
+                    completedIds = setOf(queue[0].id),
+                    onOpenTask = { opened += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        // Решённое задание выводится один раз — в «Уже решал», а не ещё и в новых.
+        compose.onAllNodesWithText(queue[0].title).assertCountEquals(1)
+        compose.onNodeWithText("Новые задания").assertIsDisplayed()
+        compose.onNodeWithText("Уже решал").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Решить ещё раз").performScrollTo().performClick()
+        compose.onNodeWithText("Если день не удался").performScrollTo().assertIsDisplayed()
+        assertEquals(listOf(queue[0].id), opened)
+    }
+
+    @Test
+    fun `когда новых нет, список говорит об этом прямо`() {
+        val solved = TaskQueue.ordered(simpleTasks).map { it.id }.toSet()
+        compose.setContent {
+            FinnyTheme {
+                TasksScreen(tasks = simpleTasks, completedIds = solved, onOpenTask = {}, onBack = {})
+            }
+        }
+
+        compose.onNodeWithText("Новых заданий нет").assertIsDisplayed()
+        compose.onNodeWithText(
+            "Новые задания закончились. Любое из тех, что уже решал, можно решить ещё раз — они ниже.",
+        )
+            .assertIsDisplayed()
+        // «Помоги Финни» в очередь не входит и не решено — утверждать,
+        // что решены все задания, экран не должен.
+        compose.onNodeWithText("Все задания", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `после ответа сразу предлагается следующее задание`() {
+        val task = content.task("save_temptation") as ChoiceTask
+        val next = content.task("cart_fit_easy")!!
+        var nextOpened = false
+        compose.setContent {
+            FinnyTheme {
+                TaskDetailScreen(
+                    task = task,
+                    onAnswer = {
+                        AnsweredTask(
+                            check = TaskCheck(
+                                isCorrect = true,
+                                explanation = "Объяснение",
+                                reward = IncomeSource.TASK_CORRECT,
+                            ),
+                            credited = Coins(10),
+                            isRepeat = false,
+                        )
+                    },
+                    onBack = {},
+                    nextTask = next,
+                    onNextTask = { nextOpened = true },
+                )
+            }
+        }
+
+        compose.onNodeWithText(task.options.first().title).performScrollTo().performClick()
+        compose.onNodeWithText("Ответить").performScrollTo().performClick()
+
+        compose.onNodeWithText("Следующее задание: ${next.title}").performScrollTo().performClick()
+        assertTrue("Переход к следующему заданию не сработал", nextOpened)
+        compose.onNodeWithText("Готово").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `главный экран открывает следующее задание сразу`() {
+        val next = TaskQueue.ordered(simpleTasks).first()
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            FinnyTheme {
+                MainScreen(
+                    state = AppState(profile = profile, game = GameState.newProfile()),
+                    parts = content.petParts(),
+                    activeTask = next,
+                    titleOf = { it },
+                    goalTitle = null,
+                    onDismissMessage = {},
+                    onOpenPlan = {},
+                    onOpenShop = {},
+                    onOpenTasks = {},
+                    onOpenSavings = {},
+                    onOpenHistory = {},
+                    onOpenGlossary = {},
+                    onOpenHelp = {},
+                    onOpenAdult = {},
+                    onOpenWardrobe = {},
+                    onFinishPeriod = {},
+                    today = "2026-09-15",
+                    onOpenTask = { opened += it },
+                )
+            }
+        }
+
+        compose.onNodeWithText("Следующее задание").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Начать задание").performScrollTo().performClick()
+        assertEquals(listOf(next.id), opened)
+    }
+
+    @Test
+    fun `когда новых нет, главный экран предлагает повтор и так и говорит`() {
+        val queue = TaskQueue.ordered(simpleTasks)
+        val state = AppState(
+            profile = profile,
+            game = GameState.newProfile(),
+            completedTaskIds = queue.map { it.id }.toSet(),
+        )
+        compose.setContent {
+            FinnyTheme {
+                MainScreen(
+                    state = state,
+                    parts = content.petParts(),
+                    activeTask = queue.first(),
+                    titleOf = { it },
+                    goalTitle = null,
+                    onDismissMessage = {},
+                    onOpenPlan = {},
+                    onOpenShop = {},
+                    onOpenTasks = {},
+                    onOpenSavings = {},
+                    onOpenHistory = {},
+                    onOpenGlossary = {},
+                    onOpenHelp = {},
+                    onOpenAdult = {},
+                    onOpenWardrobe = {},
+                    onFinishPeriod = {},
+                    today = "2026-09-15",
+                )
+            }
+        }
+
+        compose.onNodeWithText("Новых заданий нет").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Решить ещё раз").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Следующее задание").assertDoesNotExist()
+    }
+
+    /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */
+    private val simpleTasks get() = content.tasks(Difficulty.SIMPLE)
 
     @Test
     fun `словарик показывает термины с объяснениями`() {

@@ -49,6 +49,8 @@ fun MainScreen(
     onOpenWardrobe: () -> Unit,
     onFinishPeriod: () -> Unit,
     today: String,
+    /** Открыть задание сразу, минуя список. */
+    onOpenTask: (String) -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -213,22 +215,40 @@ fun MainScreen(
                 }
             }
 
-            SectionCard(title = "Задание на сегодня") {
+            // Задание открывается прямо отсюда. Заголовок говорит, что это:
+            // следующее новое или, когда новых не осталось, предложение
+            // решить одно из пройденных ещё раз. «Задание на сегодня» здесь
+            // не пишется: задания не привязаны к дню, и такой заголовок
+            // обещал бы обновление, которого нет.
+            val isRepeat = activeTask != null && activeTask.id in state.completedTaskIds
+            SectionCard(title = if (isRepeat) "Новых заданий нет" else "Следующее задание") {
                 Column {
                     if (activeTask != null) {
+                        if (isRepeat) {
+                            Text(
+                                text = "Можно решить ещё раз:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
                         Text(activeTask.title, style = MaterialTheme.typography.bodyMedium)
                         Text(
                             text = activeTask.topic.displayName,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 4.dp),
                         )
-                        if (activeTask.id in state.completedTaskIds) {
+                        if (isRepeat) {
                             Text(
                                 text = repeatNote(activeTask),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
                         }
+                        SecondaryButton(
+                            text = if (isRepeat) "Решить ещё раз" else "Начать задание",
+                            onClick = { onOpenTask(activeTask.id) },
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
                     } else {
                         Text(
                             "Заданий пока нет.",
@@ -236,9 +256,9 @@ fun MainScreen(
                         )
                     }
                     SecondaryButton(
-                        text = "Открыть задания",
+                        text = "Все задания",
                         onClick = onOpenTasks,
-                        modifier = Modifier.padding(top = 12.dp),
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
             }

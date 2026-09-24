@@ -44,6 +44,7 @@ import ru.onefortwo.finny.ui.common.CoinSlider
 import ru.onefortwo.finny.ui.common.MinTouchTarget
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
+import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.TaskResultIcon
 import ru.onefortwo.finny.ui.state.AnsweredTask
@@ -61,6 +62,12 @@ fun TaskDetailScreen(
     task: TaskContent,
     onAnswer: (TaskAnswer) -> AnsweredTask,
     onBack: () -> Unit,
+    /**
+     * Следующее новое задание, которое можно открыть сразу после ответа,
+     * либо `null`: новых не осталось или время на сегодня вышло.
+     */
+    nextTask: TaskContent? = null,
+    onNextTask: () -> Unit = {},
 ) {
     var result by rememberSaveable(stateSaver = AnsweredTaskSaver) {
         mutableStateOf<AnsweredTask?>(null)
@@ -81,7 +88,12 @@ fun TaskDetailScreen(
                     is ChoiceTask -> ChoiceForm(task) { result = onAnswer(it) }
                 }
             } else {
-                ResultCard(answered = current, onBack = onBack)
+                ResultCard(
+                    answered = current,
+                    nextTask = nextTask,
+                    onNextTask = onNextTask,
+                    onBack = onBack,
+                )
             }
         }
     }
@@ -93,9 +105,17 @@ fun TaskDetailScreen(
  * Сумма берётся фактически начисленная, а не полная награда источника:
  * за повтор начисляется половина, и на карточке должна стоять та же сумма,
  * на которую изменился баланс (ТЗ 2.5.4).
+ *
+ * Если есть новое задание, оно предлагается сразу основной кнопкой: после
+ * ответа ребёнок продолжает, а не ищет следующее задание в списке.
  */
 @Composable
-private fun ResultCard(answered: AnsweredTask, onBack: () -> Unit) {
+private fun ResultCard(
+    answered: AnsweredTask,
+    nextTask: TaskContent?,
+    onNextTask: () -> Unit,
+    onBack: () -> Unit,
+) {
     val check = answered.check
     Column {
         SectionCard(
@@ -123,7 +143,16 @@ private fun ResultCard(answered: AnsweredTask, onBack: () -> Unit) {
                 )
             }
         }
-        PrimaryButton(text = "Готово", onClick = onBack)
+        if (nextTask != null) {
+            PrimaryButton(text = "Следующее задание: ${nextTask.title}", onClick = onNextTask)
+            SecondaryButton(
+                text = "Готово",
+                onClick = onBack,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        } else {
+            PrimaryButton(text = "Готово", onClick = onBack)
+        }
     }
 }
 
