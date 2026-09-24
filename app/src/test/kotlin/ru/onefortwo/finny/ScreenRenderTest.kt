@@ -16,6 +16,11 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import java.io.File
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import ru.onefortwo.finny.economy.PurchaseRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -33,6 +38,7 @@ import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.content.toDomain
+import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.Difficulty
@@ -135,7 +141,6 @@ class ScreenRenderTest {
                     state = state,
                     parts = content.petParts(),
                     activeTask = content.tasks().first(),
-                    titleOf = { it },
                     goalTitle = null,
                     onDismissMessage = {},
                     onOpenPlan = {},
@@ -178,7 +183,6 @@ class ScreenRenderTest {
                     state = state,
                     parts = content.petParts(),
                     activeTask = content.tasks().first(),
-                    titleOf = { it },
                     goalTitle = null,
                     onDismissMessage = {},
                     onOpenPlan = {},
@@ -195,7 +199,7 @@ class ScreenRenderTest {
 
         compose.onNodeWithText("Закончить день").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(
-            "Закончить этот день получится завтра: один игровой день — в одни сутки.",
+            "Закончить день можно завтра.",
         )
             .performScrollTo()
             .assertIsDisplayed()
@@ -283,7 +287,6 @@ class ScreenRenderTest {
                     state = state,
                     parts = content.petParts(),
                     activeTask = content.tasks().first(),
-                    titleOf = { it },
                     goalTitle = null,
                     onDismissMessage = {},
                     onOpenPlan = {},
@@ -298,8 +301,8 @@ class ScreenRenderTest {
             }
         }
 
-        compose.onNodeWithText("День 1 закончен. План на день 2 составлен: можно делать покупки.")
-            .assertIsDisplayed()
+        compose.onNodeWithText("Закончить день можно завтра.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Сначала составь план.").assertDoesNotExist()
         compose.onNodeWithText("можно составить план", substring = true).assertDoesNotExist()
     }
 
@@ -714,7 +717,6 @@ class ScreenRenderTest {
                     state = AppState(profile = profile, game = GameState.newProfile()),
                     parts = content.petParts(),
                     activeTask = next,
-                    titleOf = { it },
                     goalTitle = null,
                     onDismissMessage = {},
                     onOpenPlan = {},
@@ -730,8 +732,9 @@ class ScreenRenderTest {
             }
         }
 
-        compose.onNodeWithText("Следующее задание").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Начать задание").performScrollTo().performClick()
+        compose.onNodeWithText("СЛЕДУЮЩЕЕ ЗАДАНИЕ").performScrollTo().assertIsDisplayed()
+        // Карточка задания нажимается целиком.
+        compose.onNodeWithText(next.title).performScrollTo().performClick()
         assertEquals(listOf(next.id), opened)
     }
 
@@ -749,7 +752,6 @@ class ScreenRenderTest {
                     state = state,
                     parts = content.petParts(),
                     activeTask = queue.first(),
-                    titleOf = { it },
                     goalTitle = null,
                     onDismissMessage = {},
                     onOpenPlan = {},
@@ -764,9 +766,65 @@ class ScreenRenderTest {
             }
         }
 
-        compose.onNodeWithText("Новых заданий нет").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Решить ещё раз").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Следующее задание").assertDoesNotExist()
+        compose.onNodeWithText("ПОВТОР · ПОЛОВИНА МОНЕТ").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(queue.first().title).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("СЛЕДУЮЩЕЕ ЗАДАНИЕ").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp")
+    fun `главный экран помещается на телефоне 360 на 640 без прокрутки`() {
+        // Под нижней панелью вкладок (80 dp) и строкой состояния (24 dp)
+        // главному экрану MI 5 остаётся 536 dp.
+        compose.setContent {
+            FinnyTheme {
+                Box(modifier = Modifier.height(536.dp)) {
+                    MainScreen(
+                        state = AppState(profile = profile, game = GameState.newProfile()),
+                        parts = content.petParts(),
+                        activeTask = content.task("cart_fit_easy"),
+                        goalTitle = null,
+                        onDismissMessage = {},
+                        onOpenPlan = {},
+                        onOpenShop = {},
+                        onOpenSavings = {},
+                        onOpenGlossary = {},
+                        onOpenHelp = {},
+                        onOpenAdult = {},
+                        onFinishPeriod = {},
+                        today = "2026-09-15",
+                    )
+                }
+            }
+        }
+
+        val bottom = compose.onNodeWithText("Закончить день").fetchSemanticsNode().boundsInRoot.bottom
+        val limit = with(compose.density) { 536.dp.toPx() }
+        assertTrue("Кнопка «Закончить день» ниже края экрана: $bottom > $limit", bottom <= limit)
+        compose.onNodeWithText("Можно потратить").assertIsDisplayed()
+        compose.onNodeWithText("Забота: В порядке").assertIsDisplayed()
+    }
+
+    @Test
+    fun `покупки дня перечислены на экране покупок`() {
+        val food = content.shopItems().first()
+        compose.setContent {
+            FinnyTheme {
+                ShopScreen(
+                    items = content.shopItems(),
+                    pet = GameState.newProfile().pet,
+                    balance = Coins(40),
+                    todayPurchases = listOf(PurchaseRecord(itemId = food.id, price = Coins(food.price), category = BudgetCategory.NEEDS)),
+                    message = null,
+                    onDismissMessage = {},
+                    onBuy = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("Сегодня куплено").assertIsDisplayed()
+        compose.onNodeWithText("Всего потрачено").assertIsDisplayed()
     }
 
     /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */

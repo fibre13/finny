@@ -65,7 +65,7 @@ fun FinnyNavigationBar(
                 icon = {
                     NavIcon(
                         section = destination.section,
-                        color = if (isSelected) colors.primary else colors.onSurfaceMuted,
+                        color = colors.attention,
                     )
                 },
                 label = { TabLabel(destination.label) },
@@ -107,7 +107,7 @@ fun FinnyNavigationRail(
                     icon = {
                         NavIcon(
                             section = destination.section,
-                            color = if (isSelected) colors.primary else colors.onSurfaceMuted,
+                            color = colors.attention,
                         )
                     },
                     label = { TabLabel(destination.label) },

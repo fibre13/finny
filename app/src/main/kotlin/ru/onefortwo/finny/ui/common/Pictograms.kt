@@ -39,7 +39,6 @@ import ru.onefortwo.finny.ui.theme.LocalBudgetColors
  * подпись, а не описание рисунка.
  */
 
-
 /** Цвет монеты в прорези копилки. */
 private val Gold = Color(0xFFF2B705)
 
@@ -81,201 +80,6 @@ val PictogramSize = 28.dp
  * раздела, но деталь оставалась различимой.
  */
 val DirectionPictogramSize = 48.dp
-
-/** Размер пиктограммы на кнопке раздела главного экрана. */
-val MenuPictogramSize = 26.dp
-
-/**
- * Разделы главного экрана. Пиктограмма помогает узнать раздел, но ничего
- * не заменяет: подпись на кнопке остаётся и читается сама по себе
- * (ТЗ 3.6). Рисунки построены одной линией, без заливки цветом.
- */
-enum class MenuSection {
-    PLAN,
-    SHOP,
-    SAVINGS,
-    WARDROBE,
-    PROGRESS,
-    GLOSSARY,
-    HELP,
-    ADULT,
-}
-
-/** Пиктограмма раздела на кнопке главного экрана. */
-@Composable
-fun MenuIcon(
-    section: MenuSection,
-    modifier: Modifier = Modifier,
-    size: Dp = MenuPictogramSize,
-    tint: Color = FinnyTheme.colors.attention,
-) {
-    val ink = tint
-
-    Canvas(modifier = modifier.size(size)) {
-        onGrid { stroke ->
-            val outline = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            when (section) {
-                MenuSection.PLAN -> drawPlanSheet(ink, outline)
-                MenuSection.SHOP -> drawShoppingBag(ink, outline)
-                MenuSection.SAVINGS -> drawPiggy(ink, stroke)
-                MenuSection.WARDROBE -> drawHanger(ink, outline)
-                MenuSection.PROGRESS -> drawGrowingBars(ink, outline)
-                MenuSection.GLOSSARY -> drawOpenBook(ink, outline)
-                MenuSection.HELP -> drawQuestion(ink, outline)
-                MenuSection.ADULT -> drawLock(ink, outline)
-            }
-        }
-    }
-}
-
-/** План: лист со строками — то, что заполняют до начала дня. */
-private fun DrawScope.drawPlanSheet(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            addRoundRect(
-                RoundRect(
-                    Rect(Offset(5f, 3f), Size(14f, 18f)),
-                    CornerRadius(2.5f, 2.5f),
-                ),
-            )
-        },
-        ink,
-        style = outline,
-    )
-    listOf(8.5f, 12f, 15.5f).forEachIndexed { index, y ->
-        // Строки разной длины: лист выглядит заполненным, а не разлинованным.
-        val right = if (index == 2) 14.5f else 16f
-        drawLine(ink, Offset(8f, y), Offset(right, y), strokeWidth = outline.width, cap = StrokeCap.Round)
-    }
-}
-
-/** Покупки: сумка с ручкой. */
-private fun DrawScope.drawShoppingBag(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            moveTo(5.5f, 8.5f)
-            lineTo(18.5f, 8.5f)
-            lineTo(17.3f, 20.5f)
-            lineTo(6.7f, 20.5f)
-            close()
-        },
-        ink,
-        style = outline,
-    )
-    // Ручка: полуокружность над краем сумки.
-    drawPath(
-        Path().apply {
-            moveTo(9f, 8.5f)
-            quadraticTo(9f, 3.5f, 12f, 3.5f)
-            quadraticTo(15f, 3.5f, 15f, 8.5f)
-        },
-        ink,
-        style = outline,
-    )
-}
-
-/** Гардероб: плечики. */
-private fun DrawScope.drawHanger(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            moveTo(12f, 8f)
-            quadraticTo(12f, 5f, 14f, 5f)
-            quadraticTo(15.8f, 5f, 15.4f, 7f)
-        },
-        ink,
-        style = outline,
-    )
-    drawPath(
-        Path().apply {
-            moveTo(12f, 8.5f)
-            lineTo(3.5f, 16.5f)
-            quadraticTo(2.6f, 17.6f, 4.1f, 18.2f)
-            lineTo(19.9f, 18.2f)
-            quadraticTo(21.4f, 17.6f, 20.5f, 16.5f)
-            close()
-        },
-        ink,
-        style = outline,
-    )
-}
-
-/** Прогресс: три растущих столбика. */
-private fun DrawScope.drawGrowingBars(ink: Color, outline: Stroke) {
-    drawLine(ink, Offset(4f, 20f), Offset(20f, 20f), strokeWidth = outline.width, cap = StrokeCap.Round)
-    listOf(7f to 14.5f, 12f to 10f, 17f to 5.5f).forEach { (x, top) ->
-        drawLine(ink, Offset(x, 20f), Offset(x, top), strokeWidth = outline.width * 1.8f, cap = StrokeCap.Round)
-    }
-}
-
-/** Словарик: раскрытая книга. */
-private fun DrawScope.drawOpenBook(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            moveTo(12f, 7f)
-            quadraticTo(8.5f, 4.6f, 3.5f, 5.6f)
-            lineTo(3.5f, 18.4f)
-            quadraticTo(8.5f, 17.4f, 12f, 19.6f)
-        },
-        ink,
-        style = outline,
-    )
-    drawPath(
-        Path().apply {
-            moveTo(12f, 7f)
-            quadraticTo(15.5f, 4.6f, 20.5f, 5.6f)
-            lineTo(20.5f, 18.4f)
-            quadraticTo(15.5f, 17.4f, 12f, 19.6f)
-        },
-        ink,
-        style = outline,
-    )
-    drawLine(ink, Offset(12f, 7f), Offset(12f, 19.6f), strokeWidth = outline.width, cap = StrokeCap.Round)
-}
-
-/** Как играть: вопрос в круге. */
-private fun DrawScope.drawQuestion(ink: Color, outline: Stroke) {
-    drawCircle(ink, radius = 9f, center = Offset(12f, 12f), style = outline)
-    drawPath(
-        Path().apply {
-            moveTo(9.2f, 9.6f)
-            quadraticTo(9.2f, 6.6f, 12f, 6.6f)
-            quadraticTo(14.9f, 6.6f, 14.9f, 9.4f)
-            quadraticTo(14.9f, 11.6f, 12f, 12.6f)
-            lineTo(12f, 14.4f)
-        },
-        ink,
-        style = outline,
-    )
-    drawCircle(ink, radius = outline.width * 0.62f, center = Offset(12f, 17.2f))
-}
-
-/** Для взрослого: закрытый замок — раздел за барьером. */
-private fun DrawScope.drawLock(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            moveTo(8f, 10.5f)
-            lineTo(8f, 7.8f)
-            quadraticTo(8f, 4.4f, 12f, 4.4f)
-            quadraticTo(16f, 4.4f, 16f, 7.8f)
-            lineTo(16f, 10.5f)
-        },
-        ink,
-        style = outline,
-    )
-    drawPath(
-        Path().apply {
-            addRoundRect(
-                RoundRect(
-                    Rect(Offset(5.2f, 10.5f), Size(13.6f, 9.6f)),
-                    CornerRadius(2.4f, 2.4f),
-                ),
-            )
-        },
-        ink,
-        style = outline,
-    )
-    drawCircle(ink, radius = 1.5f, center = Offset(12f, 15.3f), style = outline)
-}
 
 /**
  * Уровень показателя: лицо вместо прежних символов `!`, `~`, `+`.
@@ -546,21 +350,7 @@ private fun arc(cx: Float, cy: Float, halfWidth: Float, rise: Float): Path = Pat
 /** Стрелка «назад». Описание задаёт кнопка, сама стрелка не озвучивается. */
 @Composable
 fun ArrowBackIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
-    Canvas(modifier = modifier.size(size)) {
-        onGrid { stroke ->
-            val outline = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            drawLine(color, Offset(19f, 12f), Offset(5f, 12f), strokeWidth = stroke, cap = StrokeCap.Round)
-            drawPath(
-                Path().apply {
-                    moveTo(11f, 6f)
-                    lineTo(5f, 12f)
-                    lineTo(11f, 18f)
-                },
-                color,
-                style = outline,
-            )
-        }
-    }
+    LineIcon(LineGlyph.BACK, color, modifier, size)
 }
 
 /** Галочка: отметка выбранного варианта. */
@@ -581,30 +371,18 @@ fun CheckIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
     }
 }
 
-/** Шеврон «открыть» в конце строки меню. */
+/** Шеврон «открыть» в конце нажимаемой карточки. */
 @Composable
 fun ChevronIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
-    Canvas(modifier = modifier.size(size)) {
-        onGrid { stroke ->
-            drawPath(
-                Path().apply {
-                    moveTo(9f, 5.5f)
-                    lineTo(15.5f, 12f)
-                    lineTo(9f, 18.5f)
-                },
-                color,
-                style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
-            )
-        }
-    }
+    LineIcon(LineGlyph.CHEVRON, color, modifier, size)
 }
 
 /** Вкладки нижней навигации. */
-enum class NavSection {
-    HOME,
-    TASKS,
-    PET,
-    PROGRESS,
+enum class NavSection(val glyph: LineGlyph) {
+    HOME(LineGlyph.HOME),
+    TASKS(LineGlyph.TASKS),
+    PET(LineGlyph.PET),
+    PROGRESS(LineGlyph.PROGRESS),
 }
 
 /**
@@ -613,67 +391,5 @@ enum class NavSection {
  */
 @Composable
 fun NavIcon(section: NavSection, color: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
-    Canvas(modifier = modifier.size(size)) {
-        onGrid { stroke ->
-            val outline = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            when (section) {
-                NavSection.HOME -> drawHouse(color, outline)
-                NavSection.TASKS -> drawOpenBook(color, outline)
-                NavSection.PET -> drawPaw(color, outline)
-                NavSection.PROGRESS -> drawGrowingBars(color, outline)
-            }
-        }
-    }
-}
-
-/** Главная: дом с дверью. */
-private fun DrawScope.drawHouse(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            moveTo(3.5f, 11f)
-            lineTo(12f, 4f)
-            lineTo(20.5f, 11f)
-        },
-        ink,
-        style = outline,
-    )
-    drawPath(
-        Path().apply {
-            moveTo(5.5f, 9.5f)
-            lineTo(5.5f, 20f)
-            lineTo(18.5f, 20f)
-            lineTo(18.5f, 9.5f)
-        },
-        ink,
-        style = outline,
-    )
-    drawPath(
-        Path().apply {
-            moveTo(10f, 20f)
-            lineTo(10f, 14.5f)
-            lineTo(14f, 14.5f)
-            lineTo(14f, 20f)
-        },
-        ink,
-        style = outline,
-    )
-}
-
-/** Питомец: отпечаток лапы. */
-private fun DrawScope.drawPaw(ink: Color, outline: Stroke) {
-    drawPath(
-        Path().apply {
-            addOval(Rect(Offset(7f, 11.5f), Size(10f, 8.5f)))
-        },
-        ink,
-        style = outline,
-    )
-    listOf(
-        Offset(5f, 9f),
-        Offset(9.3f, 5.6f),
-        Offset(14.7f, 5.6f),
-        Offset(19f, 9f),
-    ).forEach { center ->
-        drawCircle(ink, radius = 1.9f, center = center, style = outline)
-    }
+    LineIcon(section.glyph, color, modifier, size)
 }

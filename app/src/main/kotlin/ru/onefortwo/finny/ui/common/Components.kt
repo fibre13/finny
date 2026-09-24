@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -61,6 +63,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.ParentDataModifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -72,9 +77,13 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GrowthStage
@@ -192,6 +201,13 @@ fun Eyebrow(
  * @param eyebrow строка над заголовком: откуда экран или к чему относится.
  * @param balance баланс монет в правом углу шапки; `null` — не показывать.
  * @param top содержимое над шапкой, например шаги знакомства.
+ * @param headerActions кнопки-значки в шапке перед балансом.
+ * @param compactHeader шапка с уменьшенными отступами — для экрана,
+ * который обязан поместиться без прокрутки.
+ * @param fillViewport содержимое растягивается как минимум на высоту
+ * окна: карточке с `Modifier.weight` достаётся свободная высота. Если
+ * содержимое выше окна (крупный шрифт), экран прокручивается как обычно.
+ * @param bottomPadding запас под последним элементом.
  */
 @Composable
 fun ScreenScaffold(
@@ -205,6 +221,12 @@ fun ScreenScaffold(
     top: (@Composable () -> Unit)? = null,
     /** Смена значения возвращает прокрутку к началу экрана. */
     scrollKey: Any? = null,
+    headerActions: (@Composable RowScope.() -> Unit)? = null,
+    compactHeader: Boolean = false,
+    fillViewport: Boolean = false,
+    bottomPadding: Dp = 28.dp,
+    /** Заголовок в одну строку с уменьшением кегля вместо переноса. */
+    singleLineTitle: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = FinnyTheme.colors
@@ -228,23 +250,27 @@ fun ScreenScaffold(
             // иначе осталось бы недоступным.
             var messageHeight by remember { mutableStateOf(0.dp) }
             val density = LocalDensity.current
+            var scrollViewportHeight by remember { mutableStateOf(0) }
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onSizeChanged { scrollViewportHeight = it.height }
                     .verticalScroll(scroll),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                Column(
-                    modifier = Modifier
-                        .widthIn(max = MaxContentWidth)
-                        .fillMaxWidth()
-                        .padding(horizontal = ScreenPadding)
-                        // Запас снизу нужен, только пока отклик показан:
-                        // замеренная высота сама не обнуляется, когда карточка
-                        // исчезает, и внизу оставалась бы пустая полоса.
-                        .padding(bottom = 28.dp + if (message != null) messageHeight else 0.dp),
-                ) {
+                // Внутри прокрутки высота не ограничена, поэтому растянуть
+                // содержимое можно только минимальной высотой — высотой окна.
+                // Запас снизу нужен, только пока отклик показан: замеренная
+                // высота сама не обнуляется, когда карточка исчезает, и внизу
+                // оставалась бы пустая полоса.
+                val bottom = bottomPadding + if (message != null) messageHeight else 0.dp
+                val columnModifier = Modifier
+                    .widthIn(max = MaxContentWidth)
+                    .fillMaxWidth()
+                    .padding(horizontal = ScreenPadding)
+                    .padding(bottom = bottom)
+                val body: @Composable () -> Unit = {
                     if (top != null) {
                         Box(modifier = Modifier.padding(top = 16.dp)) { top() }
                     }
@@ -253,8 +279,17 @@ fun ScreenScaffold(
                         eyebrow = eyebrow,
                         balance = balance,
                         onBack = onBack,
+                        actions = headerActions,
+                        compact = compactHeader,
+                        singleLineTitle = singleLineTitle,
                     )
                     content()
+                }
+                if (fillViewport) {
+                    val viewport = with(density) { scrollViewportHeight.toDp() }
+                    ViewportColumn(minHeight = viewport - bottom, modifier = columnModifier, content = body)
+                } else {
+                    Column(modifier = columnModifier) { body() }
                 }
             }
 
@@ -284,6 +319,58 @@ fun ScreenScaffold(
     }
 }
 
+/** Отметка блока, который забирает оставшуюся высоту экрана. */
+private class FillRemaining(val min: Dp) : ParentDataModifier {
+    override fun Density.modifyParentData(parentData: Any?): Any = this@FillRemaining
+}
+
+/**
+ * Блок забирает высоту, оставшуюся от остальных блоков экрана, но не
+ * меньше [min]. Работает внутри каркаса с `fillViewport = true`.
+ */
+fun Modifier.fillRemaining(min: Dp): Modifier = this.then(FillRemaining(min))
+
+/**
+ * Колонка, которая растягивается на высоту окна: остальные блоки
+ * измеряются по содержимому, а блок с [fillRemaining] получает остаток,
+ * но не меньше своего минимума. Если блоки не помещаются (крупный шрифт,
+ * низкий экран), колонка становится выше окна и экран прокручивается —
+ * ничего не сжимается до нуля.
+ */
+@Composable
+private fun ViewportColumn(
+    minHeight: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val childConstraints = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
+        val flexIndex = measurables.indexOfFirst { it.parentData is FillRemaining }
+        val placeables = arrayOfNulls<Placeable>(measurables.size)
+        var fixed = 0
+        measurables.forEachIndexed { index, measurable ->
+            if (index != flexIndex) {
+                val p = measurable.measure(childConstraints)
+                placeables[index] = p
+                fixed += p.height
+            }
+        }
+        if (flexIndex >= 0) {
+            val min = (measurables[flexIndex].parentData as FillRemaining).min.roundToPx()
+            val height = maxOf(min, minHeight.roundToPx() - fixed)
+            placeables[flexIndex] = measurables[flexIndex].measure(
+                constraints.copy(minWidth = 0, minHeight = height, maxHeight = height),
+            )
+        }
+        val total = placeables.sumOf { it!!.height }
+        val layoutHeight = maxOf(total, minOf(minHeight.roundToPx(), constraints.maxHeight)).coerceAtLeast(constraints.minHeight)
+        layout(constraints.maxWidth, layoutHeight) {
+            var y = 0
+            placeables.forEach { p -> p!!.placeRelative(0, y); y += p.height }
+        }
+    }
+}
+
 /**
  * Шапка экрана. Заголовок переносится по словам, а баланс не сжимается:
  * при увеличенном шрифте заголовок уходит на вторую строку, число монет
@@ -295,16 +382,20 @@ private fun ScreenHeader(
     eyebrow: String?,
     balance: Coins?,
     onBack: (() -> Unit)?,
+    actions: (@Composable RowScope.() -> Unit)?,
+    compact: Boolean,
+    singleLineTitle: Boolean,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 18.dp),
+            .padding(top = if (compact) 8.dp else 16.dp, bottom = if (compact) 8.dp else 18.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (onBack != null) {
             BackButton(onClick = onBack)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
             if (eyebrow != null) {
@@ -314,16 +405,67 @@ private fun ScreenHeader(
                     color = LocalMutedColor.current,
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.semantics { heading() },
-            )
+            if (singleLineTitle) {
+                // Длинное имя не переносится посреди слова: кегль уменьшается
+                // до размера основного текста, и только потом — многоточие.
+                // Полное имя остаётся в описании для программы чтения с экрана.
+                BasicText(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium.copy(color = LocalContentColor.current),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 16.sp, maxFontSize = 26.sp),
+                    modifier = Modifier.semantics {
+                        heading()
+                        contentDescription = title
+                    },
+                )
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
+        }
+        if (actions != null) {
+            Spacer(modifier = Modifier.width(4.dp))
+            actions()
         }
         if (balance != null) {
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(if (actions != null) 0.dp else 8.dp))
             CoinBalance(amount = balance)
         }
+    }
+}
+
+/**
+ * Кнопка-значок в шапке: тот же квадрат, что у кнопки «Назад», со
+ * значком в стиле значков разделов. Подписи на экране нет, поэтому
+ * описание для программы чтения с экрана обязательно.
+ */
+@Composable
+fun HeaderIconButton(
+    glyph: LineGlyph,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = FinnyTheme.colors
+    val shape = MaterialTheme.shapes.small
+
+    Box(
+        modifier = modifier
+            .size(maxOf(MinTouchTarget, 48.dp))
+            .softShadow(shape, lift = false)
+            .clip(shape)
+            .background(colors.surface)
+            .border(1.5.dp, colors.outline, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        LineIcon(glyph, colors.attention, size = 22.dp)
     }
 }
 
@@ -340,7 +482,7 @@ private fun BackButton(onClick: () -> Unit) {
             .softShadow(shape, lift = false)
             .clip(shape)
             .background(colors.surface)
-            .border(1.dp, colors.divider, shape)
+            .border(1.5.dp, colors.outline, shape)
             .clickable(role = Role.Button, onClickLabel = null, onClick = onClick)
             .semantics { contentDescription = "Назад" },
         contentAlignment = Alignment.Center,
@@ -367,7 +509,7 @@ fun CoinBalance(
             .clip(PillShape)
             .background(colors.surface)
             .heightIn(min = 44.dp)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .clearAndSetSemantics { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -413,6 +555,9 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     tone: ButtonTone = ButtonTone.Primary,
+    /** `false` — кнопка по ширине подписи, например рядом с пояснением. */
+    fillWidth: Boolean = true,
+    horizontalPadding: Dp = 24.dp,
 ) {
     val colors = FinnyTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -429,7 +574,7 @@ fun PrimaryButton(
         interactionSource = interaction,
         shape = PillShape,
         elevation = null,
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
@@ -437,7 +582,7 @@ fun PrimaryButton(
             disabledContentColor = colors.disabledContent,
         ),
         modifier = modifier
-            .fillMaxWidth()
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
             .heightIn(min = maxOf(ControlHeight, MinTouchTarget))
             .pressScale(pressed),
     ) {
@@ -1121,6 +1266,45 @@ fun StatBar(
     }
 }
 
+/**
+ * Компактная строка показателя для экрана без прокрутки: значок уровня,
+ * «Забота: В порядке» и полоса 8 dp. Число «60 из 100» на экране не
+ * выводится, но произносится программой чтения с экрана; уровень назван
+ * словом, поэтому состояние не передаётся одним цветом (ТЗ 3.6).
+ */
+@Composable
+fun StatLine(
+    name: String,
+    value: Int,
+    label: String,
+    level: StatLevel,
+    modifier: Modifier = Modifier,
+) {
+    val colors = FinnyTheme.colors
+
+    Column(
+        modifier = modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$name: $label, $value из 100"
+        },
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatLevelIcon(level = level, size = 20.dp, modifier = Modifier.padding(end = 4.dp))
+            Text(
+                text = "$name: $label",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        ProgressBar(
+            fraction = value / 100f,
+            height = 8.dp,
+            color = if (level == StatLevel.LOW) colors.attention else colors.success,
+        )
+    }
+}
+
 /** Полоса заполнения: дорожка 10 dp со скруглёнными краями. */
 @Composable
 fun ProgressBar(
@@ -1128,18 +1312,19 @@ fun ProgressBar(
     modifier: Modifier = Modifier,
     color: Color = FinnyTheme.colors.success,
     trackColor: Color = FinnyTheme.colors.track,
+    height: Dp = 10.dp,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .sizeIn(minHeight = 10.dp)
+            .sizeIn(minHeight = height)
             .clip(PillShape)
             .background(trackColor),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .sizeIn(minHeight = 10.dp)
+                .sizeIn(minHeight = height)
                 .clip(PillShape)
                 .background(color),
         )

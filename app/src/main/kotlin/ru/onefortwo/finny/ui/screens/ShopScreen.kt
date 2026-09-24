@@ -19,6 +19,7 @@ import ru.onefortwo.finny.content.ShopItemContent
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.PetState
+import ru.onefortwo.finny.economy.PurchaseRecord
 import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.ui.common.BudgetDirectionIcon
 import ru.onefortwo.finny.ui.common.CardTone
@@ -46,6 +47,12 @@ fun ShopScreen(
     /** Состояние питомца: нужно, чтобы предупредить о покупке без пользы. */
     pet: PetState,
     balance: Coins,
+    /**
+     * Покупки текущего дня. Перечислены списком, а не одним сообщением:
+     * сообщение показывает только последнее действие. Список перенесён
+     * сюда с главного экрана, чтобы главная помещалась без прокрутки.
+     */
+    todayPurchases: List<PurchaseRecord> = emptyList(),
     message: FeedbackMessage?,
     onDismissMessage: () -> Unit,
     onBuy: (String) -> Unit,
@@ -66,6 +73,25 @@ fun ShopScreen(
         Column {
             SectionCard {
                 LabeledValue("Можно потратить", Explanations.coins(balance))
+            }
+
+            if (todayPurchases.isNotEmpty()) {
+                SectionCard(title = "Сегодня куплено") {
+                    Column {
+                        todayPurchases.forEach { record ->
+                            LabeledValue(
+                                label = items.firstOrNull { it.id == record.itemId }?.title ?: record.itemId,
+                                value = Explanations.coins(record.price),
+                            )
+                        }
+                        LabeledValue(
+                            label = "Всего потрачено",
+                            value = Explanations.coins(
+                                todayPurchases.fold(Coins.ZERO) { sum, it -> sum + it.price },
+                            ),
+                        )
+                    }
+                }
             }
 
             Text(

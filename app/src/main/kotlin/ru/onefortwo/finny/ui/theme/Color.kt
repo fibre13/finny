@@ -90,7 +90,7 @@ val LightFinnyColors = FinnyColors(
     outline = Color(0xFF8A8578),
     divider = Color(0xFFE2DBCF),
     disabledContainer = Color(0xFFD8D4CB),
-    disabledContent = Color(0xFF5C6660),
+    disabledContent = Color(0xFF4A544E),
     track = Color(0xFFE6DFD2),
     shadow = Color(0x14294C3A),
 )
