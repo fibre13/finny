@@ -139,6 +139,18 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/**
+ * Версия 6 → 7: выключатель движений питомца в настройках отображения.
+ * По умолчанию движения включены, как и до появления настройки.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `display_settings` ADD COLUMN `motionEnabled` INTEGER NOT NULL DEFAULT 1",
+        )
+    }
+}
+
 /** Все переходы, известные приложению. Порядок не важен. */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2,
@@ -146,4 +158,5 @@ val ALL_MIGRATIONS = arrayOf(
     MIGRATION_3_4,
     MIGRATION_4_5,
     MIGRATION_5_6,
+    MIGRATION_6_7,
 )

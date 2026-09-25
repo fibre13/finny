@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.economy.PurchaseRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -51,7 +54,14 @@ import ru.onefortwo.finny.economy.chooseGoal
 import ru.onefortwo.finny.economy.confirmPlan
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
+import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.common.LocalMotionEnabled
+import ru.onefortwo.finny.ui.common.MotionFrame
+import ru.onefortwo.finny.ui.common.rememberPetMotion
+import ru.onefortwo.finny.ui.screens.AdultScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
+import ru.onefortwo.finny.ui.state.PetReaction
+import ru.onefortwo.finny.ui.state.PetReactions
 import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
@@ -931,6 +941,68 @@ class ScreenRenderTest {
         val bottom = compose.onNodeWithText("Утвердить план").fetchSemanticsNode().boundsInRoot.bottom
         val limit = with(compose.density) { 728.dp.toPx() }
         assertTrue("Кнопка «Утвердить план» ниже края экрана: $bottom > $limit", bottom <= limit)
+    }
+
+    @Test
+    fun `взрослый выключает и включает движения питомца`() {
+        var motion by mutableStateOf(true)
+        compose.setContent {
+            FinnyTheme {
+                AdultScreen(
+                    game = GameState.newProfile(),
+                    tasks = content.tasks(Difficulty.HARDER),
+                    completedIds = emptySet(),
+                    isDemo = false,
+                    timeLimitEnabled = true,
+                    minutesUsedToday = 0,
+                    onResetProfile = {},
+                    onStartDemo = {},
+                    onResetDemo = {},
+                    onSetTimeLimit = {},
+                    onResetTodayUsage = {},
+                    onBack = {},
+                    motionEnabled = motion,
+                    onSetMotion = { motion = it },
+                )
+            }
+        }
+
+        // Барьер: пример вида «7 × 4 = ?».
+        val example = compose.onNode(hasText("= ?", substring = true)).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].joinToString("") { it.text }
+        val (a, b) = Regex("""(\d+) × (\d+)""").find(example)!!.destructured
+        compose.onNode(hasSetTextAction()).performTextInput((a.toInt() * b.toInt()).toString())
+        compose.onNodeWithText("Продолжить").performClick()
+
+        compose.onNodeWithText("включены").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Выключить движения").performScrollTo().performClick()
+        assertFalse(motion)
+        compose.onNodeWithText("выключены").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Включить движения").performScrollTo().performClick()
+        assertTrue(motion)
+    }
+
+    @Test
+    fun `при выключенных движениях питомец неподвижен, а реакция сразу снимается`() {
+        val animation = content.pixelArt().animation
+        val frames = mutableListOf<MotionFrame>()
+        var ended: Long? = null
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                frames += rememberPetMotion(
+                    animation = animation,
+                    care = StatLevel.HIGH,
+                    joy = StatLevel.HIGH,
+                    reaction = PetReaction(PetReactions.PLAY, id = 7, stageBefore = null),
+                    onReactionEnd = { ended = it },
+                )
+            }
+        }
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.waitForIdle()
+
+        assertEquals(7L, ended)
+        assertTrue(frames.all { it == MotionFrame() })
     }
 
     /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */

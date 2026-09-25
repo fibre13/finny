@@ -56,6 +56,8 @@ fun AdultScreen(
     onSetTimeLimit: (Boolean) -> Unit,
     onResetTodayUsage: () -> Unit,
     onBack: () -> Unit,
+    motionEnabled: Boolean = true,
+    onSetMotion: (Boolean) -> Unit = {},
 ) {
     var unlocked by rememberSaveable { mutableStateOf(false) }
 
@@ -69,10 +71,12 @@ fun AdultScreen(
             isDemo = isDemo,
             timeLimitEnabled = timeLimitEnabled,
             minutesUsedToday = minutesUsedToday,
+            motionEnabled = motionEnabled,
             onResetProfile = onResetProfile,
             onStartDemo = onStartDemo,
             onResetDemo = onResetDemo,
             onSetTimeLimit = onSetTimeLimit,
+            onSetMotion = onSetMotion,
             onResetTodayUsage = onResetTodayUsage,
             onBack = onBack,
         )
@@ -145,10 +149,12 @@ private fun AdultContent(
     isDemo: Boolean,
     timeLimitEnabled: Boolean,
     minutesUsedToday: Int,
+    motionEnabled: Boolean,
     onResetProfile: () -> Unit,
     onStartDemo: () -> Unit,
     onResetDemo: () -> Unit,
     onSetTimeLimit: (Boolean) -> Unit,
+    onSetMotion: (Boolean) -> Unit,
     onResetTodayUsage: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -279,6 +285,25 @@ private fun AdultContent(
                         text = "Сбросить счётчик на сегодня",
                         onClick = onResetTodayUsage,
                         modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+
+            SectionCard(title = "Движения питомца") {
+                Column {
+                    SupportingText(
+                        text = "Питомец дышит, моргает и радуется покупкам, кнопка " +
+                            "«Закончить день» мягко пульсирует. Звуков в приложении нет.",
+                    )
+                    LabeledValue(
+                        "Движения",
+                        if (motionEnabled) "включены" else "выключены",
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    SecondaryButton(
+                        text = if (motionEnabled) "Выключить движения" else "Включить движения",
+                        onClick = { onSetMotion(!motionEnabled) },
+                        modifier = Modifier.padding(top = 12.dp),
                     )
                 }
             }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -82,6 +83,19 @@ class PersistenceTest {
 
     /** Модель с настоящим хранилищем и фиксированной датой. */
     private fun viewModel() = GameViewModel(content, repository, dates = { TODAY })
+
+    @Test
+    fun `выключенные движения сохраняются и переживают сброс профиля`() = runBlocking {
+        val first = viewModel()
+        assertTrue("по умолчанию движения включены", first.motionEnabled.value)
+        first.createProfile("Финни", PetAppearance("cat", "ginger", "none"), Difficulty.HARDER)
+        first.setMotionEnabled(false)
+        first.resetProfile()
+
+        assertEquals(false, repository.observeDisplaySettings().first()?.motionEnabled)
+        // Повторный запуск: новая модель читает настройку с устройства.
+        assertFalse(viewModel().motionEnabled.value)
+    }
 
     @Test
     fun `на чистом устройстве профиля нет`() = runBlocking {

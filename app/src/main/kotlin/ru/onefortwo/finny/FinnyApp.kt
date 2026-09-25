@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.ui.common.FinnyNavigationBar
+import ru.onefortwo.finny.ui.common.LocalMotionEnabled
 import ru.onefortwo.finny.ui.common.FinnyNavigationRail
 import ru.onefortwo.finny.ui.common.NavSection
 import ru.onefortwo.finny.ui.screens.AdultScreen
@@ -117,6 +119,7 @@ private const val EXPANDED_WIDTH_DP = 840
 fun FinnyApp(viewModel: GameViewModel) {
     val navController = rememberNavController()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val motionEnabled by viewModel.motionEnabled.collectAsStateWithLifecycle()
 
     // Счётчик экранного времени идёт только пока приложение на переднем плане.
     LifecycleResumeEffect(Unit) {
@@ -159,7 +162,9 @@ fun FinnyApp(viewModel: GameViewModel) {
                         },
                     ),
             ) {
-                AppNavHost(navController = navController, viewModel = viewModel)
+                CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
+                    AppNavHost(navController = navController, viewModel = viewModel)
+                }
             }
             if (bottomBar && tab != null) {
                 FinnyNavigationBar(selected = tab, onSelect = onSelectTab)
@@ -440,7 +445,9 @@ private fun AppNavHost(
                 isDemo = state.isDemo,
                 timeLimitEnabled = state.timeLimitEnabled,
                 minutesUsedToday = state.minutesUsed(today),
+                motionEnabled = LocalMotionEnabled.current,
                 onSetTimeLimit = viewModel::setTimeLimitEnabled,
+                onSetMotion = viewModel::setMotionEnabled,
                 onResetTodayUsage = viewModel::resetTodayUsage,
                 onResetProfile = {
                     viewModel.resetProfile()

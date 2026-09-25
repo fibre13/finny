@@ -68,7 +68,7 @@ class GameRepository(private val database: FinnyDatabase) {
      */
     fun observeDisplaySettings(): Flow<SavedDisplaySettings?> =
         dao.observeDisplaySettings().map { entity ->
-            entity?.let { SavedDisplaySettings(it.themeMode, it.highContrast) }
+            entity?.let { SavedDisplaySettings(it.themeMode, it.highContrast, it.motionEnabled) }
         }
 
     /** Сохраняет настройки отображения. */
@@ -77,6 +77,7 @@ class GameRepository(private val database: FinnyDatabase) {
             DisplaySettingsEntity(
                 themeMode = settings.themeMode,
                 highContrast = settings.highContrast,
+                motionEnabled = settings.motionEnabled,
             ),
         )
     }

@@ -22,11 +22,17 @@
             планшетов и альбомной ориентации отнесена ТЗ 3.1 к необязательным
             преимуществам; обязательный минимум — портрет от 360 dp — при этом
             сохраняется.
+
+            adjustResize: без него Android 8 сдвигает окно под клавиатуру,
+            а интерфейс не узнаёт, что клавиатура закрылась, — после ввода
+            ответа в барьере раздел для взрослого оставался укороченным на
+            её высоту.
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.Finny">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

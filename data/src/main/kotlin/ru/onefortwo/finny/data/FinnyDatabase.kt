@@ -20,7 +20,7 @@ import androidx.room.RoomDatabase
         DisplaySettingsEntity::class,
         AchievedGoalEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class FinnyDatabase : RoomDatabase() {

@@ -254,4 +254,6 @@ data class SavedDisplaySettings(
     /** Тема: SYSTEM, LIGHT или DARK. */
     val themeMode: String,
     val highContrast: Boolean,
+    /** Движения питомца и кнопок; выключаются взрослым (ТЗ 3.6). */
+    val motionEnabled: Boolean = true,
 )

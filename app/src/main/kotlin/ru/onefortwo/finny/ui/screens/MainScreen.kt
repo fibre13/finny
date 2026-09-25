@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -47,6 +48,7 @@ import ru.onefortwo.finny.ui.common.LocalMutedColor
 import ru.onefortwo.finny.ui.common.MinTouchTarget
 import ru.onefortwo.finny.ui.common.PetFigure
 import ru.onefortwo.finny.ui.common.PrimaryButton
+import ru.onefortwo.finny.ui.common.rememberPulse
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SceneStats
@@ -474,7 +476,16 @@ private fun TaskCard(
 @Composable
 private fun FinishDayRow(reason: String?, onFinish: () -> Unit) {
     if (reason == null) {
-        PrimaryButton(text = "Закончить день", onClick = onFinish)
+        // Всё для дня сделано — кнопка мягко пульсирует, подсказывая шаг.
+        val pulse = rememberPulse()
+        PrimaryButton(
+            text = "Закончить день",
+            onClick = onFinish,
+            modifier = Modifier.graphicsLayer {
+                scaleX = pulse.value
+                scaleY = pulse.value
+            },
+        )
         return
     }
     val largeFont = LocalDensity.current.fontScale >= 1.3f

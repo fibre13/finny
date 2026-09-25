@@ -2,10 +2,18 @@ package ru.onefortwo.finny.ui.common
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -147,10 +155,57 @@ class PetMotionClock(
 fun animationsEnabled(context: Context): Boolean =
     Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
 
+/** Настройка «Движения питомца» из раздела для взрослого (ТЗ 3.6). */
+val LocalMotionEnabled = compositionLocalOf { true }
+
 /**
- * Текущий кадр движений питомца. При отключённой анимации — неподвижный
- * кадр: дыхание 0, без моргания и прыжков, первое небо; реакция не
- * показывается и сразу считается проигранной.
+ * Собственные движения приложения разрешены: их не выключил взрослый
+ * в приложении и не отключила системная настройка Android.
+ */
+@Composable
+fun motionAllowed(): Boolean {
+    val context = LocalContext.current
+    val system = remember { animationsEnabled(context) }
+    return system && LocalMotionEnabled.current
+}
+
+/** Увеличение кнопки на пике пульсации. */
+const val PULSE_SCALE = 1.04f
+
+/** Период пульсации: короткий вдох и пауза, чтобы кнопка не мельтешила. */
+const val PULSE_PERIOD_MS = 2400
+
+/**
+ * Масштаб для мягкой пульсации кнопки, которую пора нажать: за 0,6 с
+ * кнопка увеличивается на 4 % и возвращается, затем пауза. При
+ * отключённых движениях ([motionAllowed]) масштаб постоянно 1.
+ *
+ * Значение читается внутри `graphicsLayer`, поэтому пульсация не
+ * перестраивает экран на каждом кадре.
+ */
+@Composable
+fun rememberPulse(): State<Float> {
+    if (!motionAllowed()) return remember { mutableFloatStateOf(1f) }
+    val transition = rememberInfiniteTransition(label = "pulse")
+    return transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            keyframes {
+                durationMillis = PULSE_PERIOD_MS
+                1f at 0 using FastOutSlowInEasing
+                PULSE_SCALE at 300 using FastOutSlowInEasing
+                1f at 600
+            },
+        ),
+        label = "pulse scale",
+    )
+}
+
+/**
+ * Текущий кадр движений питомца. При отключённых движениях ([motionAllowed])
+ * — неподвижный кадр: дыхание 0, без моргания и прыжков, первое небо;
+ * реакция не показывается и сразу считается проигранной.
  *
  * Такты идут через `withInfiniteAnimationFrameNanos`: в тестах интерфейса
  * бесконечная анимация останавливается, и экран не ждёт её окончания.
@@ -166,8 +221,7 @@ fun rememberPetMotion(
     reaction: PetReaction? = null,
     onReactionEnd: (Long) -> Unit = {},
 ): MotionFrame {
-    val context = LocalContext.current
-    val enabled = remember { animationsEnabled(context) }
+    val enabled = motionAllowed()
     var frame by remember { mutableStateOf(MotionFrame()) }
     val state by rememberUpdatedState(motionStateFor(care, joy))
     val currentReaction by rememberUpdatedState(reaction)
@@ -188,5 +242,7 @@ fun rememberPetMotion(
     } else if (reaction != null) {
         LaunchedEffect(reaction.id) { onEnd(reaction.id) }
     }
-    return frame
+    // Выключение во время движения возвращает питомца в покой, а не
+    // оставляет его в последнем кадре — например, в прыжке.
+    return if (enabled) frame else MotionFrame()
 }

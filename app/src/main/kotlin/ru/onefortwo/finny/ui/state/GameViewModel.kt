@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.onefortwo.finny.content.ContentRepository
@@ -21,6 +22,7 @@ import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.content.check
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.data.GameRepository
+import ru.onefortwo.finny.data.SavedDisplaySettings
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
@@ -106,7 +108,32 @@ class GameViewModel(
         _reactions.update { queued -> queued.filterNot { it.id == id } }
     }
 
+    /**
+     * Настройки отображения устройства. Хранятся отдельно от профиля и
+     * сбросом профиля не затрагиваются.
+     */
+    private var display = SavedDisplaySettings(themeMode = "SYSTEM", highContrast = false)
+    private val _motionEnabled = MutableStateFlow(true)
+
+    /** Движения питомца и кнопок включены; выключаются взрослым (ТЗ 3.6). */
+    val motionEnabled: StateFlow<Boolean> = _motionEnabled.asStateFlow()
+
+    /** Включение и отключение движений в разделе для взрослого. */
+    fun setMotionEnabled(enabled: Boolean) {
+        _motionEnabled.value = enabled
+        display = display.copy(motionEnabled = enabled)
+        val toSave = display
+        viewModelScope.launch { repository?.saveDisplaySettings(toSave) }
+    }
+
     init {
+        viewModelScope.launch {
+            repository?.observeDisplaySettings()?.first()?.let { saved ->
+                display = saved
+                _motionEnabled.value = saved.motionEnabled
+            }
+        }
+
         // Автосохранение включается до чтения с устройства, поэтому ни одно
         // изменение состояния не может пройти мимо записи (ТЗ 2.5.13).
         viewModelScope.launch {
