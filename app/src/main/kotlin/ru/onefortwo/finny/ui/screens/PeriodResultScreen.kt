@@ -61,7 +61,7 @@ fun PeriodResultScreen(
                     Text(summary.text, style = MaterialTheme.typography.bodyMedium)
                     if (summary.nextStep != null) {
                         SupportingText(
-                            text = "Что дальше: ${summary.nextStep}",
+                            text = "→ ${summary.nextStep}",
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }

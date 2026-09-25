@@ -427,11 +427,13 @@ private fun ScreenHeader(
             if (singleLineTitle) {
                 // Длинное имя не переносится посреди слова: кегль уменьшается
                 // до размера основного текста, и только потом — многоточие.
+                // При крупном системном шрифте даже 16 sp не вмещают
+                // «План бюджета», поэтому допускается вторая строка.
                 // Полное имя остаётся в описании для программы чтения с экрана.
                 BasicText(
                     text = title,
                     style = MaterialTheme.typography.headlineMedium.copy(color = LocalContentColor.current),
-                    maxLines = 1,
+                    maxLines = if (LocalDensity.current.fontScale >= 1.3f) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                     autoSize = TextAutoSize.StepBased(minFontSize = 16.sp, maxFontSize = 26.sp),
                     modifier = Modifier.semantics {
@@ -929,7 +931,8 @@ fun ColorSwatch(color: Color, size: Dp = 36.dp) {
 /**
  * Сетка, которая сама подбирает число колонок по ширине: не меньше
  * [minItemWidth] на ячейку, с учётом масштаба шрифта. Так плитки выбора
- * не рвут слова посередине: при нехватке места колонок становится меньше.
+ * не рвут слова посередине: при нехватке места колонок становится меньше,
+ * а ряды заполняются поровну.
  */
 @Composable
 fun AdaptiveGrid(
@@ -943,7 +946,11 @@ fun AdaptiveGrid(
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cell = minItemWidth * fontScale
-        val columns = ((maxWidth + spacing) / (cell + spacing)).toInt().coerceIn(1, count.coerceAtLeast(1))
+        val fit = ((maxWidth + spacing) / (cell + spacing)).toInt().coerceIn(1, count.coerceAtLeast(1))
+        // Ряды выравниваются: при том же числе рядов колонок берётся
+        // меньше, чтобы четыре плитки встали 2 × 2, а не 3 + 1.
+        val rows = (count + fit - 1) / fit
+        val columns = ((count + rows - 1) / rows).coerceAtLeast(1)
         Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
             (0 until count).chunked(columns).forEach { row ->
                 Row(
@@ -1220,10 +1227,15 @@ fun FinnyTextField(
     val focusManager = LocalFocusManager.current
 
     Column(modifier = modifier.fillMaxWidth()) {
+        // Подпись над полем видна глазами, а программе чтения с экрана её
+        // называет само поле: иначе TalkBack сказал бы «поле редактирования»
+        // без имени, а подпись прочитал бы отдельно.
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier
+                .padding(bottom = 8.dp)
+                .clearAndSetSemantics { },
         )
         OutlinedTextField(
             value = value,
@@ -1257,7 +1269,8 @@ fun FinnyTextField(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = maxOf(ControlHeight, MinTouchTarget)),
+                .heightIn(min = maxOf(ControlHeight, MinTouchTarget))
+                .semantics { contentDescription = label },
         )
         if (errorText != null) {
             Text(

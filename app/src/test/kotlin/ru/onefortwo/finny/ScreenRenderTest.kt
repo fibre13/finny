@@ -169,7 +169,8 @@ class ScreenRenderTest {
         compose.onNodeWithText("Какие задания тебе по силам")
             .performScrollTo()
             .assertIsDisplayed()
-        compose.onNodeWithText("Как назовём").performScrollTo().assertIsDisplayed()
+        // Поле имени названо для программы чтения с экрана своей подписью.
+        compose.onNodeWithContentDescription("Как назовём").performScrollTo().assertIsDisplayed()
         // Пока сложность и имя не выбраны, дальше пройти нельзя: задания
         // начинаются сразу после создания питомца.
         compose.onNodeWithText("Проверить выбор").performScrollTo().assertIsNotEnabled()
