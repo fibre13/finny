@@ -6,7 +6,7 @@
     "price": 10,
     "stat": "care",
     "stat_delta": 30,
-    "effect": "Финни будет сытым"
+    "effect": "{name} будет сытым"
   },
   {
     "id": "water",
@@ -15,7 +15,7 @@
     "price": 5,
     "stat": "care",
     "stat_delta": 15,
-    "effect": "Финни не будет хотеть пить"
+    "effect": "{name} не будет хотеть пить"
   },
   {
     "id": "vitamins",
@@ -24,7 +24,7 @@
     "price": 8,
     "stat": "care",
     "stat_delta": 20,
-    "effect": "Финни будет бодрым"
+    "effect": "{name} будет бодрым"
   },
   {
     "id": "brush",
@@ -33,7 +33,7 @@
     "price": 7,
     "stat": "care",
     "stat_delta": 15,
-    "effect": "Шёрстка Финни будет чистой"
+    "effect": "{name} будет чистым и пушистым"
   },
   {
     "id": "ball",
@@ -42,7 +42,7 @@
     "price": 12,
     "stat": "joy",
     "stat_delta": 15,
-    "effect": "Финни будет весело играть"
+    "effect": "{name} будет весело играть"
   },
   {
     "id": "bow",
@@ -51,7 +51,7 @@
     "price": 6,
     "stat": "joy",
     "stat_delta": 8,
-    "effect": "Финни будет нарядным",
+    "effect": "{name} будет нарядным",
     "unlocks_accessory": "bow"
   },
   {
@@ -61,7 +61,7 @@
     "price": 25,
     "stat": "joy",
     "stat_delta": 30,
-    "effect": "У Финни будет своё укрытие",
+    "effect": "{name} получит своё укрытие",
     "unlocks_scenery": "house"
   },
   {
@@ -71,7 +71,7 @@
     "price": 4,
     "stat": "joy",
     "stat_delta": 5,
-    "effect": "Финни украсит домик",
+    "effect": "{name} украсит домик",
     "unlocks_scenery": "stickers"
   },
   {
@@ -81,7 +81,7 @@
     "price": 9,
     "stat": "joy",
     "stat_delta": 10,
-    "effect": "Финни будет тёплым и нарядным",
+    "effect": "{name} будет тёплым и нарядным",
     "unlocks_accessory": "scarf"
   }
 ]

@@ -289,7 +289,7 @@ class GameViewModel(
                             } else {
                                 "План на день готов."
                             },
-                            nextStep = "Теперь купи то, что нужно ${petName}.",
+                            nextStep = "Теперь купи нужное — $petName ждёт.",
                         ),
                     )
                 }
@@ -528,7 +528,7 @@ class GameViewModel(
 
             PeriodCompletion.NoDecision -> showProblem(
                 "За день ещё нет ни одного решения.",
-                "Купи что-нибудь для ${petName} или отложи монеты в копилку.",
+                "Купи что-нибудь в «Покупках» или отложи монеты в копилку.",
             )
         }
     }

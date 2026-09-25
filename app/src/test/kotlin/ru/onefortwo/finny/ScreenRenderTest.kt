@@ -617,7 +617,7 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Купить Корм за 10 монет").performClick()
         compose.onNodeWithText("Цена: 10 монет.").assertIsDisplayed()
         compose.onNodeWithText("Это нужное.").assertIsDisplayed()
-        compose.onNodeWithText("Финни будет сытым").assertIsDisplayed()
+        compose.onNodeWithText("Финни будет сытым").assertIsDisplayed() // имя по умолчанию
     }
 
     @Test

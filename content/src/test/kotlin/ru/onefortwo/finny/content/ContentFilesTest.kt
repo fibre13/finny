@@ -86,6 +86,16 @@ class ContentFilesTest {
     }
 
     @Test
+    fun `пояснение покупки называет питомца его именем`() {
+        shop.forEach { item ->
+            // Имя подставляется, а не вписано: ребёнок мог назвать питомца иначе.
+            assertTrue("Нет {name} в пояснении ${item.id}", item.effect.contains("{name}"))
+            assertTrue("Имя вписано в пояснение ${item.id}", !item.effect.contains("Финни"))
+            assertTrue(item.effectFor("Мурзик").startsWith("Мурзик"))
+        }
+    }
+
+    @Test
     fun `каждая цель переводится в доменный тип`() {
         goals.forEach { goal ->
             val domain = goal.toDomain()

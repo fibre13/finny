@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.ItemCategory
 import ru.onefortwo.finny.content.ShopItemContent
+import ru.onefortwo.finny.content.effectFor
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.PetState
@@ -67,6 +68,8 @@ import ru.onefortwo.finny.ui.theme.PillShape
 @Composable
 fun ShopScreen(
     items: List<ShopItemContent>,
+    /** Имя питомца для пояснений в окне покупки. */
+    petName: String = "Финни",
     /** Состояние питомца: нужно, чтобы предупредить о покупке без пользы. */
     pet: PetState,
     balance: Coins,
@@ -138,6 +141,7 @@ fun ShopScreen(
         items.firstOrNull { it.id == id }?.let { item ->
             PurchaseConfirmation(
                 item = item,
+                petName = petName,
                 statAtMax = pet.isAtMax(item.stat.toDomain()),
                 onConfirm = {
                     onBuy(item.id)
@@ -320,6 +324,7 @@ private fun glyphOf(itemId: String): LineGlyph = when (itemId) {
 @Composable
 private fun PurchaseConfirmation(
     item: ShopItemContent,
+    petName: String,
     /**
      * Показатель уже на пределе, и покупка его не сдвинет. Покупку это
      * не запрещает: ограниченность ресурсов и цена необдуманной траты —
@@ -343,13 +348,13 @@ private fun PurchaseConfirmation(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                item.effect,
+                item.effectFor(petName),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp),
             )
             if (statAtMax) {
                 Text(
-                    text = "Но этот показатель у Финни уже полный: монеты " +
+                    text = "Но $petName и так этим доволен: монеты " +
                         "потратятся, а лучше не станет.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = FinnyTheme.colors.warningText,

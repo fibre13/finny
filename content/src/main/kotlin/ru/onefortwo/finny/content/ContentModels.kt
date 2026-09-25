@@ -39,7 +39,10 @@ data class ShopItemContent(
     val stat: PetStat,
     @SerialName("stat_delta")
     val statDelta: Int,
-    /** Короткое пояснение влияния, показывается до подтверждения покупки. */
+    /**
+     * Короткое пояснение влияния, показывается до подтверждения покупки.
+     * Вместо `{name}` подставляется имя питомца — см. [effectFor].
+     */
     val effect: String,
 
     /**
@@ -75,3 +78,10 @@ data class GlossaryEntry(
     val term: String,
     val explanation: String,
 )
+
+/**
+ * Пояснение влияния покупки с именем питомца, которое выбрал ребёнок.
+ * Имя стоит в именительном падеже: придуманные имена склоняются
+ * по-разному, и «У Мурзик» читалось бы как ошибка.
+ */
+fun ShopItemContent.effectFor(petName: String): String = effect.replace("{name}", petName)

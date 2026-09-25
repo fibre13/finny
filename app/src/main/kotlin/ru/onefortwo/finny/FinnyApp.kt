@@ -288,6 +288,7 @@ private fun AppNavHost(
         composable(Routes.SHOP) {
             ShopScreen(
                 items = content.shopItems(),
+                petName = state.profile?.petName ?: "Финни",
                 pet = state.game.pet,
                 balance = balance,
                 todayPurchases = state.game.period.purchases,
