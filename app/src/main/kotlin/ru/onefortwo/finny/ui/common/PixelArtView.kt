@@ -372,8 +372,9 @@ fun pixelImage(pixels: IntArray, width: Int): ImageBitmap =
 /**
  * Выводит пиксельное изображение с целым увеличением по центру области.
  *
- * @param cropTop сколько верхних строк не показывать (сцена в альбомной
- * ориентации).
+ * @param cropTop сколько верхних строк можно не показывать (сцена в
+ * альбомной ориентации): срез применяется, только если даёт увеличение
+ * крупнее.
  * @param background цвет полей вокруг изображения.
  * @param extendEdges поля заполняются продолжением краёв изображения:
  * над сценой — небо, под ней — трава, по бокам — крайние столбцы
@@ -396,14 +397,22 @@ fun PixelImage(
     overlay: DrawScope.(scale: Int, left: Int, top: Int) -> Unit = { _, _, _ -> },
 ) {
     Canvas(modifier = modifier) {
-        val srcHeight = image.height - cropTop
-        val scale = floor(min(size.width / coreWidth, size.height / srcHeight)).toInt().coerceAtLeast(1)
+        fun scaleFor(crop: Int) =
+            floor(min(size.width / coreWidth, size.height / (image.height - crop))).toInt().coerceAtLeast(1)
+        // Срез неба нужен, только если он даёт увеличение крупнее. Иначе
+        // над сценой остаётся поле, и продолжение срезанной строки тянуло
+        // бы солнце и облака вертикальными полосами.
+        val crop = if (cropTop > 0 && scaleFor(cropTop) > scaleFor(0)) cropTop else 0
+        val srcHeight = image.height - crop
+        val scale = scaleFor(crop)
         val visible = min(image.width, ceil(size.width / scale).toInt())
         val srcLeft = (coreLeft + coreWidth / 2 - visible / 2).coerceIn(0, image.width - visible)
         val width = visible * scale
         val height = srcHeight * scale
         val left = ((size.width - width) / 2).toInt()
-        val top = ((size.height - height) / 2).toInt()
+        // Срезанная сцена прижата к верху: обрез неба приходится на край
+        // карточки, а свободное место снизу занимает трава.
+        val top = if (crop > 0) 0 else ((size.height - height) / 2).toInt()
         val right = size.width.toInt() - left - width
         val bottom = size.height.toInt() - top - height
         if (background != Color.Transparent) drawRect(background)
@@ -415,12 +424,12 @@ fun PixelImage(
             }
             // Сначала бока на высоту изображения, затем верх и низ на всю
             // ширину области — вместе с углами.
-            edge(IntOffset(srcLeft, cropTop), IntSize(1, srcHeight), IntOffset(0, top), IntSize(left, height))
+            edge(IntOffset(srcLeft, crop), IntSize(1, srcHeight), IntOffset(0, top), IntSize(left, height))
             edge(
-                IntOffset(srcLeft + visible - 1, cropTop), IntSize(1, srcHeight),
+                IntOffset(srcLeft + visible - 1, crop), IntSize(1, srcHeight),
                 IntOffset(left + width, top), IntSize(right, height),
             )
-            edge(IntOffset(srcLeft, cropTop), IntSize(visible, 1), IntOffset(0, 0), IntSize(size.width.toInt(), top))
+            edge(IntOffset(srcLeft, crop), IntSize(visible, 1), IntOffset(0, 0), IntSize(size.width.toInt(), top))
             edge(
                 IntOffset(srcLeft, image.height - 1), IntSize(visible, 1),
                 IntOffset(0, top + height), IntSize(size.width.toInt(), bottom),
@@ -428,12 +437,12 @@ fun PixelImage(
         }
         drawImage(
             image = image,
-            srcOffset = IntOffset(srcLeft, cropTop),
+            srcOffset = IntOffset(srcLeft, crop),
             srcSize = IntSize(visible, srcHeight),
             dstOffset = IntOffset(left, top),
             dstSize = IntSize(width, height),
             filterQuality = FilterQuality.None,
         )
-        overlay(scale, left + (coreLeft - srcLeft) * scale, top - cropTop * scale)
+        overlay(scale, left + (coreLeft - srcLeft) * scale, top - crop * scale)
     }
 }
