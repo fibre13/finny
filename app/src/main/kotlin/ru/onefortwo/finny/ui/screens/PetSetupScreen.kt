@@ -125,6 +125,7 @@ fun PetSetupScreen(
         // остался предыдущий.
         scrollKey = step,
         bottomPadding = 16.dp,
+        centerOnTablet = true,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             when (step) {

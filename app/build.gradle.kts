@@ -25,8 +25,8 @@ android {
         applicationId = "ru.onefortwo.finny"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.6.5"
+        versionCode = 14
+        versionName = "0.6.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -64,6 +64,7 @@ fun OnboardingScreen(
         onBack = onBack,
         top = step?.let { { StepProgress(step = it) } },
         bottomPadding = 16.dp,
+        centerOnTablet = true,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SupportingText(

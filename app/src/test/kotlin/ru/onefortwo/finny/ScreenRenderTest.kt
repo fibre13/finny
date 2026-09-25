@@ -55,6 +55,7 @@ import ru.onefortwo.finny.economy.confirmPlan
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
 import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.common.FeedbackCard
 import ru.onefortwo.finny.ui.common.LocalMotionEnabled
 import ru.onefortwo.finny.ui.common.MotionFrame
 import ru.onefortwo.finny.ui.common.rememberPetMotion
@@ -73,6 +74,7 @@ import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.AppState
+import ru.onefortwo.finny.ui.state.FeedbackMessage
 import ru.onefortwo.finny.ui.state.Profile
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
@@ -1003,6 +1005,32 @@ class ScreenRenderTest {
 
         assertEquals(7L, ended)
         assertTrue(frames.all { it == MotionFrame() })
+    }
+
+    @Test
+    fun `отклик показывает текст и следующий шаг и закрывается крестиком`() {
+        var shown by mutableStateOf(true)
+        compose.setContent {
+            FinnyTheme {
+                if (shown) {
+                    FeedbackCard(
+                        message = FeedbackMessage(
+                            text = "Не хватает 9 монет.",
+                            nextStep = "Выполни задание.",
+                            isProblem = true,
+                        ),
+                        onDismiss = { shown = false },
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithText("Не хватает 9 монет.").assertIsDisplayed()
+        compose.onNodeWithText("→ Выполни задание.").assertIsDisplayed()
+        // Затруднение отличается не только цветом: знак озвучивается словом.
+        compose.onNodeWithContentDescription("Внимание").assertExists()
+        compose.onNodeWithContentDescription("Закрыть сообщение").performClick()
+        assertFalse(shown)
     }
 
     /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */

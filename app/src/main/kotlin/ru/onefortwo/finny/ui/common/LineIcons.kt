@@ -69,6 +69,7 @@ enum class LineGlyph(vararg val paths: String) {
         "M12 7a3 3 0 1 0 0 6a3 3 0 1 0 0-6z", "m16 18 2 2 4-4",
     ),
     CLOCK("M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z", "M12 6v6l4 2"),
+    CLOSE("M18 6 6 18", "m6 6 12 12"),
     GOAL("M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z", "M4 22v-7"),
     CHEVRON("m9 18 6-6-6-6"),
     BACK("m12 19-7-7 7-7", "M19 12H5"),

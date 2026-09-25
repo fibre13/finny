@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.screens
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -285,9 +287,10 @@ private fun SectionCell(
  */
 @Composable
 private fun SceneCard(onOpenPet: () -> Unit, content: @Composable () -> Unit) {
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     Box(
         modifier = Modifier
-            .fillRemaining(SceneMinHeight)
+            .fillRemaining(if (landscape) SceneMinHeightLandscape else SceneMinHeight)
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .clickable(role = Role.Button, onClickLabel = "Открыть питомца", onClick = onOpenPet),
@@ -298,6 +301,14 @@ private fun SceneCard(onOpenPet: () -> Unit, content: @Composable () -> Unit) {
 
 /** Наименьшая высота сцены: при меньшей экран прокручивается. */
 private val SceneMinHeight = 72.dp
+
+/**
+ * Наименьшая высота сцены в альбомной ориентации. На телефоне высота
+ * окна около 360 dp, и сцене доставалось 72 dp — питомец выходил
+ * крохотным. 190 dp хватает на сцену вдвое крупнее (93 строки после
+ * среза неба × 2); ниже экран прокручивается.
+ */
+private val SceneMinHeightLandscape = 190.dp
 
 /** Монеты и цель на тёмной карточке. */
 @Composable

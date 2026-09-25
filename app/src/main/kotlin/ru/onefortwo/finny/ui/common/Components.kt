@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.KeyboardActions
@@ -72,6 +73,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -211,6 +213,9 @@ fun Eyebrow(
  * окна: карточке с `Modifier.weight` достаётся свободная высота. Если
  * содержимое выше окна (крупный шрифт), экран прокручивается как обычно.
  * @param bottomPadding запас под последним элементом.
+ * @param centerOnTablet на планшете короткое содержимое ставится по
+ * центру по высоте, а не прижимается к верху с пустой половиной экрана
+ * снизу. На телефоне не действует.
  */
 @Composable
 fun ScreenScaffold(
@@ -230,6 +235,7 @@ fun ScreenScaffold(
     bottomPadding: Dp = 28.dp,
     /** Заголовок в одну строку с уменьшением кегля вместо переноса. */
     singleLineTitle: Boolean = false,
+    centerOnTablet: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = FinnyTheme.colors
@@ -288,9 +294,16 @@ fun ScreenScaffold(
                     )
                     content()
                 }
+                val tablet = LocalConfiguration.current.smallestScreenWidthDp >= TABLET_MIN_WIDTH_DP
                 if (fillViewport) {
                     val viewport = with(density) { scrollViewportHeight.toDp() }
                     ViewportColumn(minHeight = viewport - bottom, modifier = columnModifier, content = body)
+                } else if (centerOnTablet && tablet) {
+                    val viewport = with(density) { scrollViewportHeight.toDp() }
+                    Column(
+                        modifier = columnModifier.heightIn(min = (viewport - bottom).coerceAtLeast(0.dp)),
+                        verticalArrangement = Arrangement.Center,
+                    ) { body() }
                 } else {
                     Column(modifier = columnModifier) { body() }
                 }
@@ -321,6 +334,9 @@ fun ScreenScaffold(
         }
     }
 }
+
+/** Наименьшая сторона экрана планшета, dp. */
+private const val TABLET_MIN_WIDTH_DP = 600
 
 /** Отметка блока, который забирает оставшуюся высоту экрана. */
 private class FillRemaining(val min: Dp) : ParentDataModifier {
@@ -1101,8 +1117,14 @@ fun StatusPill(
 }
 
 /**
- * Сообщение обратной связи. Затруднение помечается знаком «!» и словом
- * «Внимание», удача — знаком «✓», а не только цветом (ТЗ 3.6).
+ * Сообщение обратной связи — одна лёгкая карточка у нижнего края: знак,
+ * текст, следующий шаг и крестик. Затруднение помечается знаком «!»,
+ * удача — «✓» в цветном круге, а не только цветом фона (ТЗ 3.6); для
+ * программы чтения с экрана знак озвучивается словом.
+ *
+ * Показывается один отклик — о последнем действии. Сам он не исчезает:
+ * ребёнку нужно время прочитать. Закрывается крестиком 48 × 48 dp или
+ * касанием карточки.
  */
 @Composable
 fun FeedbackCard(
@@ -1112,44 +1134,61 @@ fun FeedbackCard(
 ) {
     val colors = FinnyTheme.colors
     val problem = message.isProblem
+    val accent = if (problem) colors.warning else colors.success
+    val shape = RoundedCornerShape(20.dp)
 
-    SectionCard(
-        modifier = modifier,
-        tone = if (problem) CardTone.Warning else CardTone.Success,
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .softShadow(shape)
+            .clip(shape)
+            .background(if (problem) colors.warningContainer else colors.successContainer)
+            .border(1.dp, accent.copy(alpha = 0.45f), shape)
+            .clickable(onClickLabel = "закрыть сообщение", onClick = onDismiss)
+            .padding(start = 14.dp, top = 12.dp, bottom = 14.dp, end = 2.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconTile(size = 38.dp) {
-                    Text(
-                        text = if (problem) "!" else "✓",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (problem) colors.warningText else colors.successText,
-                        modifier = Modifier.clearAndSetSemantics { },
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Eyebrow(
-                    text = if (problem) "Внимание" else "Что произошло",
-                    color = if (problem) colors.warningText else colors.successText,
-                )
-            }
+        Box(
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(accent)
+                .semantics { contentDescription = if (problem) "Внимание" else "Готово" },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = if (problem) "!" else "✓",
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.onPrimary,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f).padding(top = 3.dp)) {
             Text(
                 text = message.text,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 10.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = colors.onSurface,
             )
             if (message.nextStep != null) {
-                SupportingText(
-                    text = "Что дальше: ${message.nextStep}",
-                    modifier = Modifier.padding(top = 6.dp),
+                Text(
+                    text = "→ ${message.nextStep}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceMuted,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            PrimaryButton(
-                text = "Понятно",
-                onClick = onDismiss,
-                tone = if (problem) ButtonTone.Coin else ButtonTone.Primary,
-                modifier = Modifier.padding(top = 14.dp),
-            )
+        }
+        Box(
+            modifier = Modifier
+                .size(MinTouchTarget)
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClick = onDismiss)
+                .semantics { contentDescription = "Закрыть сообщение" },
+            contentAlignment = Alignment.Center,
+        ) {
+            LineIcon(glyph = LineGlyph.CLOSE, color = colors.onSurface, size = 20.dp)
         }
     }
 }
