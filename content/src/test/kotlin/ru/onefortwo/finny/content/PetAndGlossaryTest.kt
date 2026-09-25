@@ -54,7 +54,7 @@ class PetAndGlossaryTest {
     fun `справочник объясняет основные термины`() {
         val terms = glossary.map { it.term.lowercase() }
 
-        listOf("бюджет", "план", "копилка", "цель").forEach { required ->
+        listOf("бюджет", "план", "копилка", "цель", "расход", "накопления", "подушка безопасности").forEach { required ->
             assertTrue("В справочнике нет термина «$required»", terms.any { it.contains(required) })
         }
     }
