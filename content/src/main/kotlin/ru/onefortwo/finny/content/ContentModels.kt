@@ -70,7 +70,25 @@ data class GoalContent(
     val id: String,
     val title: String,
     val price: Int,
+    /** Короткое название для кнопки «Забрать …»: «аквариум». */
+    @SerialName("claim_title")
+    val claimTitle: String = title,
+    /**
+     * Строка праздника, когда цель накоплена; вместо `{name}` — имя
+     * питомца в именительном падеже: «{name} будет смотреть на рыбок».
+     */
+    val celebration: String = "",
 )
+
+/** Строка праздника с именем питомца. */
+fun GoalContent.celebrationFor(petName: String): String = celebration.replace("{name}", petName)
+
+/** Размер мечты по цене — подпись на карточке выбора цели. */
+fun GoalContent.dreamSize(): String = when {
+    price <= 60 -> "Маленькая мечта"
+    price <= 100 -> "Средняя мечта"
+    else -> "Большая мечта"
+}
 
 /** Термин справочного раздела (ТЗ 2.5.11). */
 @Serializable

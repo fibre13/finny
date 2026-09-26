@@ -1,6 +1,41 @@
 package ru.onefortwo.finny.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import ru.onefortwo.finny.content.PetPartsContent
+import ru.onefortwo.finny.content.celebrationFor
+import ru.onefortwo.finny.content.dreamSize
+import ru.onefortwo.finny.ui.common.ChevronIcon
+import ru.onefortwo.finny.ui.common.MinTouchTarget
+import ru.onefortwo.finny.ui.common.PetFigure
+import ru.onefortwo.finny.ui.common.StatusPill
+import ru.onefortwo.finny.ui.common.rememberPulse
+import ru.onefortwo.finny.ui.common.softShadow
+import ru.onefortwo.finny.ui.state.PetReaction
+import ru.onefortwo.finny.ui.state.PetReactions
+import ru.onefortwo.finny.ui.state.Profile
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,6 +101,11 @@ fun SavingsScreen(
     onWithdraw: (Int) -> Unit,
     onBack: () -> Unit,
     balance: Coins? = null,
+    /** Профиль и части внешности: питомец ребёнка на празднике и при выборе цели. */
+    profile: Profile? = null,
+    parts: PetPartsContent? = null,
+    /** Цель уже получали: выбор цели — «новая мечта». */
+    afterClaim: Boolean = false,
 ) {
     // Суммы выставляются кнопками шага, как на экране плана: печатать
     // число с клавиатуры не нужно (замечание тестировщика о вводе).
@@ -76,10 +116,38 @@ fun SavingsScreen(
     var previewAmount by rememberSaveable { mutableStateOf<Int?>(null) }
 
     val goal = game.savings.goal
-    val goalTitle = goals.firstOrNull { it.id == goal?.id }?.title
+    val goalContent = goals.firstOrNull { it.id == goal?.id }
+    val goalTitle = goalContent?.title
+    val reached = goal != null && game.savings.saved >= goal.price
+
+    val pet: PetSlot = { size, reaction, onEnd ->
+        if (profile != null && parts != null) {
+            val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
+            val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
+            val accessory = parts.accessories.firstOrNull { it.id == profile.appearance.accessoryId }
+            PetFigure(
+                petName = profile.petName,
+                speciesId = profile.appearance.speciesId,
+                speciesTitle = species?.title ?: "Питомец",
+                accessoryId = profile.appearance.accessoryId,
+                accessoryTitle = accessory?.title ?: "без украшения",
+                colorHex = color?.hex ?: "#CCCCCC",
+                stage = game.stage,
+                care = game.pet.care.level,
+                joy = game.pet.joy.level,
+                size = size,
+                caption = false,
+                plain = true,
+                reaction = reaction,
+                onReactionEnd = onEnd,
+                description = "${profile.petName} радуется",
+                modifier = Modifier.width(size),
+            )
+        }
+    }
 
     ScreenScaffold(
-        eyebrow = "Моя цель",
+        eyebrow = if (goal == null && afterClaim) "Новая мечта" else "Моя цель",
         title = "Копилка",
         balance = balance,
         onBack = onBack,
@@ -88,21 +156,23 @@ fun SavingsScreen(
     ) {
         Column {
             if (goal == null) {
-                SectionCard(title = "Выбери цель", tone = CardTone.Sage) {
-                    Column {
-                        SupportingText(
-                            "Цель — это то, ради чего копят. Выбери, что хочешь накопить.",
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
-                        goals.forEach { option ->
-                            SecondaryButton(
-                                text = "${option.title} — ${Explanations.coins(option.price)}",
-                                onClick = { onChooseGoal(option.id) },
-                                modifier = Modifier.padding(bottom = 10.dp),
-                            )
-                        }
-                    }
-                }
+                GoalChooser(
+                    goals = goals,
+                    saved = game.savings.saved,
+                    afterClaim = afterClaim,
+                    pet = pet,
+                    onChoose = onChooseGoal,
+                )
+            } else if (reached) {
+                GoalCelebration(
+                    goal = goalContent,
+                    goalId = goal.id,
+                    price = goal.price,
+                    saved = game.savings.saved,
+                    petName = profile?.petName ?: "Финни",
+                    pet = pet,
+                    onClaim = onClaimGoal,
+                )
             } else {
                 SectionCard(
                     eyebrow = goalTitle ?: "Моя цель",
@@ -124,17 +194,6 @@ fun SavingsScreen(
                             text = Explanations.forecast(game.goalForecast()),
                             modifier = Modifier.padding(top = 8.dp),
                         )
-                        // Накопленную цель нужно получить, иначе экран
-                        // становится тупиковым: копилка растёт, а выбрать
-                        // следующую цель нельзя (ТЗ 2.5.7, 3.4).
-                        if (game.savings.saved >= goal.price) {
-                            PrimaryButton(
-                                text = "Получить: ${goalTitle ?: "цель"}",
-                                tone = ButtonTone.Coin,
-                                onClick = onClaimGoal,
-                                modifier = Modifier.padding(top = 12.dp),
-                            )
-                        }
                     }
                 }
 
@@ -292,22 +351,301 @@ private fun WithdrawalConfirmation(
 
 /**
  * Иллюстрация цели на светлой плитке. Декоративная: цель названа
- * надзаголовком карточки.
+ * надзаголовком карточки или описанием карточки выбора.
  */
 @Composable
-private fun GoalPicture(goalId: String) {
+private fun GoalPicture(
+    goalId: String,
+    modifier: Modifier = Modifier,
+    size: Dp = 72.dp,
+    container: Color = FinnyTheme.colors.surface,
+    inset: Dp = 4.dp,
+) {
     val art = rememberPixelArt()
     val image = remember(art, goalId) {
         composeGoal(art, goalId)?.let { pixelImage(it, art.sprite(goalId)?.width ?: 32) }
     } ?: return
 
     Box(
-        modifier = Modifier
-            .size(72.dp)
+        modifier = modifier
+            .size(size)
             .clip(MaterialTheme.shapes.small)
-            .background(FinnyTheme.colors.surface)
+            .background(container)
             .clearAndSetSemantics { },
     ) {
-        PixelImage(image = image, modifier = Modifier.fillMaxSize().padding(4.dp))
+        PixelImage(image = image, modifier = Modifier.fillMaxSize().padding(inset))
+    }
+}
+
+/** Сколько раз питомец прыгает от радости, когда открывается праздник. */
+private const val CELEBRATION_ROUNDS = 3
+
+/** Питомец ребёнка заданного размера с реакцией; на экране копилки — без плитки. */
+private typealias PetSlot = @Composable (size: Dp, reaction: PetReaction?, onReactionEnd: (Long) -> Unit) -> Unit
+
+/**
+ * Цель накоплена: праздник вместо карточки цели, пополнения и снятия.
+ * Питомец ребёнка прыгает рядом с предметом цели, счётчик — «цена из цены»,
+ * лишнее названо отдельной строкой. Кнопка «Забрать …» пульсирует.
+ */
+@Composable
+private fun GoalCelebration(
+    goal: GoalContent?,
+    goalId: String,
+    price: Coins,
+    saved: Coins,
+    petName: String,
+    pet: PetSlot,
+    onClaim: () -> Unit,
+) {
+    val colors = FinnyTheme.colors
+    val shape = RoundedCornerShape(24.dp)
+    // Прыжки проигрываются несколько раз подряд, затем питомец просто дышит.
+    // При выключенных движениях реакции снимаются сразу, и фигура стоит.
+    var round by rememberSaveable(goalId) { mutableIntStateOf(0) }
+    val reaction = if (round < CELEBRATION_ROUNDS) PetReaction(PetReactions.PLAY, id = round + 1L) else null
+    val title = goal?.title ?: "Цель"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .softShadow(shape)
+            .clip(shape)
+            .background(colors.surface)
+            .border(2.dp, colors.coin, shape)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(236.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.coinContainer),
+        ) {
+            Box(modifier = Modifier.align(Alignment.Center).size(width = 292.dp, height = 236.dp)) {
+                Sparkles(modifier = Modifier.matchParentSize())
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 4.dp)
+                        .size(width = 260.dp, height = 26.dp)
+                        .clip(CircleShape)
+                        .background(colors.coin.copy(alpha = 0.55f)),
+                )
+                Box(modifier = Modifier.offset(x = (-30).dp, y = (-6).dp)) {
+                    pet(240.dp, reaction) { round++ }
+                }
+                GoalPicture(
+                    goalId = goalId,
+                    size = 160.dp,
+                    container = Color.Transparent,
+                    modifier = Modifier.offset(x = 136.dp, y = 62.dp),
+                )
+            }
+        }
+        Text(
+            text = "Ты сделал это!",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 12.dp).semantics { heading() },
+        )
+        val line = goal?.celebrationFor(petName).orEmpty()
+        if (line.isNotBlank()) {
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "$title: накоплено ${price.amount} из ${price.amount}, цель собрана"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.weight(1f),
+            )
+            Text(text = "${price.amount} из ${price.amount} ✓", style = MaterialTheme.typography.titleMedium)
+        }
+        ProgressBar(
+            fraction = 1f,
+            color = colors.coin,
+            trackColor = colors.track,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        val surplus = saved.amount - price.amount
+        if (surplus > 0) {
+            Text(
+                text = "Ещё ${Explanations.coins(surplus)} ${remainVerb(surplus)} в копилке — для новой цели.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+    }
+    val pulse = rememberPulse()
+    PrimaryButton(
+        text = "Забрать ${goal?.claimTitle ?: "цель"}",
+        onClick = onClaim,
+        modifier = Modifier
+            .padding(top = 16.dp)
+            .graphicsLayer {
+                scaleX = pulse.value
+                scaleY = pulse.value
+            },
+    )
+}
+
+/** «останется» для 1, 21, 31…, иначе «останутся». */
+private fun remainVerb(n: Int): String = if (n % 10 == 1 && n % 100 != 11) "останется" else "останутся"
+
+/** Пиксельные искры вокруг питомца: крестики из пяти клеток по 5 dp. */
+@Composable
+private fun Sparkles(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.clearAndSetSemantics { }) {
+        val cell = 5.dp.toPx()
+        SPARKLES.forEach { (x, y, color) ->
+            val ox = x.dp.toPx()
+            val oy = y.dp.toPx()
+            listOf(1 to 0, 0 to 1, 1 to 1, 2 to 1, 1 to 2).forEach { (cx, cy) ->
+                drawRect(color, topLeft = Offset(ox + cx * cell, oy + cy * cell), size = Size(cell, cell))
+            }
+        }
+    }
+}
+
+/** Положения (dp от левого верхнего угла сцены 292 × 236) и цвета искр. */
+private val SPARKLES = listOf(
+    Triple(250, 20, Color(0xFFF2B233)),
+    Triple(222, 40, Color(0xFF4A90C8)),
+    Triple(18, 150, Color(0xFFF2B233)),
+    Triple(268, 120, Color(0xFFE0655A)),
+    Triple(150, 12, Color(0xFFF2B233)),
+    Triple(40, 20, Color(0xFF7BB86F)),
+)
+
+/**
+ * Выбор цели — «новая мечта» после полученной цели. Остаток копилки
+ * назван плашкой, у каждой цели — картинка, размер мечты, цена и
+ * сколько осталось накопить с учётом остатка.
+ */
+@Composable
+private fun GoalChooser(
+    goals: List<GoalContent>,
+    saved: Coins,
+    afterClaim: Boolean,
+    pet: PetSlot,
+    onChoose: (String) -> Unit,
+) {
+    val colors = FinnyTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (saved.amount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colors.coinContainer)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(colors.coin)
+                        .border(2.dp, colors.warning.copy(alpha = 0.35f), CircleShape),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "В копилке ${Explanations.coins(saved)} — это старт для новой мечты!",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (afterClaim) "Выбери новую цель" else "Выбери цель",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    text = "На что будем копить?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceMuted,
+                )
+            }
+            pet(96.dp, null) {}
+        }
+        goals.forEach { GoalOption(goal = it, saved = saved, onChoose = onChoose) }
+        Text(
+            text = "Совет: начни с маленькой мечты — её достичь быстрее.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceMuted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** Карточка цели: нажимается целиком. */
+@Composable
+private fun GoalOption(goal: GoalContent, saved: Coins, onChoose: (String) -> Unit) {
+    val colors = FinnyTheme.colors
+    val shape = RoundedCornerShape(20.dp)
+    val left = (goal.price - saved.amount).coerceAtLeast(0)
+    val size = goal.dreamSize()
+    // Размер мечты назван словом; цвет метки его только дублирует (ТЗ 3.6).
+    val (pillBg, pillFg) = when {
+        goal.price <= 60 -> colors.successContainer to colors.successText
+        goal.price <= 100 -> colors.warningContainer to colors.warningText
+        else -> colors.errorContainer to colors.attentionText
+    }
+    val leftText = if (left > 0) "осталось $left" else "уже накоплено ✓"
+    val leftSpoken = if (left > 0) "осталось накопить ${Explanations.coins(left)}" else "уже накоплено"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MinTouchTarget)
+            .softShadow(shape)
+            .clip(shape)
+            .background(colors.surface)
+            .clickable(role = Role.Button, onClick = { onChoose(goal.id) })
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Выбрать цель: ${goal.title}, ${Explanations.coins(goal.price)}, " +
+                    "$leftSpoken, ${size.lowercase()}"
+            }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GoalPicture(goalId = goal.id, size = 64.dp, container = colors.appBackground, inset = 0.dp)
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            StatusPill(text = size, container = pillBg, content = pillFg, uppercase = false)
+            Text(
+                text = goal.title,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+            Text(
+                text = "${Explanations.coins(goal.price)} · $leftText",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceMuted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        ChevronIcon(color = colors.onSurface)
     }
 }

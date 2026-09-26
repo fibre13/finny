@@ -369,6 +369,9 @@ private fun AppNavHost(
                 onPreviewWithdrawal = viewModel::previewWithdrawal,
                 onWithdraw = viewModel::withdraw,
                 onBack = { navController.popBackStack() },
+                profile = state.profile,
+                parts = content.petParts(),
+                afterClaim = state.achievedGoalIds.isNotEmpty(),
             )
         }
 

@@ -2,16 +2,22 @@
   {
     "id": "scooter",
     "title": "Самокат для Финни",
-    "price": 60
+    "price": 60,
+    "claim_title": "самокат",
+    "celebration": "{name} будет кататься на самокате"
   },
   {
     "id": "aquarium",
     "title": "Аквариум с рыбками",
-    "price": 90
+    "price": 90,
+    "claim_title": "аквариум",
+    "celebration": "{name} будет смотреть на рыбок"
   },
   {
     "id": "party",
     "title": "Праздник для друзей",
-    "price": 120
+    "price": 120,
+    "claim_title": "праздник",
+    "celebration": "{name} позовёт друзей на праздник"
   }
 ]

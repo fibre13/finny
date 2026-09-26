@@ -385,20 +385,17 @@ class GameViewModel(
      */
     fun claimGoal() {
         val current = _state.value
-        val title = current.game.savings.goal
-            ?.let { goal -> content.goals().firstOrNull { it.id == goal.id }?.title }
-            ?: return
         val (game, goal) = current.game.claimGoal() ?: return
 
+        // Отклика внизу нет: праздник уже был на экране копилки, а остаток
+        // называет плашка «В копилке N монет — это старт для новой мечты».
+        // Питомец радуется награде, когда ребёнок вернётся на главную.
+        react(PetReactions.REWARD)
         _state.update {
             it.copy(
                 game = game,
                 achievedGoalIds = it.achievedGoalIds + goal.id,
-                message = FeedbackMessage(
-                    text = "Ты накопил на «$title» и получил её. " +
-                        "В копилке осталось ${Explanations.coins(game.savings.saved)}.",
-                    nextStep = "Выбери следующую цель — копить станет на что.",
-                ),
+                message = null,
             )
         }
     }

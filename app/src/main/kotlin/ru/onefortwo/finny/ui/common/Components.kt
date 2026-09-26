@@ -1643,6 +1643,8 @@ fun PetFigure(
      * ширину и высоту, поля — продолжение неба, холмов и травы.
      */
     fillArea: Boolean = false,
+    /** Фигура без светлой плитки — поверх своего фона (праздник в копилке). */
+    plain: Boolean = false,
 ) {
     val art = rememberPixelArt()
     val motion = rememberPetMotion(art.animation, care, joy, reaction, onReactionEnd)
@@ -1743,8 +1745,13 @@ fun PetFigure(
             Box(
                 modifier = Modifier
                     .size(size)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(FinnyTheme.colors.surface)
+                    .then(
+                        if (plain) {
+                            Modifier
+                        } else {
+                            Modifier.clip(MaterialTheme.shapes.large).background(FinnyTheme.colors.surface)
+                        },
+                    )
                     .then(describePet),
                 contentAlignment = Alignment.Center,
             ) {
