@@ -45,6 +45,8 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            // ТЕСТ: метка тестовой сборки в сведениях о приложении.
+            versionNameSuffix = "-двор"
         }
         release {
             // Обфускация отключена: ТЗ 7.2 требует полный исходный код без обфускации.
