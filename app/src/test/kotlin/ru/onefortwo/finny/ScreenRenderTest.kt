@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
@@ -72,6 +73,7 @@ import ru.onefortwo.finny.ui.screens.SavingsScreen
 import ru.onefortwo.finny.ui.screens.ShopScreen
 import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
+import ru.onefortwo.finny.ui.screens.YardScreen
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.FeedbackMessage
@@ -1033,6 +1035,64 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Закрыть сообщение").performClick()
         assertFalse(shown)
     }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `двор открывает разделы предметами, питомцем и табличкой прогресса`() {
+        val opened = mutableListOf<String>()
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state,
+                        parts = content.petParts(),
+                        activeTask = content.tasks(Difficulty.HARDER).first(),
+                        goal = null,
+                        today = "2026-09-26",
+                        onDismissMessage = {},
+                        onOpenPlan = { opened += "plan" },
+                        onOpenShop = { opened += "shop" },
+                        onOpenSavings = { opened += "savings" },
+                        onOpenGlossary = { opened += "glossary" },
+                        onOpenTasks = { opened += "tasks" },
+                        onOpenPet = { opened += "pet" },
+                        onOpenProgress = { opened += "progress" },
+                        onOpenHelp = { opened += "help" },
+                        onOpenAdult = { opened += "adult" },
+                        onFinishPeriod = { opened += "finish" },
+                    )
+                }
+            }
+        }
+
+        // Без движений раздел открывается сразу, без перебежки питомца.
+        compose.onNodeWithContentDescription("Покупки: лавка для питомца").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("План на день").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Словарик: финансовые слова").performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Задания. На доске:")).performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Копилка:")).performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Финни")).performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Мой прогресс.")).performClick()
+        compose.onNodeWithContentDescription("Как играть").performClick()
+        compose.onNodeWithContentDescription("Для взрослого").performClick()
+        assertEquals(
+            listOf("shop", "plan", "glossary", "tasks", "savings", "pet", "progress", "help", "adult"),
+            opened,
+        )
+        // План не составлен — отметка передана словами.
+        compose.onNodeWithContentDescription("План на день").assert(
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(
+                androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "не составлен",
+            ),
+        )
+    }
+
+    private fun hasContentDescriptionPrefix(prefix: String) =
+        androidx.compose.ui.test.SemanticsMatcher("описание начинается с «$prefix»") { node ->
+            node.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { null }
+                ?.any { it.startsWith(prefix) } == true
+        }
 
     /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */
     private val simpleTasks get() = content.tasks(Difficulty.SIMPLE)

@@ -40,6 +40,7 @@ import ru.onefortwo.finny.ui.screens.AdultScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.HistoryScreen
 import ru.onefortwo.finny.ui.screens.MainScreen
+import ru.onefortwo.finny.ui.screens.YardScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
@@ -144,11 +145,9 @@ fun FinnyApp(viewModel: GameViewModel) {
             .fillMaxSize()
             .background(FinnyTheme.colors.appBackground),
     ) {
-        if (tab != null && state.hasProfile && expanded) {
-            FinnyNavigationRail(selected = tab, onSelect = onSelectTab)
-        }
+        // ТЕСТ: навигационных панелей нет — разделы открываются со двора.
         Column(modifier = Modifier.weight(1f)) {
-            val bottomBar = tab != null && state.hasProfile && !expanded
+            val bottomBar = false
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -237,27 +236,29 @@ private fun AppNavHost(
 
             val reactions by viewModel.reactions.collectAsStateWithLifecycle()
 
-            MainScreen(
+            // ТЕСТ: главная — двор питомца; разделы открываются предметами.
+            YardScreen(
                 state = state,
                 parts = content.petParts(),
                 activeTask = activeTask,
+                goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
+                today = today,
                 reaction = reactions.firstOrNull(),
                 onReactionPlayed = viewModel::reactionPlayed,
-                onOpenPet = { navController.openTab(NavSection.PET) },
-                goalTitle = goalTitle,
                 onDismissMessage = viewModel::dismissMessage,
                 onOpenPlan = { navController.navigate(Routes.PLAN) },
                 onOpenShop = { navController.navigate(Routes.SHOP) },
                 onOpenSavings = { navController.navigate(Routes.SAVINGS) },
                 onOpenGlossary = { navController.navigate(Routes.GLOSSARY) },
+                onOpenTasks = { navController.navigate(Routes.TASKS) },
+                onOpenPet = { navController.navigate(Routes.WARDROBE) },
+                onOpenProgress = { navController.navigate(Routes.HISTORY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenAdult = { navController.navigate(Routes.ADULT) },
-                today = today,
                 onFinishPeriod = {
                     viewModel.finishPeriod()
                     navController.navigate(Routes.RESULT)
                 },
-                onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
             )
         }
 
@@ -305,6 +306,7 @@ private fun AppNavHost(
                 completedIds = state.completedTaskIds,
                 balance = balance,
                 onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -416,6 +418,7 @@ private fun AppNavHost(
                 achievedGoalTitles = content.goals()
                     .filter { it.id in state.achievedGoalIds }
                     .map { it.title },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -431,6 +434,7 @@ private fun AppNavHost(
                 onOpenShop = {
                     navController.navigate(Routes.SHOP) { popUpTo(Routes.MAIN) }
                 },
+                onBack = { navController.popBackStack() },
             )
         }
 

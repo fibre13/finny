@@ -1645,6 +1645,8 @@ fun PetFigure(
     fillArea: Boolean = false,
     /** Фигура без светлой плитки — поверх своего фона (праздник в копилке). */
     plain: Boolean = false,
+    /** Спит: глаза закрыты (двор, конец дня). */
+    sleeping: Boolean = false,
 ) {
     val art = rememberPixelArt()
     val motion = rememberPetMotion(art.animation, care, joy, reaction, onReactionEnd)
@@ -1730,11 +1732,12 @@ fun PetFigure(
                 HashMap<MotionFrame, ImageBitmap>()
             }
             // Облака на карточке не видны: кадр неба не различает изображения.
-            val image = frames.getOrPut(motion.copy(sky = 0)) {
+            val still = motion.copy(sky = 0, blink = motion.blink || sleeping)
+            val image = frames.getOrPut(still) {
                 pixelImage(
                     composePet(
                         art, speciesId, stage, colorHex, accessoryId, care, joy,
-                        frame = motion.breath, blink = motion.blink, dy = motion.dy,
+                        frame = still.breath, blink = still.blink, dy = still.dy,
                         reaction = motion.reaction, reactionTick = motion.reactionTick,
                         stageBefore = motion.stageBefore,
                     ),

@@ -1,0 +1,9 @@
+# 7 7
+# pivot 0 0
+..KKK..
+.KRRcK.
+KRRccRK
+KccRRRK
+KcRRRrK
+.KRrrK.
+..KKK..
