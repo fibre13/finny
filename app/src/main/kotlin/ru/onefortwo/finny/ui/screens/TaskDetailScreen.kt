@@ -196,7 +196,7 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
 
     Column {
         TaskAmount("Нужное", needs, task.amount) { needs = it }
-        TaskAmount("Хочу", wants, task.amount) { wants = it }
+        TaskAmount("Развлечения", wants, task.amount) { wants = it }
         TaskAmount("Копилка", savings, task.amount) { savings = it }
 
         SupportingText(
@@ -430,6 +430,6 @@ private val AnsweredTaskSaver: Saver<AnsweredTask?, Any> = listSaver(
 /** Направление плана в задании на распределение. */
 private fun PlanCategory.title(): String = when (this) {
     PlanCategory.NEEDS -> "Нужное"
-    PlanCategory.WANTS -> "Хочу"
+    PlanCategory.WANTS -> "Развлечения"
     PlanCategory.SAVINGS -> "Копилка"
 }

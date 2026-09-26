@@ -775,6 +775,8 @@ fun CheckOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     swatch: (@Composable () -> Unit)? = null,
+    /** Подпись видна; без неё название только озвучивается (плитка-картинка). */
+    showTitle: Boolean = true,
 ) {
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.small
@@ -790,7 +792,10 @@ fun CheckOption(
                 shape = shape,
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .semantics { stateDescription = if (selected) "выбрано" else "не выбрано" },
+            .semantics {
+                stateDescription = if (selected) "выбрано" else "не выбрано"
+                if (!showTitle) contentDescription = title
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -799,13 +804,15 @@ fun CheckOption(
         ) {
             if (swatch != null) {
                 swatch()
-                Spacer(modifier = Modifier.size(4.dp))
+                if (showTitle) Spacer(modifier = Modifier.size(4.dp))
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-            )
+            if (showTitle) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         if (selected) {
             CheckIcon(

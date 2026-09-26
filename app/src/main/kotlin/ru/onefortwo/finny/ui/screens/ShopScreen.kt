@@ -126,7 +126,7 @@ fun ShopScreen(
                 onBuy = { pendingId = it },
             )
             ShopSection(
-                title = "Хочу",
+                title = "Развлечения",
                 hint = "можно и завтра",
                 tone = CardTone.Coin,
                 items = items.filter { it.category == ItemCategory.WANTS },

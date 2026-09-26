@@ -103,4 +103,24 @@ G(12, 12).stamp(["....KKKK....", "...K....K...", "...K....K...", "...K....K...",
 G(12, 12).stamp(["............", ".........EE.", "........KEEK", "......EEKEEK", ".....KEEKEEK",
                   "...EEKEEKEEK", "..KEEKEEKEEK", "EEKEEKEEKEEK", "EEKEEKEEKEEK", "KKKKKKKKKKKK",
                   "............", "............"], 0, 0).save("yard_icon_progress", "значок «Мой прогресс»")
+
+# Подарок: коробка с бантом (знакомство, шаг 1)
+gift = G(34, 32)
+gift.box(6, 0, 10, 9, "Y").rect(9, 3, 4, 3, "O").box(18, 0, 10, 9, "Y").rect(21, 3, 4, 3, "O").box(14, 4, 6, 6, "O")
+gift.box(0, 8, 34, 8, "R").rect(1, 9, 32, 1, "n").rect(1, 14, 32, 1, "r")
+gift.box(2, 15, 30, 17, "R").rect(26, 16, 5, 15, "r")
+gift.rect(15, 8, 4, 24, "Y").rect(18, 9, 1, 22, "O").rect(15, 8, 4, 1, "K").rect(15, 15, 4, 1, "K").rect(15, 31, 4, 1, "K")
+gift.save("yard_gift", "подарок: коробка с бантом")
+
+# Шарики четырёх цветов
+BALLOON = ["..KKKKKK..", ".KaccCCCK.", "KcCCCCCCCK", "KCCCCCCCCK", "KCCCCCCCCK", "KCCCCCCCCK",
+           ".KCCCCCCK.", "..KCCCCK..", "...KKKK...", "....KK....", "....K.....", ".....K....",
+           "....K.....", ".....K....", "....K....."]
+for name, ch in (("red", "R"), ("blue", "u"), ("yellow", "Y"), ("green", "g")):
+    G(10, 15).stamp([r.replace("C", ch) for r in BALLOON], 0, 0).save("yard_balloon_" + name, "шарик")
+
+# Стрелка «Назад» 12 × 8
+G(12, 8).stamp(["............", "....K.......", "...KK.......", "..KKKKKKKKK.", "..KKKKKKKKK.", "...KK.......",
+                "....K.......", "............"], 0, 0).save("yard_icon_back", "значок «Назад»")
+
 print("ok")

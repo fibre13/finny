@@ -61,6 +61,7 @@ import ru.onefortwo.finny.ui.common.LocalMotionEnabled
 import ru.onefortwo.finny.ui.common.MotionFrame
 import ru.onefortwo.finny.ui.common.rememberPetMotion
 import ru.onefortwo.finny.ui.screens.AdultScreen
+import ru.onefortwo.finny.ui.screens.GiftScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
@@ -115,19 +116,32 @@ class ScreenRenderTest {
     }
 
     @Test
+    fun `подарок называет цель и три решения и открывается кнопкой`() {
+        var opened = false
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme { GiftScreen(onOpen = { opened = true }) }
+            }
+        }
+
+        // ТЗ 2.5.1: цель игры и три типа решений.
+        compose.onNodeWithText("на нужное — чтобы был сыт").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("на развлечения — чтобы радовался").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("в копилку — на большую мечту").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Шаг 1 из 3").assertExists()
+        compose.onNodeWithText("Открыть подарок").performScrollTo().performClick()
+        assertTrue(opened)
+    }
+
+    @Test
     @Config(qualifiers = "w360dp-h800dp")
     fun `шаги знакомства помещаются на телефоне 360 на 800 без прокрутки`() {
         // Эталонный телефон 720 × 1600, 320 dpi: под строкой состояния
         // (24 dp) и системной панелью (48 dp) экрану остаётся 728 dp.
-        var step by mutableStateOf(1)
         compose.setContent {
             FinnyTheme {
                 Box(modifier = Modifier.height(728.dp)) {
-                    if (step == 1) {
-                        OnboardingScreen(onContinue = {}, step = 1)
-                    } else {
-                        PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> })
-                    }
+                    PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> })
                 }
             }
         }
@@ -137,26 +151,21 @@ class ScreenRenderTest {
             assertTrue("Кнопка «$button» ниже края экрана: $bottom > $limit", bottom <= limit)
         }
 
+        // Шаг 2 — кто будет другом.
         assertFits("Дальше")
-
-        step = 2
-        compose.waitForIdle()
-        assertFits("Выбрать")
-
+        compose.onNodeWithText("Дальше").performClick()
         // Шаг 3 до выбора — худший случай: под кнопкой причина её недоступности.
-        compose.onNodeWithText("Выбрать").performClick()
-        assertFits("Проверить выбор")
-        // Причина выводится; её положение здесь не проверяется: Robolectric
-        // отводит каждой строке текста около 35 px независимо от стиля, и
-        // высоты получаются больше, чем на устройстве. Поэтому проверка
-        // кнопок строже реальной: на эмуляторе 360 × 800 причина помещается.
-        compose.onNodeWithText("Выбери задания и придумай имя, и кнопка станет доступной.")
-            .assertExists()
+        // Положение причины здесь не проверяется: Robolectric отводит строке
+        // текста около 35 px, и высоты получаются больше, чем на устройстве.
+        assertFits("Дальше")
+        compose.onNodeWithText("Придумай имя и выбери задания.").assertExists()
 
         compose.onNodeWithText("Попроще").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("Финни")
-        compose.onNodeWithText("Проверить выбор").performClick()
-        assertFits("Начать первый день")
+        compose.onNodeWithText("Дальше").performClick()
+        // Финал: имя питомца и «Начать игру».
+        compose.onNodeWithText("Финни ждёт тебя!").assertExists()
+        assertFits("Начать игру")
     }
 
     @Test
@@ -165,20 +174,17 @@ class ScreenRenderTest {
             FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }) }
         }
 
-        // Шаг 2 — внешность, шаг 3 — сложность заданий и имя.
-        compose.onNodeWithText("Выбрать").performScrollTo().performClick()
+        // Шаг 2 — внешность, шаг 3 — имя и сложность заданий.
+        compose.onNodeWithText("Дальше").performScrollTo().performClick()
 
-        compose.onNodeWithText("Какие задания тебе по силам")
-            .performScrollTo()
-            .assertIsDisplayed()
+        compose.onNodeWithText("Какие задания?").performScrollTo().assertIsDisplayed()
         // Поле имени названо для программы чтения с экрана своей подписью.
-        compose.onNodeWithContentDescription("Как назовём").performScrollTo().assertIsDisplayed()
-        // Пока сложность и имя не выбраны, дальше пройти нельзя: задания
-        // начинаются сразу после создания питомца.
-        compose.onNodeWithText("Проверить выбор").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Выбери задания и придумай имя, и кнопка станет доступной.")
-            .performScrollTo()
-            .assertIsDisplayed()
+        compose.onNodeWithContentDescription("Имя питомца").performScrollTo().assertIsDisplayed()
+        // Подсказка ТЗ 3.5: настоящее имя не нужно.
+        compose.onNodeWithText("Придумай игровое имя — настоящее писать не нужно.").performScrollTo().assertIsDisplayed()
+        // Пока сложность и имя не выбраны, дальше пройти нельзя.
+        compose.onNodeWithText("Дальше").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Придумай имя и выбери задания.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -187,8 +193,13 @@ class ScreenRenderTest {
             FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }) }
         }
 
-        compose.onNodeWithText("Кто это").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Какого цвета").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Кто будет твоим другом?").assertIsDisplayed()
+        // Виды — картинками, названия озвучиваются.
+        listOf("Котёнок", "Щенок", "Крольчонок").forEach {
+            compose.onNodeWithContentDescription(it).performScrollTo().assertIsDisplayed()
+        }
+        compose.onNodeWithText("Окрас").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Серый").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Украшение").performScrollTo().assertIsDisplayed()
     }
 
@@ -419,7 +430,7 @@ class ScreenRenderTest {
 
         compose.onNodeWithText("Ответить").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Хочу: прибавить 1").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Развлечения: прибавить 1").performScrollTo().performClick()
         repeat(4) {
             compose.onNodeWithContentDescription("Копилка: прибавить 1").performScrollTo().performClick()
         }
@@ -589,7 +600,7 @@ class ScreenRenderTest {
         }
 
         compose.onNodeWithText("Нужное").assertIsDisplayed()
-        compose.onNodeWithText("Хочу").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Развлечения").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Копилка").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("0 из 50").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Остаток 50 монет — можно оставить на всякий случай.")

@@ -116,7 +116,7 @@ import kotlin.math.sin
  */
 
 /** Размер клетки предметов и рамок. */
-private val CELL = 2.dp
+internal val YARD_CELL = 2.dp
 
 /** Клетка питомца — крупнее предметов: он главный на сцене. */
 private val PET_CELL = 3.dp
@@ -129,7 +129,7 @@ private const val RUN_MS = 700
 private const val ARRIVE_PAUSE_MS = 150L
 
 /** Цвета рамок из палитры пиксельной графики. */
-private class YardColors(private val art: PixelArt) {
+internal class YardColors(private val art: PixelArt) {
     private fun c(ch: Char) = Color(art.colors[art.indexOf(ch)])
     val outline = c('K')
     val card = c('c')
@@ -144,20 +144,23 @@ private class YardColors(private val art: PixelArt) {
     val paperShadow = c('O')
     val coral = c('R')
     val coin = c('Y')
+    val cardLight = c('l')
+    val blue = c('u')
+    val pink = c('P')
 }
 
 /**
  * Пиксельная рамка: контур со срезанными углами, светлая кромка сверху
  * и тёмная снизу — объёмная табличка или кнопка.
  */
-private fun Modifier.pixelPanel(
+internal fun Modifier.pixelPanel(
     fill: Color,
     light: Color,
     shadow: Color,
     outline: Color,
     shadowCells: Int = 1,
 ): Modifier = drawBehind {
-    val c = max(1f, floor(CELL.toPx()))
+    val c = max(1f, floor(YARD_CELL.toPx()))
     val w = size.width
     val h = size.height
     drawRect(outline, Offset(c, 0f), Size(w - 2 * c, c))
@@ -171,7 +174,7 @@ private fun Modifier.pixelPanel(
 
 /** Спрайт из `art/pixel` в клетках [cell]. Декоративный: смысл несёт кнопка. */
 @Composable
-private fun Sprite(art: PixelArt, id: String, modifier: Modifier = Modifier, cell: Dp = CELL) {
+internal fun Sprite(art: PixelArt, id: String, modifier: Modifier = Modifier, cell: Dp = YARD_CELL) {
     val sprite = art.sprite(id) ?: return
     val image = remember(art, id) { composeGoal(art, id)?.let { pixelImage(it, sprite.width) } } ?: return
     PixelImage(
@@ -354,8 +357,8 @@ fun YardScreen(
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
-                                    .padding(start = CELL * 6, top = CELL * 5, end = CELL * 5)
-                                    .width(CELL * 54),
+                                    .padding(start = YARD_CELL * 6, top = YARD_CELL * 5, end = YARD_CELL * 5)
+                                    .width(YARD_CELL * 54),
                             )
                         },
                     )
@@ -373,7 +376,9 @@ fun YardScreen(
                         onClick = { runTo(places["plan"], onOpenPlan) },
                         overlay = { if (planMissing) Badge(colors, Modifier.align(Alignment.TopEnd)) },
                     )
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
+                    // Питомец рисуется поверх соседей по ряду: иначе, подбежав к
+                    // словарику, он оказывался за книгой.
+                    Box(modifier = Modifier.weight(1f).zIndex(1f), contentAlignment = Alignment.BottomCenter) {
                         Pet(
                             state = state,
                             parts = parts,
@@ -513,7 +518,7 @@ private fun IconPanelButton(art: PixelArt, colors: YardColors, icon: String, lab
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Sprite(art, icon, modifier = Modifier.padding(bottom = CELL))
+        Sprite(art, icon, modifier = Modifier.padding(bottom = YARD_CELL))
     }
 }
 
@@ -832,7 +837,7 @@ private fun ChestRow(
                         modifier = Modifier
                             .size(width = 76.dp, height = 10.dp)
                             .drawBehind {
-                                val c = max(1f, floor(CELL.toPx()))
+                                val c = max(1f, floor(YARD_CELL.toPx()))
                                 drawRect(colors.outline)
                                 drawRect(colors.paper, Offset(c, c), Size(size.width - 2 * c, size.height - 2 * c))
                                 val fill = (saved.toFloat() / price).coerceIn(0f, 1f)

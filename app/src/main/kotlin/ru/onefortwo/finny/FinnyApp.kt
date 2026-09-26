@@ -41,6 +41,7 @@ import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.HistoryScreen
 import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.YardScreen
+import ru.onefortwo.finny.ui.screens.GiftScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
@@ -190,10 +191,8 @@ private fun AppNavHost(
         startDestination = if (state.hasProfile) Routes.MAIN else Routes.ONBOARDING,
     ) {
         composable(Routes.ONBOARDING) {
-            OnboardingScreen(
-                onContinue = { navController.navigate(Routes.PET_SETUP) },
-                step = 1,
-            )
+            // ТЕСТ: знакомство начинается с подарка.
+            GiftScreen(onOpen = { navController.navigate(Routes.PET_SETUP) })
         }
 
         composable(Routes.HELP) {

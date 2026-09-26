@@ -10,7 +10,7 @@ enum class BudgetCategory(val displayName: String) {
     NEEDS("Нужное"),
 
     /** Необязательные расходы: игрушки, украшения. */
-    WANTS("Хочу"),
+    WANTS("Развлечения"),
 
     /** Накопления на финансовую цель. */
     SAVINGS("Копилка"),

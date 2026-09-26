@@ -3,6 +3,24 @@ package ru.onefortwo.finny.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
+import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.common.rememberPixelArt
+import ru.onefortwo.finny.ui.state.PetReaction
+import ru.onefortwo.finny.ui.state.PetReactions
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -95,9 +113,8 @@ fun PetSetupScreen(
     val back: (() -> Unit)? = if (step > 2) ({ step -= 1 }) else onBack
 
     val title = when (step) {
-        2 -> "Твой питомец"
-        3 -> "Почти готово"
-        else -> "Всё готово!"
+        2 -> "Кто будет твоим другом?"
+        else -> "Как назовём?"
     }
 
     // Профиля ещё нет: питомец показывается на начальной стадии и
@@ -117,10 +134,46 @@ fun PetSetupScreen(
         )
     }
 
+    // ТЕСТ: финал знакомства — питомец выпрыгивает на лугу.
+    if (step == 4) {
+        ReadyStep(
+            name = name.trim(),
+            figure = { size, reaction, onEnd ->
+                PetFigure(
+                    petName = name.trim(),
+                    speciesId = species.id,
+                    speciesTitle = species.title,
+                    accessoryId = accessory.id,
+                    accessoryTitle = accessory.title,
+                    colorHex = color.hex,
+                    stage = GrowthStage.BABY,
+                    care = StatLevel.HIGH,
+                    joy = StatLevel.HIGH,
+                    size = size,
+                    caption = false,
+                    plain = true,
+                    reaction = reaction,
+                    onReactionEnd = onEnd,
+                    description = "${name.trim()}, ${species.title.lowercase()}",
+                    modifier = Modifier.width(size),
+                )
+            },
+            onBack = { step = 3 },
+            onStart = {
+                onDone(name.trim(), PetAppearance(speciesId, colorId, accessoryId), difficulty ?: Difficulty.SIMPLE)
+            },
+        )
+        return
+    }
+
     ScreenScaffold(
         title = title,
         onBack = back,
-        top = { StepProgress(step = step) },
+        top = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                StepDots(current = step - 1)
+            }
+        },
         // Каждый шаг открывается сверху, а не с той же прокрутки, где
         // остался предыдущий.
         scrollKey = step,
@@ -141,45 +194,24 @@ fun PetSetupScreen(
                     onNext = { step = 3 },
                 )
 
-                3 -> NameStep(
+                else -> NameStep(
                     preview = {
                         PreviewRow(
                             figure = { figure(64.dp) },
                             name = name.trim(),
-                            caption = "${species.title} · ${accessory.title.lowercase()}",
+                            caption = "${species.title} · ${color.title.lowercase()} · ${accessory.title.lowercase()}",
                             large = false,
+                            onEdit = { step = 2 },
                         )
                     },
                     difficulty = difficulty,
                     onDifficulty = { difficultyName = it.name },
                     name = name,
-                    onName = { if (it.length <= NAME_MAX_LENGTH) name = it },
+                    // Предел длины держится молча, без счётчика на экране.
+                    onName = { name = it.take(NAME_MAX_LENGTH) },
                     onNext = { step = 4 },
                 )
 
-                else -> ConfirmStep(
-                    preview = {
-                        PreviewRow(
-                            figure = { figure(104.dp) },
-                            name = name.trim(),
-                            caption = petCaption(GrowthStage.BABY, accessory.title),
-                            large = true,
-                        )
-                    },
-                    speciesTitle = species.title,
-                    colorTitle = color.title,
-                    accessoryTitle = accessory.title,
-                    difficulty = difficulty ?: Difficulty.SIMPLE,
-                    name = name,
-                    onEdit = { step = 2 },
-                    onStart = {
-                        onDone(
-                            name.trim(),
-                            PetAppearance(speciesId, colorId, accessoryId),
-                            difficulty ?: Difficulty.SIMPLE,
-                        )
-                    },
-                )
             }
         }
     }
@@ -205,42 +237,40 @@ private fun AppearanceStep(
     onNext: () -> Unit,
 ) {
     val large = LocalDensity.current.fontScale >= LARGE_FONT_SCALE
+    val colorHex = parts.colors.firstOrNull { it.id == colorId }?.hex ?: "#CCCCCC"
 
-    SupportingText("Выбери, каким будет твой новый друг.")
-
-    if (large) {
-        PreviewCard { figure(140.dp) }
-        GroupTitle("Кто это")
-        AdaptiveGrid(count = parts.species.size, minItemWidth = 140.dp) { index ->
-            val option = parts.species[index]
-            CheckOption(
-                title = option.title,
-                selected = option.id == speciesId,
-                onClick = { onSpecies(option.id) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PreviewCard { figure(140.dp) }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                GroupTitle("Кто это")
-                parts.species.forEach { option ->
-                    CheckOption(
-                        title = option.title,
-                        selected = option.id == speciesId,
-                        onClick = { onSpecies(option.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
+    // Крупное превью по центру, меняется сразу при выборе.
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        PreviewCard { figure(150.dp) }
+    }
+    // Виды — картинками; название озвучивается программой чтения с экрана.
+    OptionRow(count = parts.species.size, large = large, minItemWidth = 96.dp) { index, modifier ->
+        val option = parts.species[index]
+        CheckOption(
+            title = option.title,
+            selected = option.id == speciesId,
+            onClick = { onSpecies(option.id) },
+            showTitle = false,
+            swatch = {
+                PetFigure(
+                    petName = option.title,
+                    speciesId = option.id,
+                    speciesTitle = option.title,
+                    accessoryId = "none",
+                    accessoryTitle = "",
+                    colorHex = colorHex,
+                    stage = GrowthStage.BABY,
+                    size = 64.dp,
+                    caption = false,
+                    plain = true,
+                    modifier = Modifier.width(64.dp).clearAndSetSemantics { },
+                )
+            },
+            modifier = modifier,
+        )
     }
 
-    GroupTitle("Какого цвета")
+    GroupTitle("Окрас")
     OptionRow(
         count = parts.colors.size,
         large = large,
@@ -274,7 +304,7 @@ private fun AppearanceStep(
         )
     }
 
-    PrimaryButton(text = "Выбрать", onClick = onNext, modifier = Modifier.padding(top = 4.dp))
+    PrimaryButton(text = "Дальше", onClick = onNext, modifier = Modifier.padding(top = 4.dp))
 }
 
 /**
@@ -312,99 +342,47 @@ private fun NameStep(
 ) {
     preview()
 
-    GroupTitle("Какие задания тебе по силам")
-    SupportingText("Можно поменять потом. О тебе мы ничего не спрашиваем.")
-    Difficulty.entries.forEach { option ->
-        SelectButton(
-            text = option.displayName,
-            supporting = option.hint,
-            selected = option == difficulty,
-            onClick = { onDifficulty(option) },
-            compact = true,
-        )
-    }
-
     FinnyTextField(
         value = name,
         onValueChange = onName,
-        label = "Как назовём",
-        maxLength = NAME_MAX_LENGTH,
+        label = "Имя питомца",
         // Имя — не слово словаря: автоисправление подменяло бы его.
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.Words,
             autoCorrectEnabled = false,
         ),
-        supportingText = "Придумай любое игровое имя. Настоящее писать не нужно.",
+        // Предупреждение по ТЗ 3.5: о ребёнке ничего не спрашивается.
+        supportingText = "Придумай игровое имя — настоящее писать не нужно.",
     )
 
+    GroupTitle("Какие задания?")
+    val large = LocalDensity.current.fontScale >= LARGE_FONT_SCALE
+    OptionRow(count = Difficulty.entries.size, large = large, minItemWidth = 150.dp) { index, modifier ->
+        val option = Difficulty.entries[index]
+        SelectButton(
+            text = option.displayName,
+            supporting = if (option == Difficulty.SIMPLE) "числа до 20" else "есть деление",
+            selected = option == difficulty,
+            onClick = { onDifficulty(option) },
+            compact = true,
+            modifier = modifier,
+        )
+    }
+
     val ready = difficulty != null && name.isNotBlank()
-    PrimaryButton(text = "Проверить выбор", enabled = ready, onClick = onNext)
+    PrimaryButton(text = "Дальше", enabled = ready, onClick = onNext, modifier = Modifier.padding(top = 4.dp))
 
     // Причина недоступности названа текстом: по одному виду кнопки
-    // непонятно, чего она ждёт.
+    // непонятно, чего она ждёт (ТЗ 3.6).
     if (!ready) {
         SupportingText(
             when {
-                difficulty == null && name.isBlank() ->
-                    "Выбери задания и придумай имя, и кнопка станет доступной."
-                difficulty == null -> "Выбери сложность, и кнопка станет доступной."
-                else -> "Придумай имя, и кнопка станет доступной."
+                difficulty == null && name.isBlank() -> "Придумай имя и выбери задания."
+                difficulty == null -> "Выбери задания."
+                else -> "Придумай имя."
             },
         )
     }
-}
-
-/** Шаг 4: проверка выбора и начало первого дня. */
-@Composable
-private fun ConfirmStep(
-    preview: @Composable () -> Unit,
-    speciesTitle: String,
-    colorTitle: String,
-    accessoryTitle: String,
-    difficulty: Difficulty,
-    name: String,
-    onEdit: () -> Unit,
-    onStart: () -> Unit,
-) {
-    SupportingText("Проверь выбор — и начинайте первый день вместе.")
-    preview()
-
-    SectionCard(
-        title = "Твой выбор",
-        contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 10.dp),
-        bottomSpacing = 0.dp,
-        trailing = {
-            Text(
-                text = "Изменить",
-                style = MaterialTheme.typography.labelLarge,
-                color = FinnyTheme.colors.attentionText,
-                modifier = Modifier
-                    .heightIn(min = MinTouchTarget)
-                    .clickable(role = Role.Button, onClick = onEdit)
-                    .padding(horizontal = 4.dp, vertical = 13.dp),
-            )
-        },
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            LabeledValue("Питомец", speciesTitle)
-            LabeledValue("Цвет", colorTitle)
-            LabeledValue("Украшение", accessoryTitle)
-            LabeledValue("Задания", difficulty.displayName)
-            LabeledValue("Имя", name.trim())
-        }
-    }
-
-    SectionCard(
-        tone = CardTone.Coin,
-        eyebrow = "Первый день",
-        title = "Познакомься с ${name.trim()}",
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        bottomSpacing = 0.dp,
-    ) {
-        SupportingText("Ты получишь первые монеты и решишь, что купить.")
-    }
-
-    PrimaryButton(text = "Начать первый день", onClick = onStart)
 }
 
 /** Превью питомца в салатовой карточке. */
@@ -430,23 +408,94 @@ private fun PreviewRow(
     name: String,
     caption: String,
     large: Boolean,
+    onEdit: () -> Unit,
 ) {
+    // Имя в карточке не повторяется: его видно в поле ниже.
     SectionCard(
         tone = CardTone.Sage,
         contentPadding = PaddingValues(start = 10.dp, top = 10.dp, end = 12.dp, bottom = 10.dp),
         bottomSpacing = 0.dp,
+        modifier = Modifier
+            .clickable(role = Role.Button, onClick = onEdit)
+            .semantics(mergeDescendants = true) { contentDescription = "$caption. Изменить внешность" },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             figure()
             Spacer(modifier = Modifier.width(14.dp))
             Column {
                 Text(
-                    text = name.ifBlank { "Пока без имени" },
-                    style = if (large) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
-                    color = if (name.isBlank()) FinnyTheme.colors.onSurfaceMuted else FinnyTheme.colors.onSurface,
+                    text = caption,
+                    style = if (large) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                 )
-                SupportingText(caption)
+                Text(
+                    text = "изменить ›",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = FinnyTheme.colors.successText,
+                )
             }
+        }
+    }
+}
+
+/** Финал знакомства: питомец выпрыгивает на лугу, его имя и «Начать игру». */
+@Composable
+private fun ReadyStep(
+    name: String,
+    figure: @Composable (Dp, PetReaction?, (Long) -> Unit) -> Unit,
+    onBack: () -> Unit,
+    onStart: () -> Unit,
+) {
+    val art = rememberPixelArt()
+    val colors = remember(art) { YardColors(art) }
+    var round by rememberSaveable { mutableIntStateOf(0) }
+    val reaction = if (round < 3) PetReaction(PetReactions.PLAY, id = round + 1L) else null
+    MeadowBackground(art, grassFrom = 0.46f) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+                        .clickable(role = Role.Button, onClick = onBack)
+                        .semantics { contentDescription = "Назад" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Sprite(art, "yard_icon_back")
+                }
+            }
+            Spacer(modifier = Modifier.height(40.dp))
+            figure(192.dp, reaction) { round++ }
+            Spacer(modifier = Modifier.height(20.dp))
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 240.dp, max = 360.dp)
+                    .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.headlineLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    text = "$name ждёт тебя!",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = FinnyTheme.colors.attentionText,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(modifier = Modifier.height(40.dp))
+            PixelButton(text = "Начать игру", onClick = onStart, pulse = true, modifier = Modifier.widthIn(max = 480.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
