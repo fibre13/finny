@@ -1,7 +1,7 @@
 package ru.onefortwo.finny.ui.screens
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.VectorConverter
@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.onefortwo.finny.content.GoalContent
@@ -118,6 +120,13 @@ private val CELL = 2.dp
 
 /** Клетка питомца — крупнее предметов: он главный на сцене. */
 private val PET_CELL = 3.dp
+
+/** Ширина двора: на планшете и в альбомной ориентации — колонка по центру. */
+private val YARD_MAX_WIDTH = 480.dp
+
+/** Бег питомца к предмету и остановка у него перед открытием раздела. */
+private const val RUN_MS = 700
+private const val ARRIVE_PAUSE_MS = 150L
 
 /** Цвета рамок из палитры пиксельной графики. */
 private class YardColors(private val art: PixelArt) {
@@ -221,12 +230,27 @@ fun YardScreen(
         busy = true
         hopping = true
         scope.launch {
-            hop.animateTo((target - petCenter) * 0.85f, tween(480, easing = FastOutSlowInEasing))
-            action()
-            hop.snapTo(Offset.Zero)
+            // Бег плавный: разгон и торможение, у предмета — короткая
+            // остановка. Назад в центр питомец возвращается, только когда
+            // ребёнок снова на дворе (см. LifecycleResumeEffect ниже): иначе
+            // он скакал бы обратно, пока открывается раздел.
+            hop.animateTo((target - petCenter) * 0.85f, tween(RUN_MS, easing = EaseInOutCubic))
             hopping = false
-            busy = false
+            delay(ARRIVE_PAUSE_MS)
+            action()
         }
+    }
+
+    // Возвращение на двор: питомец снова в центре, готов бежать.
+    LifecycleResumeEffect(Unit) {
+        scope.launch {
+            hop.snapTo(Offset.Zero)
+            petAlpha.snapTo(1f)
+        }
+        hopping = false
+        snoring = false
+        busy = false
+        onPauseOrDispose { }
     }
 
     val dayFinished = state.isDayFinished(today)
@@ -249,33 +273,34 @@ fun YardScreen(
             if (house && tentDoor[0] >= 0) {
                 hopping = true
                 val door = Offset(sceneOrigin[0] + tentDoor[0], sceneOrigin[1] + tentDoor[1])
-                hop.animateTo(door - petCenter, tween(650, easing = FastOutSlowInEasing))
+                hop.animateTo(door - petCenter, tween(RUN_MS + 150, easing = EaseInOutCubic))
                 petAlpha.animateTo(0f, tween(220))
                 hopping = false
             }
             snoring = true
             delay(1600)
             onFinishPeriod()
-            snoring = false
-            hop.snapTo(Offset.Zero)
-            petAlpha.snapTo(1f)
-            busy = false
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.grass),
     ) {
+        val screenWidth = maxWidth
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
         ) {
             // --- Сцена без питомца, шапка — поверх её неба ---------------------
+            // Высота сцены — по ширине двора, а не экрана: на планшете сцена
+            // не растёт во весь экран, по бокам продолжаются холмы и луг.
+            val yardWidth = minOf(screenWidth, YARD_MAX_WIDTH)
             Backdrop(
                 art = art,
+                height = yardWidth * art.sceneHeight / art.sceneWidth,
                 state = state,
                 snoring = snoring && state.hasScenery("house"),
                 tentDoor = tentDoor,
@@ -296,7 +321,11 @@ fun YardScreen(
 
             // --- Луг: предметы-разделы и питомец -------------------------------
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .widthIn(max = YARD_MAX_WIDTH)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -492,6 +521,7 @@ private fun IconPanelButton(art: PixelArt, colors: YardColors, icon: String, lab
 @Composable
 private fun Backdrop(
     art: PixelArt,
+    height: Dp,
     state: AppState,
     snoring: Boolean,
     tentDoor: FloatArray,
@@ -578,9 +608,10 @@ private fun Backdrop(
                     }
                 }
             },
+            extendEdges = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(art.sceneWidth.toFloat() / art.sceneHeight)
+                .height(height)
                 .onGloballyPositioned {
                     origin[0] = it.boundsInRoot().left
                     origin[1] = it.boundsInRoot().top
@@ -592,7 +623,9 @@ private fun Backdrop(
                 },
         )
       }
-      header()
+      Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+          Box(modifier = Modifier.widthIn(max = YARD_MAX_WIDTH)) { header() }
+      }
     }
 }
 

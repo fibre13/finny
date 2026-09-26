@@ -1088,6 +1088,84 @@ class ScreenRenderTest {
         )
     }
 
+    /**
+     * Раскладка двора на экране [widthDp] × [heightDp]: предметы и питомец не
+     * накладываются и не выходят за экран, двор — колонка не шире 480 dp,
+     * сцена во всю ширину экрана, но не выше 480 × 100 / 180 dp.
+     */
+    private fun checkYardLayout(widthDp: Int) {
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state,
+                    parts = content.petParts(),
+                    activeTask = content.tasks(Difficulty.HARDER).first(),
+                    goal = content.goals().first(),
+                    today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                )
+            }
+        }
+        val px = compose.density.density
+        // Полные границы, а не обрезанные видимой областью: на низком экране
+        // двор прокручивается, и часть предметов ниже края.
+        fun bounds(matcher: androidx.compose.ui.test.SemanticsMatcher) =
+            compose.onNode(matcher).fetchSemanticsNode().let { n ->
+                androidx.compose.ui.geometry.Rect(
+                    n.positionInRoot.x / px, n.positionInRoot.y / px,
+                    (n.positionInRoot.x + n.size.width) / px, (n.positionInRoot.y + n.size.height) / px,
+                )
+            }
+        val objects = mapOf(
+            "лавка" to bounds(hasContentDescriptionPrefix("Покупки:")),
+            "доска заданий" to bounds(hasContentDescriptionPrefix("Задания.")),
+            "доска плана" to bounds(hasContentDescriptionPrefix("План на день")),
+            "книга" to bounds(hasContentDescriptionPrefix("Словарик:")),
+            "питомец" to bounds(hasContentDescriptionPrefix("Финни")),
+            "сундучок" to bounds(hasContentDescriptionPrefix("Копилка:")),
+        )
+        val tolerance = 0.5f
+        objects.forEach { (name, r) ->
+            assertTrue("$name выходит за экран: $r", r.left >= -tolerance && r.right <= widthDp + tolerance)
+        }
+        val names = objects.keys.toList()
+        for (i in names.indices) for (j in i + 1 until names.size) {
+            val a = objects.getValue(names[i])
+            val b = objects.getValue(names[j])
+            // Сундучок растянут на ширину двора, но стоит отдельным рядом.
+            if ("сундучок" in listOf(names[i], names[j])) {
+                assertTrue("${names[i]} и ${names[j]} наложились по высоте", a.bottom <= b.top + tolerance || b.bottom <= a.top + tolerance)
+            } else {
+                assertTrue("${names[i]} и ${names[j]} наложились: $a / $b", !a.overlaps(b))
+            }
+        }
+        val lefts = objects.filterKeys { it != "сундучок" }.values
+        val span = lefts.maxOf { it.right } - lefts.minOf { it.left }
+        assertTrue("двор шире 480 dp: $span; $objects", span <= 480f + tolerance)
+        val scene = bounds(hasContentDescriptionPrefix("Двор."))
+        assertEquals("сцена не во всю ширину", widthDp.toFloat(), scene.width, 1f)
+        assertTrue("сцена выше 267 dp: ${scene.height}", scene.height <= 480f * 100 / 180 + 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `двор на телефоне 360 на 800`() = checkYardLayout(360)
+
+    @Test
+    @Config(qualifiers = "w800dp-h360dp-land")
+    fun `двор на телефоне в альбомной ориентации`() = checkYardLayout(800)
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp")
+    fun `двор на планшете в портрете`() = checkYardLayout(800)
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land")
+    fun `двор на планшете в альбомной ориентации`() = checkYardLayout(1280)
+
     private fun hasContentDescriptionPrefix(prefix: String) =
         androidx.compose.ui.test.SemanticsMatcher("описание начинается с «$prefix»") { node ->
             node.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { null }
