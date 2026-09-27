@@ -222,15 +222,30 @@ class PersistenceTest {
         assertFalse(viewModel().state.value.hasProfile)
     }
 
+    /** Включает демонстрационный режим и проходит знакомство, как ребёнок. */
+    private fun startDemoProfile(model: GameViewModel) {
+        model.startDemo()
+        model.createProfile("Пупс", PetAppearance("dog", "white", "none"), Difficulty.HARDER)
+    }
+
     @Test
-    fun `демонстрационный режим создаёт тестовый профиль с выбранной целью`() = runBlocking {
+    fun `демонстрационный режим начинается со знакомства, как обычная игра`() = runBlocking {
         val model = viewModel()
+        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.SIMPLE)
         model.startDemo()
 
-        val state = model.state.value
+        // Прежний профиль снят: ребёнок проходит подарок и выбор питомца.
+        val pending = model.state.value
+        assertFalse(pending.hasProfile)
+        assertTrue(pending.demoPending)
+        assertNull(repository.load())
 
+        model.createProfile("Пупс", PetAppearance("dog", "white", "none"), Difficulty.HARDER)
+
+        val state = model.state.value
         assertTrue(state.isDemo)
-        assertEquals("Финни", state.profile?.petName)
+        assertEquals("Пупс", state.profile?.petName)
+        assertEquals("dog", state.profile?.appearance?.speciesId)
         assertEquals("scooter", state.game.savings.goal?.id)
         assertEquals(1, state.game.period.number)
 
@@ -239,9 +254,19 @@ class PersistenceTest {
     }
 
     @Test
+    fun `обычное знакомство создаёт обычный профиль без цели`() {
+        val model = viewModel()
+        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.SIMPLE)
+
+        val state = model.state.value
+        assertFalse(state.isDemo)
+        assertNull(state.game.savings.goal)
+    }
+
+    @Test
     fun `сброс тестового профиля возвращает исходное состояние`() = runBlocking {
         val model = viewModel()
-        model.startDemo()
+        startDemoProfile(model)
         model.confirmPlan(needs = 15, wants = 12, savings = 10)
         model.buy("food")
         model.buy("ball")
@@ -250,6 +275,10 @@ class PersistenceTest {
         assertEquals(2, model.state.value.game.period.number)
 
         model.resetDemo()
+        // Сброс возвращает к подарку: знакомство проходится заново.
+        assertFalse(model.state.value.hasProfile)
+        assertTrue(model.state.value.demoPending)
+        model.createProfile("Пупс", PetAppearance("dog", "white", "none"), Difficulty.HARDER)
 
         val state = model.state.value
         assertTrue(state.isDemo)
@@ -264,7 +293,7 @@ class PersistenceTest {
     @Test
     fun `все задания своего класса доступны сразу в демонстрационном режиме`() {
         val model = viewModel()
-        model.startDemo()
+        startDemoProfile(model)
 
         val difficulty = model.state.value.difficulty
         val available = content.tasks(difficulty)
@@ -281,7 +310,7 @@ class PersistenceTest {
     @Test
     fun `демонстрационный режим не ограничен днём и временем`() = runBlocking {
         val model = viewModel()
-        model.startDemo()
+        startDemoProfile(model)
         model.confirmPlan(needs = 15, wants = 12, savings = 10)
         model.buy("food")
         model.buy("ball")

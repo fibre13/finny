@@ -100,6 +100,15 @@ import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
 import ru.onefortwo.finny.ui.theme.FinnyTheme
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.unit.Constraints
+import ru.onefortwo.finny.ui.state.GuideStep
+import ru.onefortwo.finny.ui.state.GuideTarget
+import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -203,6 +212,7 @@ fun YardScreen(
     onFinishPeriod: () -> Unit,
     reaction: PetReaction? = null,
     onReactionPlayed: (Long) -> Unit = {},
+    guide: GuideStep? = null,
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -213,6 +223,9 @@ fun YardScreen(
 
     // Положения предметов и питомца на экране — для перебежки.
     val places = remember { HashMap<String, Offset>() }
+    // Границы предметов для облачка подсказки — в координатах экрана.
+    val bounds = remember { mutableStateMapOf<GuideTarget, Rect>() }
+    var yardOrigin by remember { mutableStateOf(Offset.Zero) }
     var petCenter by remember { mutableStateOf(Offset.Zero) }
     val hop = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     val petAlpha = remember { Animatable(1f) }
@@ -289,7 +302,8 @@ fun YardScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.grass),
+            .background(colors.grass)
+            .onGloballyPositioned { yardOrigin = it.boundsInRoot().topLeft },
     ) {
         val screenWidth = maxWidth
         Column(
@@ -335,7 +349,7 @@ fun YardScreen(
                     YardObject(
                         art, colors, "yard_shop", "Покупки",
                         description = "Покупки: лавка для питомца",
-                        onPlaced = { places["shop"] = it },
+                        onPlaced = { places["shop"] = it.center; bounds[GuideTarget.SHOP] = it },
                         onClick = { runTo(places["shop"], onOpenShop) },
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -347,7 +361,7 @@ fun YardScreen(
                     YardObject(
                         art, colors, "yard_tasks", "Задания",
                         description = "Задания. На доске: $board",
-                        onPlaced = { places["tasks"] = it },
+                        onPlaced = { places["tasks"] = it.center; bounds[GuideTarget.TASKS] = it },
                         onClick = { runTo(places["tasks"], onOpenTasks) },
                         overlay = {
                             Text(
@@ -372,7 +386,7 @@ fun YardScreen(
                         art, colors, "yard_plan", "План",
                         description = "План на день",
                         state = if (planMissing) "не составлен" else null,
-                        onPlaced = { places["plan"] = it },
+                        onPlaced = { places["plan"] = it.center; bounds[GuideTarget.PLAN] = it },
                         onClick = { runTo(places["plan"], onOpenPlan) },
                         overlay = { if (planMissing) Badge(colors, Modifier.align(Alignment.TopEnd)) },
                     )
@@ -400,7 +414,7 @@ fun YardScreen(
                     YardObject(
                         art, colors, "yard_glossary", "Словарик",
                         description = "Словарик: финансовые слова",
-                        onPlaced = { places["glossary"] = it },
+                        onPlaced = { places["glossary"] = it.center },
                         onClick = { runTo(places["glossary"], onOpenGlossary) },
                     )
                 }
@@ -410,13 +424,37 @@ fun YardScreen(
                     goal = goal,
                     saved = game.savings.saved.amount,
                     price = game.savings.goal?.price?.amount,
-                    onPlaced = { places["savings"] = it },
+                    onPlaced = { places["savings"] = it.center; bounds[GuideTarget.SAVINGS] = it },
                     onClick = { runTo(places["savings"], onOpenSavings) },
                 )
-                FinishDayButton(colors = colors, reason = reason, onClick = { finishDay() })
+                FinishDayButton(
+                    colors = colors,
+                    reason = reason,
+                    onClick = { finishDay() },
+                    onPlaced = { bounds[GuideTarget.FINISH] = it },
+                )
                 Spacer(modifier = Modifier.height(10.dp))
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
+        }
+
+        // Подсказка первого дня — облачко над предметом, к которому пора идти.
+        // Нажатие на облачко — как на сам предмет; конец дня облачко не
+        // запускает: это решение ребёнок принимает кнопкой.
+        val target = guide?.let { bounds[it.target] }
+        if (guide != null && target != null && !busy) {
+            GuideBubble(
+                colors = colors,
+                step = guide,
+                target = target.translate(-yardOrigin),
+                onClick = when (guide.target) {
+                    GuideTarget.PLAN -> ({ runTo(places["plan"], onOpenPlan) })
+                    GuideTarget.SHOP -> ({ runTo(places["shop"], onOpenShop) })
+                    GuideTarget.TASKS -> ({ runTo(places["tasks"], onOpenTasks) })
+                    GuideTarget.SAVINGS -> ({ runTo(places["savings"], onOpenSavings) })
+                    GuideTarget.FINISH -> null
+                },
+            )
         }
 
         val message = state.message
@@ -641,7 +679,7 @@ private fun YardObject(
     sprite: String,
     label: String,
     description: String,
-    onPlaced: (Offset) -> Unit,
+    onPlaced: (Rect) -> Unit,
     onClick: () -> Unit,
     state: String? = null,
     overlay: @Composable BoxScope.() -> Unit = {},
@@ -653,7 +691,7 @@ private fun YardObject(
                 contentDescription = description
                 if (state != null) stateDescription = state
             }
-            .onGloballyPositioned { onPlaced(it.boundsInRoot().center) }
+            .onGloballyPositioned { onPlaced(it.boundsInRoot()) }
             .padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -803,7 +841,7 @@ private fun ChestRow(
     goal: GoalContent?,
     saved: Int,
     price: Int?,
-    onPlaced: (Offset) -> Unit,
+    onPlaced: (Rect) -> Unit,
     onClick: () -> Unit,
 ) {
     val title = goal?.let { "Копилка · ${it.claimTitle}" } ?: "Копилка"
@@ -817,7 +855,7 @@ private fun ChestRow(
             .fillMaxWidth()
             .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = spoken }
-            .onGloballyPositioned { onPlaced(it.boundsInRoot().center) }
+            .onGloballyPositioned { onPlaced(it.boundsInRoot()) }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -855,10 +893,15 @@ private fun ChestRow(
 }
 
 @Composable
-private fun FinishDayButton(colors: YardColors, reason: String?, onClick: () -> Unit) {
+private fun FinishDayButton(colors: YardColors, reason: String?, onClick: () -> Unit, onPlaced: (Rect) -> Unit) {
     val enabled = reason == null
     val pulse = rememberPulse()
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .onGloballyPositioned { onPlaced(it.boundsInRoot()) },
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -892,6 +935,83 @@ private fun FinishDayButton(colors: YardColors, reason: String?, onClick: () -> 
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
+        }
+    }
+}
+
+/**
+ * Облачко подсказки над предметом [target] (в координатах двора): табличка
+ * «Шаг N из 6» с текстом и хвостик вниз, к предмету. Облачко не выходит за
+ * края экрана; хвостик всегда над серединой предмета. Слегка покачивается,
+ * если движения включены. TalkBack зачитывает новый шаг сам.
+ */
+@Composable
+private fun GuideBubble(colors: YardColors, step: GuideStep, target: Rect, onClick: (() -> Unit)?) {
+    val motion = motionAllowed()
+    val bob = rememberInfiniteTransition(label = "guide")
+    val phase by bob.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "bob")
+    val lift = if (motion) sin(phase * 2 * PI.toFloat()) * 3f else 0f
+    val spoken = "Подсказка, шаг ${step.number} из ${step.total}: ${step.text}"
+    Layout(
+        modifier = Modifier.fillMaxSize(),
+        content = {
+            Column(
+                modifier = Modifier
+                    .graphicsLayer { translationY = lift.dp.toPx() }
+                    .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+                    .then(
+                        if (onClick != null) {
+                            Modifier.clickable(role = Role.Button, onClick = onClick)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = spoken
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                    .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
+            ) {
+                Text(
+                    text = "Шаг ${step.number} из ${step.total}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = FinnyTheme.colors.onSurfaceMuted,
+                )
+                Text(text = step.text, style = MaterialTheme.typography.titleSmall)
+            }
+            Box(
+                modifier = Modifier
+                    .graphicsLayer { translationY = lift.dp.toPx() }
+                    .size(YARD_CELL * 8, YARD_CELL * 5)
+                    .drawBehind {
+                        // Хвостик ступеньками: верхний ряд закрывает нижнюю
+                        // кромку таблички, и облачко выглядит цельным.
+                        val c = max(1f, floor(YARD_CELL.toPx()))
+                        for (row in 0 until 4) {
+                            val from = row
+                            val to = 7 - row
+                            drawRect(colors.outline, Offset(from * c, row * c), Size((to - from + 1) * c, c))
+                            if (to - from >= 2) {
+                                drawRect(colors.card, Offset((from + 1) * c, row * c), Size((to - from - 1) * c, c))
+                            }
+                        }
+                    },
+            )
+        },
+    ) { measurables, constraints ->
+        val margin = 8.dp.roundToPx()
+        val maxWidth = minOf(constraints.maxWidth - 2 * margin, 220.dp.roundToPx()).coerceAtLeast(0)
+        val panel = measurables[0].measure(Constraints(maxWidth = maxWidth))
+        val tail = measurables[1].measure(Constraints())
+        val overlap = max(1f, floor(YARD_CELL.toPx())).roundToInt() * 2
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val cx = target.center.x.roundToInt()
+            val right = (constraints.maxWidth - margin - panel.width).coerceAtLeast(margin)
+            val x = (cx - panel.width / 2).coerceIn(margin, right)
+            val tailTop = target.top.roundToInt() - tail.height + overlap
+            val panelTop = (tailTop - panel.height + overlap).coerceAtLeast(0)
+            panel.place(x, panelTop)
+            tail.place(cx - tail.width / 2, panelTop + panel.height - overlap, zIndex = 1f)
         }
     }
 }

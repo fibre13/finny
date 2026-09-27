@@ -177,12 +177,19 @@ class GameViewModel(
     /** Создаёт локальный профиль: игровое имя и внешность, без личных данных. */
     fun createProfile(petName: String, appearance: PetAppearance, difficulty: Difficulty) {
         _reactions.value = emptyList()
-        _state.value = freshProfile(
+        val previous = _state.value
+        val demo = previous.demoPending
+        val profile = freshProfile(
             petName = petName.trim(),
             appearance = appearance,
-            isDemo = false,
+            isDemo = demo,
             difficulty = difficulty,
+            keepUsage = previous,
         )
+        // В демонстрационном режиме цель выбрана заранее: сценарий проверки
+        // проходится подряд, без лишних шагов (ТЗ 2.5.13).
+        val goal = if (demo) content.goals().firstOrNull { it.id == DEMO_GOAL_ID } else null
+        _state.value = if (goal == null) profile else profile.copy(game = profile.game.chooseGoal(goal.toDomain()))
     }
 
     /** Полный сброс профиля; доступен взрослому (ТЗ 2.5.12, 3.5). */
@@ -198,29 +205,24 @@ class GameViewModel(
     }
 
     /**
-     * Включает демонстрационный режим: создаёт тестовый профиль с
-     * фиксированными данными и выбранной целью, чтобы обязательный сценарий
-     * проходился подряд без ожидания календарных сроков (ТЗ 2.5.13).
+     * Включает демонстрационный режим. Игра начинается так же, как обычная:
+     * подарок, выбор питомца и имени. Профиль, созданный в конце знакомства,
+     * тестовый: этапы идут подряд без ожидания календарных сроков, цель
+     * выбрана заранее (ТЗ 2.5.13).
      */
     fun startDemo() {
         _reactions.value = emptyList()
-        val demo = freshProfile(
-            petName = DEMO_PET_NAME,
-            appearance = DEMO_APPEARANCE,
-            isDemo = true,
-            difficulty = DEMO_DIFFICULTY,
-            keepUsage = _state.value,
+        val previous = _state.value
+        _state.value = AppState(
+            isLoaded = true,
+            demoPending = true,
+            usageDate = previous.usageDate,
+            usageMinutes = previous.usageMinutes,
+            timeLimitEnabled = previous.timeLimitEnabled,
         )
-        val goal = content.goals().firstOrNull { it.id == DEMO_GOAL_ID }
-
-        _state.value = if (goal == null) {
-            demo
-        } else {
-            demo.copy(game = demo.game.chooseGoal(goal.toDomain()))
-        }
     }
 
-    /** Возвращает тестовый профиль к исходному состоянию (ТЗ 2.5.13). */
+    /** Возвращает тестовый профиль к исходному состоянию — к подарку (ТЗ 2.5.13). */
     fun resetDemo() = startDemo()
 
     /** Начальное состояние профиля со стартовым бюджетом. */
@@ -627,15 +629,8 @@ class GameViewModel(
     }
 
     private companion object {
-        /** Фиксированные данные тестового профиля для экспертной проверки. */
-        const val DEMO_PET_NAME = "Финни"
+        /** Цель тестового профиля: выбрана заранее для экспертной проверки. */
         const val DEMO_GOAL_ID = "scooter"
-        val DEMO_DIFFICULTY = Difficulty.HARDER
         const val MINUTE_MILLIS = 60_000L
-        val DEMO_APPEARANCE = PetAppearance(
-            speciesId = "cat",
-            colorId = "ginger",
-            accessoryId = "bow",
-        )
     }
 }

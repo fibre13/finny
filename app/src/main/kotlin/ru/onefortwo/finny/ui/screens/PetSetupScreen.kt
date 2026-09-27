@@ -95,13 +95,14 @@ fun PetSetupScreen(
     parts: PetPartsContent,
     onDone: (String, PetAppearance, Difficulty) -> Unit,
     onBack: (() -> Unit)? = null,
+    initialDifficulty: Difficulty? = null,
 ) {
     var step by rememberSaveable { mutableIntStateOf(2) }
     var speciesId by rememberSaveable { mutableStateOf(parts.species.first().id) }
     var colorId by rememberSaveable { mutableStateOf(parts.colors.first().id) }
     var accessoryId by rememberSaveable { mutableStateOf(parts.accessories.first().id) }
     var name by rememberSaveable { mutableStateOf("") }
-    var difficultyName by rememberSaveable { mutableStateOf<String?>(null) }
+    var difficultyName by rememberSaveable { mutableStateOf(initialDifficulty?.name) }
     val difficulty = difficultyName?.let(Difficulty::ofName)
 
     val species = parts.species.first { it.id == speciesId }

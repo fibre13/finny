@@ -1099,6 +1099,43 @@ class ScreenRenderTest {
         )
     }
 
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `подсказка первого дня видна над предметом и открывает его раздел`() {
+        val opened = mutableListOf<String>()
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        val guide = ru.onefortwo.finny.ui.state.YardGuide.step(state, housePrice = 25)
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state,
+                        parts = content.petParts(),
+                        activeTask = content.tasks(Difficulty.HARDER).first(),
+                        goal = null,
+                        today = "2026-09-26",
+                        onDismissMessage = {},
+                        onOpenPlan = { opened += "plan" },
+                        onOpenShop = { opened += "shop" },
+                        onOpenSavings = {}, onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {},
+                        onOpenProgress = {}, onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                        guide = guide,
+                    )
+                }
+            }
+        }
+        val bubble = compose.onNode(hasContentDescriptionPrefix("Подсказка, шаг 1 из 6"))
+        bubble.assertIsDisplayed()
+        // Облачко стоит над доской плана: хвостик указывает на неё.
+        val px = compose.density.density
+        val b = bubble.fetchSemanticsNode()
+        val plan = compose.onNodeWithContentDescription("План на день").fetchSemanticsNode()
+        assertTrue("облачко ниже доски плана", (b.positionInRoot.y + b.size.height) / px <= plan.positionInRoot.y / px + 8)
+        assertTrue("облачко выходит за экран", b.positionInRoot.x >= 0 && (b.positionInRoot.x + b.size.width) / px <= 360.5f)
+        bubble.performClick()
+        assertEquals(listOf("plan"), opened)
+    }
+
     /**
      * Раскладка двора на экране [widthDp] × [heightDp]: предметы и питомец не
      * накладываются и не выходят за экран, двор — колонка не шире 480 dp,

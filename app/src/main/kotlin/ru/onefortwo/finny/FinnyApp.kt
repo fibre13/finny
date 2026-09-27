@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,6 +18,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -31,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
+import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.ui.common.FinnyNavigationBar
 import ru.onefortwo.finny.ui.common.LocalMotionEnabled
@@ -52,6 +57,7 @@ import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.screens.WardrobeScreen
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.YardGuide
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /** Маршруты навигации. */
@@ -165,6 +171,7 @@ fun FinnyApp(viewModel: GameViewModel) {
                 CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
                     AppNavHost(navController = navController, viewModel = viewModel)
                 }
+                if (state.isDemo || state.demoPending) DemoWatermark()
             }
             if (bottomBar && tab != null) {
                 FinnyNavigationBar(selected = tab, onSelect = onSelectTab)
@@ -209,6 +216,9 @@ private fun AppNavHost(
             PetSetupScreen(
                 parts = content.petParts(),
                 onBack = { navController.popBackStack() },
+                // В демонстрационном режиме заранее отмечен набор «Посложнее»:
+                // эксперт видит задания с делением; выбор можно поменять.
+                initialDifficulty = if (state.demoPending) Difficulty.HARDER else null,
                 onDone = { name, appearance, difficulty ->
                     viewModel.createProfile(
                         petName = name,
@@ -236,10 +246,12 @@ private fun AppNavHost(
             val reactions by viewModel.reactions.collectAsStateWithLifecycle()
 
             // ТЕСТ: главная — двор питомца; разделы открываются предметами.
+            val housePrice = content.shopItems().firstOrNull { it.unlocksScenery == YardGuide.HOUSE }?.price
             YardScreen(
                 state = state,
                 parts = content.petParts(),
                 activeTask = activeTask,
+                guide = YardGuide.step(state, housePrice),
                 goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
                 today = today,
                 reaction = reactions.firstOrNull(),
@@ -462,21 +474,48 @@ private fun AppNavHost(
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
                 },
+                // Демонстрационный режим начинается, как обычная игра, с подарка.
                 onStartDemo = {
                     viewModel.startDemo()
-                    navController.navigate(Routes.MAIN) {
+                    navController.navigate(Routes.ONBOARDING) {
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
                 },
                 onResetDemo = {
                     viewModel.resetDemo()
-                    navController.navigate(Routes.MAIN) {
+                    navController.navigate(Routes.ONBOARDING) {
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() },
             )
         }
+    }
+}
+
+/**
+ * Водяной знак демонстрационного режима: одна строка поверх всех экранов.
+ * Стоит выше середины: на дворе — над холмами, где нет предметов и
+ * подсказок, и не ложится на текст облачка. Полупрозрачный и не перехватывает нажатия; для TalkBack режим назван
+ * на табличке дня, поэтому знак не озвучивается.
+ */
+@Composable
+private fun DemoWatermark() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 190.dp)
+            .clearAndSetSemantics { },
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Text(
+            text = "Демо режим",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = FinnyTheme.colors.onSurface.copy(alpha = 0.16f),
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
