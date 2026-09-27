@@ -1,7 +1,7 @@
 [
   {
     "id": "scooter",
-    "title": "Самокат для Финни",
+    "title": "Самокат",
     "price": 60,
     "claim_title": "самокат",
     "celebration": "{name} будет кататься на самокате"
