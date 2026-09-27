@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
@@ -52,6 +53,7 @@ import ru.onefortwo.finny.economy.IncomeSource
 import ru.onefortwo.finny.economy.PeriodCompletion
 import ru.onefortwo.finny.economy.PlanConfirmation
 import ru.onefortwo.finny.economy.chooseGoal
+import ru.onefortwo.finny.economy.buy
 import ru.onefortwo.finny.economy.confirmPlan
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
@@ -152,20 +154,48 @@ class ScreenRenderTest {
         }
 
         // Шаг 2 — кто будет другом.
-        assertFits("Дальше")
-        compose.onNodeWithText("Дальше").performClick()
+        assertFits("Далее")
+        compose.onNodeWithText("Далее").performClick()
         // Шаг 3 до выбора — худший случай: под кнопкой причина её недоступности.
         // Положение причины здесь не проверяется: Robolectric отводит строке
         // текста около 35 px, и высоты получаются больше, чем на устройстве.
-        assertFits("Дальше")
+        assertFits("Далее")
         compose.onNodeWithText("Придумай имя и выбери задания.").assertExists()
 
         compose.onNodeWithText("Попроще").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("Финни")
-        compose.onNodeWithText("Дальше").performClick()
+        compose.onNodeWithText("Далее").performClick()
         // Финал: имя питомца и «Начать игру».
-        compose.onNodeWithText("Финни ждёт тебя!").assertExists()
+        compose.onNodeWithText("Привет!").assertExists()
+        compose.onNodeWithText("Финни").assertExists()
         assertFits("Начать игру")
+    }
+
+    @Test
+    fun `недопустимое имя стирается, показывается ошибка, дальше не пройти`() {
+        compose.setContent {
+            FinnyTheme {
+                PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }, nameFilter = content.nameFilter())
+            }
+        }
+        compose.onNodeWithText("Далее").performScrollTo().performClick()
+        compose.onNodeWithText("Попроще").performScrollTo().performClick()
+
+        // Корень «дурак» стирается сразу, на вводе.
+        compose.onNode(hasSetTextAction()).performTextInput("Дурак")
+        compose.onNodeWithText("Так не принято называть питомцев. Придумай другое имя.").performScrollTo().assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assert(
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(
+                androidx.compose.ui.semantics.SemanticsProperties.EditableText,
+                androidx.compose.ui.text.AnnotatedString(""),
+            ),
+        )
+        compose.onNodeWithText("Далее").performScrollTo().assertIsNotEnabled()
+
+        // Нормальное имя принимается, ошибка уходит.
+        compose.onNode(hasSetTextAction()).performTextInput("Барсик")
+        compose.onNodeWithText("Так не принято называть питомцев. Придумай другое имя.").assertDoesNotExist()
+        compose.onNodeWithText("Далее").performScrollTo().assertIsEnabled()
     }
 
     @Test
@@ -175,7 +205,7 @@ class ScreenRenderTest {
         }
 
         // Шаг 2 — внешность, шаг 3 — имя и сложность заданий.
-        compose.onNodeWithText("Дальше").performScrollTo().performClick()
+        compose.onNodeWithText("Далее").performScrollTo().performClick()
 
         compose.onNodeWithText("Какие задания?").performScrollTo().assertIsDisplayed()
         // Поле имени названо для программы чтения с экрана своей подписью.
@@ -183,7 +213,7 @@ class ScreenRenderTest {
         // Подсказка ТЗ 3.5: настоящее имя не нужно.
         compose.onNodeWithText("Придумай игровое имя — настоящее писать не нужно.").performScrollTo().assertIsDisplayed()
         // Пока сложность и имя не выбраны, дальше пройти нельзя.
-        compose.onNodeWithText("Дальше").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Далее").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("Придумай имя и выбери задания.").performScrollTo().assertIsDisplayed()
     }
 
@@ -1134,6 +1164,47 @@ class ScreenRenderTest {
         assertTrue("облачко выходит за экран", b.positionInRoot.x >= 0 && (b.positionInRoot.x + b.size.width) / px <= 360.5f)
         bubble.performClick()
         assertEquals(listOf("plan"), opened)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `питомец здоровается на дворе и прощается перед концом дня`() {
+        var finished = false
+        val game = GameState.newProfile().let { g ->
+            (g.confirmPlan(BudgetPlan(Coins(10), Coins(0), Coins(0))) as
+                PlanConfirmation.Success).state
+        }.let { g ->
+            (g.buy(content.shopItems().first { it.id == "food" }.toDomain()) as ru.onefortwo.finny.economy.PurchaseResult.Success).state
+        }
+        val state = AppState(isLoaded = true, profile = profile, game = game)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides true) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state,
+                        parts = content.petParts(),
+                        activeTask = null,
+                        goal = null,
+                        today = "2026-09-26",
+                        onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                        onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                        onOpenHelp = {}, onOpenAdult = {},
+                        onFinishPeriod = { finished = true },
+                        speech = "Привет! Как дела?",
+                    )
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithText("Привет! Как дела?").assertExists()
+
+        compose.onNodeWithText("Закончить день").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithText("Пока! Приходи завтра — я буду ждать!").assertExists()
+        assertFalse("день закончился раньше прощания", finished)
+        compose.mainClock.advanceTimeBy(6000)
+        assertTrue("день не закончился после прощания", finished)
     }
 
     /**

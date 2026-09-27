@@ -100,6 +100,9 @@ import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
 import ru.onefortwo.finny.ui.theme.FinnyTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.layout.layout
+import ru.onefortwo.finny.ui.state.PetSpeech
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.Layout
@@ -136,6 +139,13 @@ private val YARD_MAX_WIDTH = 480.dp
 /** Бег питомца к предмету и остановка у него перед открытием раздела. */
 private const val RUN_MS = 700
 private const val ARRIVE_PAUSE_MS = 150L
+
+/** Сколько висит приветствие и сколько питомец прощается перед сном. */
+private const val SPEECH_MS = 4500L
+private const val FAREWELL_MS = 1600L
+
+/** Насколько облачко реплики опускается в рамку питомца: над головой в спрайте пустые ряды. */
+private val SPEECH_DROP = 44.dp
 
 /** Цвета рамок из палитры пиксельной графики. */
 internal class YardColors(private val art: PixelArt) {
@@ -213,6 +223,8 @@ fun YardScreen(
     reaction: PetReaction? = null,
     onReactionPlayed: (Long) -> Unit = {},
     guide: GuideStep? = null,
+    speech: String? = null,
+    onSpeechShown: () -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -232,6 +244,14 @@ fun YardScreen(
     var busy by remember { mutableStateOf(false) }
     var hopping by remember { mutableStateOf(false) }
     var snoring by remember { mutableStateOf(false) }
+    var farewell by remember { mutableStateOf(false) }
+    // Реплика висит несколько секунд, потом облачко убирается само.
+    LaunchedEffect(speech) {
+        if (speech != null) {
+            delay(SPEECH_MS)
+            onSpeechShown()
+        }
+    }
     // Вход в палатку в координатах сцены и положение сцены на экране:
     // запоминаются при рисовании и раскладке, нужны только по нажатию.
     val tentDoor = remember { floatArrayOf(-1f, -1f) }
@@ -265,6 +285,7 @@ fun YardScreen(
         }
         hopping = false
         snoring = false
+        farewell = false
         busy = false
         onPauseOrDispose { }
     }
@@ -286,6 +307,10 @@ fun YardScreen(
         }
         busy = true
         scope.launch {
+            // Сначала питомец прощается, потом идёт спать.
+            farewell = true
+            delay(FAREWELL_MS)
+            farewell = false
             if (house && tentDoor[0] >= 0) {
                 hopping = true
                 val door = Offset(sceneOrigin[0] + tentDoor[0], sceneOrigin[1] + tentDoor[1])
@@ -401,6 +426,8 @@ fun YardScreen(
                             hopping = hopping,
                             sleeping = snoring,
                             desire = desireOf(game.pet.care.level, game.pet.joy.level),
+                            speech = if (farewell) PetSpeech.FAREWELL else speech,
+                            onSpeechClick = onSpeechShown,
                             art = art,
                             colors = colors,
                             modifier = Modifier
@@ -442,7 +469,7 @@ fun YardScreen(
         // Нажатие на облачко — как на сам предмет; конец дня облачко не
         // запускает: это решение ребёнок принимает кнопкой.
         val target = guide?.let { bounds[it.target] }
-        if (guide != null && target != null && !busy) {
+        if (guide != null && target != null && !busy && speech == null) {
             GuideBubble(
                 colors = colors,
                 step = guide,
@@ -737,6 +764,8 @@ private fun Pet(
     colors: YardColors,
     modifier: Modifier,
     onClick: () -> Unit,
+    speech: String? = null,
+    onSpeechClick: () -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -776,7 +805,23 @@ private fun Pet(
                 .width(PET_CELL * art.petSize)
                 .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick),
         )
-        if (desire != null && !sleeping) {
+        if (speech != null) {
+            // Облачко над головой: не шире 220 dp, может выходить за ряд.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(2f)
+                    .layout { measurable, constraints ->
+                        val max = 220.dp.roundToPx()
+                        val p = measurable.measure(
+                            constraints.copy(minWidth = 0, maxWidth = max, minHeight = 0, maxHeight = Constraints.Infinity),
+                        )
+                        layout(0, 0) { p.place(-p.width / 2, -p.height + SPEECH_DROP.roundToPx()) }
+                    },
+            ) {
+                SpeechBubble(colors = colors, text = speech, onClick = onSpeechClick)
+            }
+        } else if (desire != null && !sleeping) {
             Bubble(
                 art = art,
                 colors = colors,
@@ -803,6 +848,41 @@ private fun Pet(
                 }
             }
         }
+    }
+}
+
+/**
+ * Облачко с репликой питомца: табличка с текстом и хвостик вниз, к нему.
+ * TalkBack зачитывает реплику сам, с именем говорящего.
+ */
+@Composable
+internal fun SpeechBubble(colors: YardColors, text: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+                .then(if (onClick != null) Modifier.clickable(interactionSource = null, indication = null, onClick = onClick) else Modifier)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+        Box(
+            modifier = Modifier
+                .offset(y = -YARD_CELL * 2)
+                .size(YARD_CELL * 8, YARD_CELL * 4)
+                .drawBehind {
+                    val c = max(1f, floor(YARD_CELL.toPx()))
+                    for (row in 0 until 4) {
+                        val to = 7 - row
+                        drawRect(colors.outline, Offset(row * c, row * c), Size((to - row + 1) * c, c))
+                        if (to - row >= 2) {
+                            drawRect(colors.card, Offset((row + 1) * c, row * c), Size((to - row - 1) * c, c))
+                        }
+                    }
+                },
+        )
     }
 }
 

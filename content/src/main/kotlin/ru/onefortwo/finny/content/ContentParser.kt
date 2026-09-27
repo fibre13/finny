@@ -22,4 +22,6 @@ object ContentParser {
     fun parsePetParts(text: String): PetPartsContent = json.decodeFromString(text)
 
     fun parseGlossary(text: String): List<GlossaryEntry> = json.decodeFromString(text)
+
+    fun parseForbiddenWords(text: String): ForbiddenWords = json.decodeFromString(text)
 }

@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +50,10 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.PetAppearance
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import ru.onefortwo.finny.content.NameFilter
+import ru.onefortwo.finny.ui.state.PetSpeech
 import ru.onefortwo.finny.content.PetPartsContent
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.economy.GrowthStage
@@ -70,6 +76,9 @@ import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /** Предел длины игрового имени. */
 private const val NAME_MAX_LENGTH = 12
+
+/** Пауза в наборе имени, после которой проверяются короткие слова. */
+private const val NAME_PAUSE_MS = 1000L
 
 /** Масштаб шрифта, с которого варианты выстраиваются сеткой, а не в строку. */
 private const val LARGE_FONT_SCALE = 1.3f
@@ -96,6 +105,7 @@ fun PetSetupScreen(
     onDone: (String, PetAppearance, Difficulty) -> Unit,
     onBack: (() -> Unit)? = null,
     initialDifficulty: Difficulty? = null,
+    nameFilter: NameFilter = NameFilter.NONE,
 ) {
     var step by rememberSaveable { mutableIntStateOf(2) }
     var speciesId by rememberSaveable { mutableStateOf(parts.species.first().id) }
@@ -103,6 +113,21 @@ fun PetSetupScreen(
     var accessoryId by rememberSaveable { mutableStateOf(parts.accessories.first().id) }
     var name by rememberSaveable { mutableStateOf("") }
     var difficultyName by rememberSaveable { mutableStateOf(initialDifficulty?.name) }
+    var nameError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun rejectName() {
+        name = ""
+        nameError = NameFilter.MESSAGE
+    }
+
+    // Короткие слова («лох», «попа») проверяются, когда ребёнок перестал
+    // печатать: иначе стирались бы «Лохматик» и «Попугай» на полпути.
+    LaunchedEffect(name) {
+        if (name.isNotBlank()) {
+            delay(NAME_PAUSE_MS)
+            if (nameFilter.isForbiddenWord(name)) rejectName()
+        }
+    }
     val difficulty = difficultyName?.let(Difficulty::ofName)
 
     val species = parts.species.first { it.id == speciesId }
@@ -208,9 +233,19 @@ fun PetSetupScreen(
                     difficulty = difficulty,
                     onDifficulty = { difficultyName = it.name },
                     name = name,
+                    nameError = nameError,
                     // Предел длины держится молча, без счётчика на экране.
-                    onName = { name = it.take(NAME_MAX_LENGTH) },
-                    onNext = { step = 4 },
+                    // Запрещённый корень стирает поле сразу (ТЗ 3.5).
+                    onName = {
+                        val typed = it.take(NAME_MAX_LENGTH)
+                        if (nameFilter.hasForbiddenRoot(typed)) {
+                            rejectName()
+                        } else {
+                            name = typed
+                            if (typed.isNotEmpty()) nameError = null
+                        }
+                    },
+                    onNext = { if (nameFilter.isAllowed(name)) step = 4 else rejectName() },
                 )
 
             }
@@ -305,7 +340,7 @@ private fun AppearanceStep(
         )
     }
 
-    PrimaryButton(text = "Дальше", onClick = onNext, modifier = Modifier.padding(top = 4.dp))
+    PrimaryButton(text = "Далее", onClick = onNext, modifier = Modifier.padding(top = 4.dp))
 }
 
 /**
@@ -338,6 +373,7 @@ private fun NameStep(
     difficulty: Difficulty?,
     onDifficulty: (Difficulty) -> Unit,
     name: String,
+    nameError: String?,
     onName: (String) -> Unit,
     onNext: () -> Unit,
 ) {
@@ -354,6 +390,7 @@ private fun NameStep(
         ),
         // Предупреждение по ТЗ 3.5: о ребёнке ничего не спрашивается.
         supportingText = "Придумай игровое имя — настоящее писать не нужно.",
+        errorText = nameError,
     )
 
     GroupTitle("Какие задания?")
@@ -362,7 +399,7 @@ private fun NameStep(
         val option = Difficulty.entries[index]
         SelectButton(
             text = option.displayName,
-            supporting = if (option == Difficulty.SIMPLE) "числа до 20" else "есть деление",
+            supporting = if (option == Difficulty.SIMPLE) "Счёт до 20" else "С делением",
             selected = option == difficulty,
             onClick = { onDifficulty(option) },
             compact = true,
@@ -371,7 +408,7 @@ private fun NameStep(
     }
 
     val ready = difficulty != null && name.isNotBlank()
-    PrimaryButton(text = "Дальше", enabled = ready, onClick = onNext, modifier = Modifier.padding(top = 4.dp))
+    PrimaryButton(text = "Далее", enabled = ready, onClick = onNext, modifier = Modifier.padding(top = 4.dp))
 
     // Причина недоступности названа текстом: по одному виду кнопки
     // непонятно, чего она ждёт (ТЗ 3.6).
@@ -438,7 +475,10 @@ private fun PreviewRow(
     }
 }
 
-/** Финал знакомства: питомец выпрыгивает на лугу, его имя и «Начать игру». */
+/**
+ * Финал знакомства: питомец выпрыгивает на лугу и говорит «Привет!»,
+ * под ним крупно имя, ниже «Начать игру». Имя не повторяется дважды.
+ */
 @Composable
 private fun ReadyStep(
     name: String,
@@ -471,7 +511,14 @@ private fun ReadyStep(
                     Sprite(art, "yard_icon_back")
                 }
             }
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            // Облачко опущено к голове: над ней в рамке питомца пустые ряды
+            // для прыжка. Рисуется поверх питомца.
+            SpeechBubble(
+                colors = colors,
+                text = PetSpeech.HELLO,
+                modifier = Modifier.offset(y = 52.dp).zIndex(1f),
+            )
             figure(192.dp, reaction) { round++ }
             Spacer(modifier = Modifier.height(20.dp))
             Column(
@@ -486,12 +533,6 @@ private fun ReadyStep(
                     style = MaterialTheme.typography.headlineLarge,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    text = "$name ждёт тебя!",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = FinnyTheme.colors.attentionText,
-                    textAlign = TextAlign.Center,
                 )
             }
             Spacer(modifier = Modifier.height(40.dp))

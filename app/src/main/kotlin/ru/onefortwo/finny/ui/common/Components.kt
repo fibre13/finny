@@ -78,6 +78,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1284,7 +1286,10 @@ fun FinnyTextField(
                 text = errorText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.errorText,
-                modifier = Modifier.padding(top = 6.dp),
+                // Ошибку TalkBack зачитывает сразу, без перехода к ней.
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .semantics { liveRegion = LiveRegionMode.Assertive },
             )
         } else if (supportingText != null) {
             SupportingText(supportingText, modifier = Modifier.padding(top = 6.dp))

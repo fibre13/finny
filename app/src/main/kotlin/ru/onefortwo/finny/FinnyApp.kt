@@ -215,6 +215,7 @@ private fun AppNavHost(
         composable(Routes.PET_SETUP) {
             PetSetupScreen(
                 parts = content.petParts(),
+                nameFilter = content.nameFilter(),
                 onBack = { navController.popBackStack() },
                 // В демонстрационном режиме заранее отмечен набор «Посложнее»:
                 // эксперт видит задания с делением; выбор можно поменять.
@@ -244,6 +245,8 @@ private fun AppNavHost(
                 ?: TaskQueue.repeatSuggestion(availableTasks, state.game.period.number)
 
             val reactions by viewModel.reactions.collectAsStateWithLifecycle()
+            val speech by viewModel.speech.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { viewModel.greetIfPending() }
 
             // ТЕСТ: главная — двор питомца; разделы открываются предметами.
             val housePrice = content.shopItems().firstOrNull { it.unlocksScenery == YardGuide.HOUSE }?.price
@@ -252,6 +255,8 @@ private fun AppNavHost(
                 parts = content.petParts(),
                 activeTask = activeTask,
                 guide = YardGuide.step(state, housePrice),
+                speech = speech,
+                onSpeechShown = viewModel::speechShown,
                 goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
                 today = today,
                 reaction = reactions.firstOrNull(),

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,7 @@ class GameViewModel(
     val content: ContentRepository,
     private val repository: GameRepository?,
     private val dates: DateProvider = DateProvider { LocalDate.now().toString() },
+    private val hours: () -> Int = { LocalTime.now().hour },
 ) : ViewModel() {
 
     /** Сегодняшняя дата по часам устройства. */
@@ -101,6 +103,27 @@ class GameViewModel(
         _reactions.update { queued ->
             (queued + PetReaction(kind, ++reactionCount, stageBefore)).takeLast(PetReactions.MAX_QUEUED)
         }
+    }
+
+    /**
+     * ТЕСТ: реплика питомца в облачке на дворе. Приветствие готовится
+     * при каждом возвращении в приложение и показывается один раз.
+     */
+    private val _speech = MutableStateFlow<String?>(null)
+    val speech: StateFlow<String?> = _speech.asStateFlow()
+    private var greetPending = true
+
+    /** Двор открыт: если ребёнок только что вошёл, питомец здоровается. */
+    fun greetIfPending() {
+        val current = _state.value
+        if (!greetPending || !current.hasProfile) return
+        greetPending = false
+        _speech.value = PetSpeech.greeting(current.usageDate, dates.today(), hours())
+    }
+
+    /** Реплика показана — облачко убирается. */
+    fun speechShown() {
+        _speech.value = null
     }
 
     /** Реакция проиграна или пропущена — убирается из очереди. */
@@ -546,6 +569,7 @@ class GameViewModel(
      * при этом запись в базу происходит не чаще раза в минуту.
      */
     fun onSessionStart() {
+        greetPending = true
         if (usageTicker?.isActive == true) return
 
         usageTicker = viewModelScope.launch {

@@ -191,7 +191,7 @@ fun GiftScreen(onOpen: () -> Unit) {
             Column(modifier = Modifier.widthIn(max = ONBOARDING_MAX_WIDTH).fillMaxWidth()) {
                 Spacer(modifier = Modifier.height(40.dp))
                 Text(
-                    text = "С днём рождения!",
+                    text = "Поздравляем!",
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().semantics { heading() },

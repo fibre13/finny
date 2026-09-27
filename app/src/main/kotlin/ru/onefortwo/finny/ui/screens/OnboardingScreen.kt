@@ -56,7 +56,7 @@ const val ONBOARDING_STEPS = 4
 fun OnboardingScreen(
     onContinue: () -> Unit,
     onBack: (() -> Unit)? = null,
-    continueText: String = "Дальше",
+    continueText: String = "Далее",
     step: Int? = null,
 ) {
     ScreenScaffold(
