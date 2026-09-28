@@ -101,6 +101,14 @@ import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
 import ru.onefortwo.finny.ui.theme.FinnyTheme
+import androidx.compose.ui.layout.LayoutCoordinates
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.platform.LocalDensity
 import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.state.FeedbackMessage
@@ -139,6 +147,50 @@ private val PET_CELL = 3.dp
 
 /** Ширина двора: на планшете и в альбомной ориентации — колонка по центру. */
 private val YARD_MAX_WIDTH = 480.dp
+
+/**
+ * Полные границы узла на экране. boundsInRoot() обрезает их видимой частью
+ * прокрутки: у предмета за краем экрана получалась полоска у границы.
+ */
+private fun LayoutCoordinates.fullBounds(): Rect =
+    // Через оба угла: на планшете луг увеличен, и собственный размер узла
+    // меньше, чем он занимает на экране.
+    Rect(localToRoot(Offset.Zero), localToRoot(Offset(size.width.toFloat(), size.height.toFloat())))
+
+/** Место над предметом (или под ним), которое нужно облачку подсказки. */
+private val GUIDE_ROOM = 96.dp
+
+/**
+ * ТЕСТ: во сколько раз увеличить луг. На планшете в портрете двор шириной
+ * 480 dp оставлял пустой половину экрана — луг растёт до 1,25 или 1,5 раза.
+ * Шаг — четверть: клетка 2 dp при плотности 2 становится 5 или 6 пикселями,
+ * рисунок остаётся ровным. На телефоне и в альбомной ориентации — 1.
+ */
+internal fun yardScaleFor(width: Dp, height: Dp): Float {
+    if (width < 600.dp || height <= width) return 1f
+    val quarters = floor(width / YARD_MAX_WIDTH * 4f)
+    return (quarters / 4f).coerceIn(1f, 1.5f)
+}
+
+/** Увеличивает содержимое в [k] раз вместе с местом, которое оно занимает. */
+private fun Modifier.scaledBy(k: Float): Modifier = if (k == 1f) {
+    this
+} else {
+    layout { measurable, constraints ->
+        val inner = Constraints(
+            maxWidth = if (constraints.hasBoundedWidth) (constraints.maxWidth / k).toInt() else Constraints.Infinity,
+            maxHeight = if (constraints.hasBoundedHeight) (constraints.maxHeight / k).toInt() else Constraints.Infinity,
+        )
+        val p = measurable.measure(inner)
+        layout((p.width * k).roundToInt(), (p.height * k).roundToInt()) {
+            p.placeWithLayer(0, 0) {
+                scaleX = k
+                scaleY = k
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
+        }
+    }
+}
 
 /** Бег питомца к предмету и остановка у него перед открытием раздела. */
 private const val RUN_MS = 700
@@ -238,6 +290,7 @@ fun YardScreen(
     val colors = remember(art) { YardColors(art) }
     val scope = rememberCoroutineScope()
     val motion = motionAllowed()
+    val density = LocalDensity.current
 
     // Положения предметов и питомца на экране — для перебежки.
     val places = remember { HashMap<String, Offset>() }
@@ -258,6 +311,11 @@ fun YardScreen(
             onSpeechShown()
         }
     }
+    // Во сколько раз увеличен луг: на планшете в портрете — крупнее.
+    var yardScale by remember { mutableFloatStateOf(1f) }
+    val scroll = rememberScrollState()
+    // Видимая часть двора (без нижней панели) — в координатах экрана.
+    var viewport by remember { mutableStateOf(Rect.Zero) }
     // Вход в палатку в координатах сцены и положение сцены на экране:
     // запоминаются при рисовании и раскладке, нужны только по нажатию.
     val tentDoor = remember { floatArrayOf(-1f, -1f) }
@@ -276,7 +334,7 @@ fun YardScreen(
             // остановка. Назад в центр питомец возвращается, только когда
             // ребёнок снова на дворе (см. LifecycleResumeEffect ниже): иначе
             // он скакал бы обратно, пока открывается раздел.
-            hop.animateTo((target - petCenter) * 0.85f, tween(RUN_MS, easing = EaseInOutCubic))
+            hop.animateTo((target - petCenter) * 0.85f / yardScale, tween(RUN_MS, easing = EaseInOutCubic))
             hopping = false
             delay(ARRIVE_PAUSE_MS)
             action()
@@ -324,7 +382,7 @@ fun YardScreen(
             if (house && tentDoor[0] >= 0) {
                 hopping = true
                 val door = Offset(sceneOrigin[0] + tentDoor[0], sceneOrigin[1] + tentDoor[1])
-                hop.animateTo(door - petCenter, tween(RUN_MS + 150, easing = EaseInOutCubic))
+                hop.animateTo((door - petCenter) / yardScale, tween(RUN_MS + 150, easing = EaseInOutCubic))
                 petAlpha.animateTo(0f, tween(220))
                 hopping = false
             }
@@ -341,15 +399,20 @@ fun YardScreen(
             .onGloballyPositioned { yardOrigin = it.boundsInRoot().topLeft },
     ) {
         val screenWidth = maxWidth
+        val k = yardScaleFor(maxWidth, maxHeight)
+        SideEffect { yardScale = k }
+        Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .weight(1f)
+                .fillMaxWidth()
+                .onGloballyPositioned { viewport = it.boundsInRoot() }
+                .verticalScroll(scroll),
         ) {
             // --- Сцена без питомца, шапка — поверх её неба ---------------------
             // Высота сцены — по ширине двора, а не экрана: на планшете сцена
             // не растёт во весь экран, по бокам продолжаются холмы и луг.
-            val yardWidth = minOf(screenWidth, YARD_MAX_WIDTH)
+            val yardWidth = minOf(screenWidth, YARD_MAX_WIDTH * k)
             Backdrop(
                 art = art,
                 height = yardWidth * art.sceneHeight / art.sceneWidth,
@@ -357,6 +420,7 @@ fun YardScreen(
                 snoring = (snoring || dayFinished) && state.hasScenery("house"),
                 tentDoor = tentDoor,
                 origin = sceneOrigin,
+                scale = k,
             ) {
                 Header(
                     art = art,
@@ -373,9 +437,11 @@ fun YardScreen(
             }
 
             // --- Луг: предметы-разделы и питомец -------------------------------
+            // ТЕСТ: на планшете в портрете луг увеличен целиком (см. yardScaleFor).
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
+                    .scaledBy(k)
                     .widthIn(max = YARD_MAX_WIDTH)
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp),
@@ -470,6 +536,21 @@ fun YardScreen(
                     onPlaced = { places["savings"] = it.center; bounds[GuideTarget.SAVINGS] = it },
                     onClick = { runTo(places["savings"], onOpenSavings) },
                 )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+
+        // ТЕСТ: «Закончить день» закреплена внизу, вне прокрутки: видна на
+        // любом экране — и на низком телефоне, и на планшете в альбомной.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colors.grass)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(modifier = Modifier.widthIn(max = YARD_MAX_WIDTH * k).fillMaxWidth()) {
                 if (dayFinished) {
                     SleepPlate(colors = colors, petName = profile.petName)
                 } else {
@@ -482,16 +563,38 @@ fun YardScreen(
                         onPlaced = { bounds[GuideTarget.FINISH] = it },
                     )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-                Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
+        }
+        }
+
+        // Подсказка на предмет за краем экрана: двор сам прокручивается к нему.
+        LaunchedEffect(guide?.number, guide?.target) {
+            val step = guide ?: return@LaunchedEffect
+            if (step.target == GuideTarget.FINISH) return@LaunchedEffect
+            // Ждём, пока предмет размещён: на холодном запуске первая
+            // раскладка бывает дольше короткой паузы.
+            snapshotFlow { bounds[step.target]?.takeIf { viewport.height > 0f } }.filterNotNull().first()
+            delay(250)
+            val t = bounds[step.target] ?: return@LaunchedEffect
+            val room = with(density) { GUIDE_ROOM.toPx() }
+            val below = step.target == GuideTarget.SAVINGS
+            val top = t.top - if (below) 0f else room
+            val bottom = t.bottom + if (below) room else 0f
+            val shift = when {
+                top < viewport.top -> top - viewport.top
+                bottom > viewport.bottom -> bottom - viewport.bottom
+                else -> 0f
+            }
+            if (shift != 0f) scroll.animateScrollTo((scroll.value + shift).roundToInt())
         }
 
         // Подсказка первого дня — облачко над предметом, к которому пора идти.
         // Нажатие на облачко — как на сам предмет; конец дня облачко не
         // запускает: это решение ребёнок принимает кнопкой.
         val target = guide?.let { bounds[it.target] }
-        if (guide != null && target != null && !busy && speech == null) {
+        // Облачко не висит над предметом, который сейчас за краем экрана.
+        val visible = target != null && (guide?.target == GuideTarget.FINISH || target.overlaps(viewport))
+        if (guide != null && target != null && visible && !busy && speech == null) {
             GuideBubble(
                 colors = colors,
                 step = guide,
@@ -627,6 +730,7 @@ private fun Backdrop(
     snoring: Boolean,
     tentDoor: FloatArray,
     origin: FloatArray,
+    scale: Float = 1f,
     header: @Composable () -> Unit,
 ) {
     val game = state.game
@@ -665,7 +769,7 @@ private fun Backdrop(
       Column {
         // Полоса неба под шапку: шапка не закрывает панель самочувствия.
         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
-        Spacer(modifier = Modifier.height(58.dp))
+        Spacer(modifier = Modifier.height(58.dp * scale))
         PixelImage(
             image = image,
             background = Color(art.colors[art.indexOf('A')]),
@@ -725,7 +829,8 @@ private fun Backdrop(
         )
       }
       Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-          Box(modifier = Modifier.widthIn(max = YARD_MAX_WIDTH)) { header() }
+          // ТЕСТ: на планшете в портрете шапка увеличена вместе с лугом.
+          Box(modifier = Modifier.scaledBy(scale).widthIn(max = YARD_MAX_WIDTH)) { header() }
       }
     }
 }
@@ -749,7 +854,7 @@ private fun YardObject(
                 contentDescription = description
                 if (state != null) stateDescription = state
             }
-            .onGloballyPositioned { onPlaced(it.boundsInRoot()) }
+            .onGloballyPositioned { onPlaced(it.fullBounds()) }
             .padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -965,7 +1070,7 @@ private fun ChestRow(
             .fillMaxWidth()
             .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = spoken }
-            .onGloballyPositioned { onPlaced(it.boundsInRoot()) }
+            .onGloballyPositioned { onPlaced(it.fullBounds()) }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1017,7 +1122,7 @@ private fun FinishDayButton(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 6.dp)
-            .onGloballyPositioned { onPlaced(it.boundsInRoot()) },
+            .onGloballyPositioned { onPlaced(it.fullBounds()) },
     ) {
         Box(
             modifier = Modifier

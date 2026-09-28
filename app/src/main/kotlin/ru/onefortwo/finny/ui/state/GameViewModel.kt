@@ -81,6 +81,7 @@ class GameViewModel(
     private val repository: GameRepository?,
     private val dates: DateProvider = DateProvider { LocalDate.now().toString() },
     private val hours: () -> Int = { LocalTime.now().hour },
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
 
     /** Сегодняшняя дата по часам устройства. */
@@ -629,7 +630,9 @@ class GameViewModel(
      * при этом запись в базу происходит не чаще раза в минуту.
      */
     fun onSessionStart() {
-        greetPending = true
+        // ТЕСТ: поворот экрана — не новый вход: приветствие только после
+        // паузы дольше минуты или при первом открытии.
+        if (stoppedAt == 0L || clock() - stoppedAt > GREET_AFTER_MS) greetPending = true
         startNewDayIfDue()
         if (usageTicker?.isActive == true) return
 
@@ -642,7 +645,10 @@ class GameViewModel(
     }
 
     /** Приложение ушло с переднего плана: счётчик останавливается. */
+    private var stoppedAt = 0L
+
     fun onSessionStop() {
+        stoppedAt = clock()
         usageTicker?.cancel()
         usageTicker = null
     }
@@ -717,5 +723,6 @@ class GameViewModel(
         /** Цель тестового профиля: выбрана заранее для экспертной проверки. */
         const val DEMO_GOAL_ID = "scooter"
         const val MINUTE_MILLIS = 60_000L
+        const val GREET_AFTER_MS = 60_000L
     }
 }

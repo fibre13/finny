@@ -1179,7 +1179,7 @@ class ScreenRenderTest {
         compose.mainClock.advanceTimeBy(100)
         compose.onNodeWithText("Привет! Как дела?").assertExists()
 
-        compose.onNodeWithText("Закончить день").performScrollTo().performClick()
+        compose.onNodeWithText("Закончить день").performClick()
         compose.mainClock.advanceTimeBy(500)
         compose.onNodeWithText("Пока! Приходи завтра — я буду ждать!").assertExists()
         assertFalse("день закончился раньше прощания", finished)
@@ -1192,7 +1192,9 @@ class ScreenRenderTest {
      * накладываются и не выходят за экран, двор — колонка не шире 480 dp,
      * сцена во всю ширину экрана, но не выше 480 × 100 / 180 dp.
      */
-    private fun checkYardLayout(widthDp: Int) {
+    private fun checkYardLayout(widthDp: Int, heightDp: Int) {
+        // ТЕСТ: на планшете в портрете луг увеличен в k раз.
+        val k = ru.onefortwo.finny.ui.screens.yardScaleFor(widthDp.dp, heightDp.dp)
         val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
         compose.setContent {
             FinnyTheme {
@@ -1243,27 +1245,47 @@ class ScreenRenderTest {
         }
         val lefts = objects.filterKeys { it != "сундучок" }.values
         val span = lefts.maxOf { it.right } - lefts.minOf { it.left }
-        assertTrue("двор шире 480 dp: $span; $objects", span <= 480f + tolerance)
+        assertTrue("двор шире ${480 * k} dp: $span; $objects", span <= 480f * k + tolerance)
         val scene = bounds(hasContentDescriptionPrefix("Двор."))
         assertEquals("сцена не во всю ширину", widthDp.toFloat(), scene.width, 1f)
-        assertTrue("сцена выше 267 dp: ${scene.height}", scene.height <= 480f * 100 / 180 + 1)
+        assertTrue("сцена выше ${480 * k * 100 / 180} dp: ${scene.height}", scene.height <= 480f * k * 100 / 180 + 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp")
+    fun `на низком телефоне кнопка конца дня видна без прокрутки`() {
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                )
+            }
+        }
+        // ТЕСТ: кнопка закреплена внизу, вне прокрутки двора.
+        compose.onNodeWithText("Закончить день").assertIsDisplayed()
+        val bottom = compose.onNodeWithText("Закончить день").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("кнопка ниже экрана: $bottom", bottom <= 640 * compose.density.density + 1)
     }
 
     @Test
     @Config(qualifiers = "w360dp-h800dp")
-    fun `двор на телефоне 360 на 800`() = checkYardLayout(360)
+    fun `двор на телефоне 360 на 800`() = checkYardLayout(360, 800)
 
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
-    fun `двор на телефоне в альбомной ориентации`() = checkYardLayout(800)
+    fun `двор на телефоне в альбомной ориентации`() = checkYardLayout(800, 360)
 
     @Test
     @Config(qualifiers = "w800dp-h1280dp")
-    fun `двор на планшете в портрете`() = checkYardLayout(800)
+    fun `двор на планшете в портрете`() = checkYardLayout(800, 1280)
 
     @Test
     @Config(qualifiers = "w1280dp-h800dp-land")
-    fun `двор на планшете в альбомной ориентации`() = checkYardLayout(1280)
+    fun `двор на планшете в альбомной ориентации`() = checkYardLayout(1280, 800)
 
     private fun hasContentDescriptionPrefix(prefix: String) =
         androidx.compose.ui.test.SemanticsMatcher("описание начинается с «$prefix»") { node ->
