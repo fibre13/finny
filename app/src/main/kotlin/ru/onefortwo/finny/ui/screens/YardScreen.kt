@@ -34,7 +34,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -401,15 +403,20 @@ fun YardScreen(
         val screenWidth = maxWidth
         val k = yardScaleFor(maxWidth, maxHeight)
         SideEffect { yardScale = k }
+        // Полоса неба под строкой состояния закреплена над прокруткой: двор,
+        // прокрученный к подсказке, уходит под неё, а не под значки системы.
+        val topInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
         Column(modifier = Modifier.fillMaxSize()) {
+        Spacer(modifier = Modifier.fillMaxWidth().background(colors.sky).windowInsetsTopHeight(topInset))
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .consumeWindowInsets(topInset)
                 .onGloballyPositioned { viewport = it.boundsInRoot() }
                 .verticalScroll(scroll),
         ) {
-            // --- Сцена без питомца, шапка — поверх её неба ---------------------
+            // --- Сцена без питомца; шапка закреплена поверх её неба ------------
             // Высота сцены — по ширине двора, а не экрана: на планшете сцена
             // не растёт во весь экран, по бокам продолжаются холмы и луг.
             val yardWidth = minOf(screenWidth, YARD_MAX_WIDTH * k)
@@ -421,20 +428,7 @@ fun YardScreen(
                 tentDoor = tentDoor,
                 origin = sceneOrigin,
                 scale = k,
-            ) {
-                Header(
-                    art = art,
-                    colors = colors,
-                    // Пока питомец спит, идёт ещё прошлый день: новый начнётся завтра.
-                    day = if (dayFinished) game.period.number - 1 else game.period.number,
-                    demo = state.isDemo,
-                    petName = profile.petName,
-                    balance = game.balance.amount,
-                    onOpenProgress = onOpenProgress,
-                    onOpenHelp = onOpenHelp,
-                    onOpenAdult = onOpenAdult,
-                )
-            }
+            )
 
             // --- Луг: предметы-разделы и питомец -------------------------------
             // На планшете в портрете луг увеличен целиком (см. yardScaleFor).
@@ -584,6 +578,30 @@ fun YardScreen(
                 }
             }
         }
+        }
+
+        // Шапка закреплена над двором: день, имя и баланс видны при любой
+        // прокрутке, прокрученный луг уходит под неё. В начальном положении
+        // она стоит на полосе неба, которую сцена оставляет под шапку.
+        Box(
+            modifier = Modifier.fillMaxWidth().windowInsetsPadding(topInset),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            // На планшете в портрете шапка увеличена вместе с лугом.
+            Box(modifier = Modifier.scaledBy(k).widthIn(max = YARD_MAX_WIDTH)) {
+                Header(
+                    art = art,
+                    colors = colors,
+                    // Пока питомец спит, идёт ещё прошлый день: новый начнётся завтра.
+                    day = if (dayFinished) game.period.number - 1 else game.period.number,
+                    demo = state.isDemo,
+                    petName = profile.petName,
+                    balance = game.balance.amount,
+                    onOpenProgress = onOpenProgress,
+                    onOpenHelp = onOpenHelp,
+                    onOpenAdult = onOpenAdult,
+                )
+            }
         }
 
         // Подсказка на предмет за краем экрана: двор сам прокручивается к нему.
@@ -750,7 +768,6 @@ private fun Backdrop(
     tentDoor: FloatArray,
     origin: FloatArray,
     scale: Float = 1f,
-    header: @Composable () -> Unit,
 ) {
     val game = state.game
     val motion = rememberPetMotion(art.animation, game.pet.care.level, game.pet.joy.level)
@@ -789,7 +806,7 @@ private fun Backdrop(
     Box(modifier = Modifier.background(Color(art.colors[art.indexOf('A')]))) {
       Column {
         // Полоса неба под шапку: шапка не закрывает панель самочувствия.
-        Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+        // Отступ строки состояния — у закреплённой полосы над прокруткой.
         Spacer(modifier = Modifier.height(58.dp * scale))
         PixelImage(
             image = image,
@@ -848,10 +865,6 @@ private fun Backdrop(
                         "${game.pet.joy.value} из 100."
                 },
         )
-      }
-      Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-          // На планшете в портрете шапка увеличена вместе с лугом.
-          Box(modifier = Modifier.scaledBy(scale).widthIn(max = YARD_MAX_WIDTH)) { header() }
       }
     }
 }
