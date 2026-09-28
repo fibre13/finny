@@ -563,12 +563,6 @@ private val AnsweredTaskSaver: Saver<AnsweredTask?, Any> = listSaver(
 )
 
 /** Направление плана в задании на распределение. */
-private fun PlanCategory.title(): String = when (this) {
-    PlanCategory.NEEDS -> "Нужное"
-    PlanCategory.WANTS -> "Развлечения"
-    PlanCategory.SAVINGS -> "Копилка"
-}
-
 /** Подпись направления плана в задании: как в плане дня. */
 private fun planLabel(category: PlanCategory): String = when (category) {
     PlanCategory.NEEDS -> BudgetCategory.NEEDS.displayName

@@ -550,7 +550,26 @@ fun YardScreen(
                 .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Box(modifier = Modifier.widthIn(max = YARD_MAX_WIDTH * k).fillMaxWidth()) {
+            Column(modifier = Modifier.widthIn(max = YARD_MAX_WIDTH * k).fillMaxWidth()) {
+                // Экранное время: предупреждение за 5 минут и сообщение, что
+                // время на сегодня вышло (основание — docs/01, «Экранное время»).
+                val timeNote = when {
+                    state.isTimeUp(today) -> "На сегодня время вышло. Приходи завтра!"
+                    state.isTimeRunningOut(today) -> "Осталось ${Explanations.minutes(state.minutesLeft(today))} на сегодня."
+                    else -> null
+                }
+                if (timeNote != null) {
+                    Text(
+                        text = timeNote,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = colors.outline,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                }
                 if (dayFinished) {
                     SleepPlate(colors = colors, petName = profile.petName)
                 } else {

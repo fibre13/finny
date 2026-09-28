@@ -82,7 +82,7 @@ object Explanations {
         IncomeSource.POCKET_MONEY -> "Карманные монеты на новый день"
         IncomeSource.TASK_CORRECT -> "Награда за задание"
         IncomeSource.TASK_PARTIAL -> "Награда за старание"
-        IncomeSource.RECOVERY_TASK -> "Награда за помощь Финни"
+        IncomeSource.RECOVERY_TASK -> "Награда за помощь питомцу"
     }
 
     /**
@@ -215,7 +215,7 @@ object Explanations {
             }
             return FeedbackMessage(
                 text = "День закончился: $reason. Прогресс сохранён, ничего не потеряно.",
-                nextStep = "Выполни задание «Помоги Финни» или сначала купи нужное в новом плане.",
+                nextStep = "Выполни задание «Помоги $petName» или сначала купи нужное в новом плане.",
                 isProblem = true,
             )
         }

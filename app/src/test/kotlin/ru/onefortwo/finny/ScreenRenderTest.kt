@@ -1252,6 +1252,26 @@ class ScreenRenderTest {
     }
 
     @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `двор предупреждает, что экранное время заканчивается`() {
+        val state = AppState(
+            isLoaded = true, profile = profile, game = GameState.newProfile(),
+            usageDate = "2026-09-26", usageMinutes = 16,
+        )
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Осталось 4 минуты на сегодня.").assertIsDisplayed()
+    }
+
+    @Test
     @Config(qualifiers = "w360dp-h640dp")
     fun `на низком телефоне кнопка конца дня видна без прокрутки`() {
         val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
