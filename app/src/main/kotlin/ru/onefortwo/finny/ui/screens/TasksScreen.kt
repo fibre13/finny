@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -132,10 +134,24 @@ private fun Star(fill: Color, outline: Color) {
     }
 }
 
-/** Короткая карточка задания в пиксельной рамке. */
+/**
+ * Короткая карточка задания в пиксельной рамке. При крупном шрифте кнопка
+ * «Начать →» стоит под названием: рядом с ним слова рвались посередине.
+ */
 @Composable
 private fun TaskRow(art: PixelArt, colors: YardColors, task: TaskContent, highlight: Boolean, onOpen: () -> Unit) {
-    Row(
+    val large = LocalDensity.current.fontScale >= LARGE_FONT
+    val start: @Composable () -> Unit = {
+        Text(
+            text = "Начать →",
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.card,
+            modifier = Modifier
+                .pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        )
+    }
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 72.dp)
@@ -151,25 +167,27 @@ private fun TaskRow(art: PixelArt, colors: YardColors, task: TaskContent, highli
                 contentDescription = "${task.title}, ${task.topic.displayName}. Начать"
             }
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        TaskSprite(art, task.icon ?: defaultIcon(task.topic), 44.dp)
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = task.title, style = MaterialTheme.typography.titleMedium)
-            SupportingText(task.topic.displayName)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TaskSprite(art, task.icon ?: defaultIcon(task.topic), 44.dp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = task.title, style = MaterialTheme.typography.titleMedium)
+                SupportingText(task.topic.displayName)
+            }
+            if (!large) {
+                Spacer(modifier = Modifier.width(8.dp))
+                start()
+            }
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Начать →",
-            style = MaterialTheme.typography.labelLarge,
-            color = colors.card,
-            modifier = Modifier
-                .pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-        )
+        if (large) {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.CenterEnd) { start() }
+        }
     }
 }
+
+/** Масштаб шрифта, с которого кнопка переносится под название. */
+private const val LARGE_FONT = 1.3f
 
 private fun defaultIcon(topic: TaskTopic): String = when (topic) {
     TaskTopic.BUDGET_PLANNING -> "yard_plan"

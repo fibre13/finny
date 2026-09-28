@@ -780,7 +780,9 @@ private fun Backdrop(
     val tent = art.sprite("tent")
     val zImage = remember(art) { composeGoal(art, "yard_z")?.let { pixelImage(it, 5) } }
     val zz = rememberInfiniteTransition(label = "snore")
-    val zPhase by zz.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "z")
+    val zMoving by zz.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "z")
+    // Без движений «Z» стоят на месте.
+    val zPhase = if (motionAllowed()) zMoving else 0.2f
     val careLabel = Explanations.statLabel(PetStatKind.CARE, game.pet.care)
     val joyLabel = Explanations.statLabel(PetStatKind.JOY, game.pet.joy)
 
@@ -930,7 +932,9 @@ private fun Pet(
     // Во время перебежки питомец прыгает; иначе — реакция из очереди.
     val shown = if (hopping) PetReaction(PetReactions.PLAY, id = -1 - hopRound) else reaction
     val zz = rememberInfiniteTransition(label = "snore-here")
-    val zPhase by zz.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "z")
+    val zMoving by zz.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "z")
+    // Без движений «Z» стоят на месте.
+    val zPhase = if (motionAllowed()) zMoving else 0.2f
 
     Box(modifier = modifier, contentAlignment = Alignment.BottomCenter) {
         PetFigure(
