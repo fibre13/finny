@@ -93,6 +93,7 @@ class GameRepository(private val database: FinnyDatabase) {
             dao.clearCompletedTasks()
             dao.clearOwnedAccessories()
             dao.clearOwnedScenery()
+            dao.clearAchievedGoals()
             dao.clearProfile()
         }
     }

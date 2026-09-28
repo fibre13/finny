@@ -171,6 +171,28 @@ class PersistenceTest {
     }
 
     @Test
+    fun `сброс профиля удаляет и полученные цели`() = runBlocking {
+        val first = viewModel()
+        first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        first.chooseGoal("scooter")
+        first.confirmPlan(needs = 0, wants = 0, savings = 50)
+        val task = content.task("save_rate")!!.withNumbers(Random(1)) as NumberTask
+        first.answerTask(task, TaskAnswer.Number(task.answer))
+        first.deposit(10)
+        first.claimGoal()
+        assertEquals(setOf("scooter"), first.state.value.achievedGoalIds)
+
+        first.resetProfile()
+
+        // Сброс удаляет данные сразу, а не при следующем сохранении: в базе
+        // не остаётся ни профиля, ни целей прежнего игрока (ТЗ 3.5).
+        assertNull(repository.load())
+        assertTrue(database.gameDao().achievedGoals().isEmpty())
+        first.createProfile("Барсик", PetAppearance("dog", "grey", "none"), Difficulty.SIMPLE)
+        assertTrue(viewModel().state.value.achievedGoalIds.isEmpty())
+    }
+
+    @Test
     fun `покупки текущего дня и подтверждённый план переживают перезапуск`() = runBlocking {
         val first = viewModel()
         first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
