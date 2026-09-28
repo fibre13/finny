@@ -152,13 +152,19 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
 }
 
 /**
- * Версия 7 → 8: счётчик новых заданий, оплаченных монетами за игровой день.
- * Монеты платятся за первые два новых задания дня.
+ * Версия 7 → 8: счётчик новых заданий, оплаченных монетами за игровой день
+ * (монеты платятся за первые два задания дня), и снятие отметки закрытого
+ * дня — карманные на него уже начислены прежней версией.
  */
 val MIGRATION_7_8 = object : Migration(7, 8) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `profile` ADD COLUMN `paidTasksPeriod` INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE `profile` ADD COLUMN `paidTasksCount` INTEGER NOT NULL DEFAULT 0")
+        // До версии 8 карманные на новый день начислялись сразу при закрытии
+        // дня. С версии 8 они приходят при первом входе в новые сутки, если
+        // отмечен закрытый день. Отметка снимается: иначе профиль, обновлённый
+        // со старой версии, получил бы карманные за этот день второй раз.
+        db.execSQL("UPDATE `profile` SET `lastFinishedDate` = NULL")
     }
 }
 
