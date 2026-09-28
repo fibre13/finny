@@ -24,6 +24,7 @@ import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.ui.state.DateProvider
 import ru.onefortwo.finny.ui.state.GameViewModel
 import ru.onefortwo.finny.ui.state.GuideTarget
+import ru.onefortwo.finny.ui.state.Reminder
 import ru.onefortwo.finny.ui.state.YardGuide
 
 /**
@@ -114,6 +115,108 @@ class YardGuideTest {
         // Со второго дня выделена только доска плана, без номера шага.
         assertEquals(GuideTarget.PLAN, model.guide()?.target)
         assertEquals(0, model.guide()?.number)
+    }
+
+    /** Первый день прожит, наступили вторые сутки, план второго дня утверждён. */
+    private fun secondDayWithPlan(): GameViewModel {
+        val model = model()
+        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        model.dismissArrival()
+        model.chooseGoal("scooter")
+        model.confirmPlan(needs = 10, wants = 0, savings = 5)
+        model.buy("food")
+        model.finishPeriod()
+        today = "2026-09-29"
+        model.startNewDayIfDue()
+        model.dismissArrival()
+        model.confirmPlan(needs = 10, wants = 5, savings = 5)
+        return model
+    }
+
+    @Test
+    fun `со второго дня двор напоминает о делах по порядку дня`() {
+        val model = secondDayWithPlan()
+
+        assertEquals(Reminder.NEEDS, model.guide()?.reminder)
+        assertEquals(GuideTarget.SHOP, model.guide()?.target)
+        model.buy("food")
+
+        assertEquals(Reminder.TASK, model.guide()?.reminder)
+        assertEquals(GuideTarget.TASKS, model.guide()?.target)
+        model.solve("save_rate")
+
+        // Слова первого дня встречены, а словарик ещё не открывали.
+        assertEquals(Reminder.WORD, model.guide()?.reminder)
+        assertEquals(GuideTarget.GLOSSARY, model.guide()?.target)
+        model.markTermsRead()
+
+        assertEquals(Reminder.FINISH, model.guide()?.reminder)
+        model.finishPeriod()
+        assertNull("питомец спит — напоминаний нет", model.guide())
+    }
+
+    @Test
+    fun `«Не сейчас» откладывает напоминание до конца игрового дня`() {
+        val model = secondDayWithPlan()
+        assertEquals(Reminder.NEEDS, model.guide()?.reminder)
+
+        model.dismissReminder(Reminder.NEEDS)
+        assertEquals("следующее дело по порядку", Reminder.TASK, model.guide()?.reminder)
+
+        // Новый игровой день — отложенное снова напоминается.
+        model.buy("ball")
+        model.finishPeriod()
+        today = "2026-09-30"
+        model.startNewDayIfDue()
+        model.dismissArrival()
+        model.confirmPlan(needs = 10, wants = 0, savings = 5)
+        assertEquals(Reminder.NEEDS, model.guide()?.reminder)
+    }
+
+    @Test
+    fun `про задание не напоминают, когда экранное время вышло`() {
+        val model = secondDayWithPlan()
+        model.buy("food")
+        val timeUp = model.state.value.copy(usageDate = today, usageMinutes = 20)
+
+        assertTrue(timeUp.isTimeUp(today))
+        assertEquals(Reminder.WORD, YardGuide.reminder(timeUp, today))
+    }
+
+    @Test
+    fun `слово становится новым при первой встрече и один раз`() {
+        val model = model()
+        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        assertTrue("до первых действий новых слов нет", model.state.value.newTerms.isEmpty())
+
+        model.chooseGoal("scooter")
+        assertEquals(setOf("Цель", "Копилка"), model.state.value.newTerms)
+
+        model.markTermsRead()
+        assertTrue(model.state.value.newTerms.isEmpty())
+
+        // Прочитанное слово не становится новым снова; новое — только встреченное впервые.
+        model.confirmPlan(needs = 10, wants = 0, savings = 5)
+        assertEquals(setOf("Бюджет", "План", "Накопления"), model.state.value.newTerms)
+        assertTrue("Цель" in model.state.value.knownTerms)
+
+        model.solve("change_count")
+        assertTrue("Сдача" in model.state.value.newTerms)
+        assertTrue("Доход" in model.state.value.newTerms)
+    }
+
+    @Test
+    fun `встреченные слова есть в словарике`() {
+        val terms = content.glossary().map { it.term }.toSet()
+        val model = secondDayWithPlan()
+        model.buy("food")
+        model.solve("change_count")
+
+        assertTrue(model.state.value.knownTerms.isNotEmpty())
+        assertTrue(
+            "каждое встреченное слово должно быть в glossary.json: ${model.state.value.knownTerms - terms}",
+            terms.containsAll(model.state.value.knownTerms),
+        )
     }
 
     @Test

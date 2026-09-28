@@ -220,6 +220,8 @@ private fun AppNavHost(
                 guide = YardGuide.step(state, today),
                 onSleepingTap = viewModel::sleepingHint,
                 onArrivalShown = viewModel::dismissArrival,
+                onOpenTask = activeTask?.let { task -> { navController.navigate("${Routes.TASK}/${task.id}") } },
+                onDismissReminder = viewModel::dismissReminder,
                 speech = speech,
                 onSpeechShown = viewModel::speechShown,
                 goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
@@ -422,8 +424,14 @@ private fun AppNavHost(
         }
 
         composable(Routes.GLOSSARY) {
+            // Отметка «Новое» запоминается на время показа экрана, а в игре
+            // слова сразу становятся прочитанными: напоминание о словах
+            // уходит, как только словарик открыт.
+            val fresh = rememberSaveable { ArrayList(state.newTerms) }
+            LaunchedEffect(Unit) { viewModel.markTermsRead() }
             GlossaryScreen(
                 entries = content.glossary().map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
+                newTerms = fresh.toSet(),
                 onBack = { navController.popBackStack() },
             )
         }

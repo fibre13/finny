@@ -169,6 +169,15 @@ class GameViewModel(
             _state.collect { current ->
                 if (!current.isLoaded) return@collect
 
+                // Встреченные слова словарика отмечаются по состоянию игры,
+                // что бы ни изменилось. Отметка — новое состояние: оно
+                // придёт сюда же следующим и будет записано.
+                val noted = GlossaryTerms.note(current)
+                if (noted !== current) {
+                    _state.update { GlossaryTerms.note(it) }
+                    return@collect
+                }
+
                 val toSave = current.toSavedGame()
                 when {
                     toSave != null -> {
@@ -293,6 +302,20 @@ class GameViewModel(
     /** Окно «Пришли монеты» прочитано. */
     fun dismissArrival() {
         _state.update { it.copy(arrival = null) }
+    }
+
+    /** Словарик открыт: новые слова прочитаны, отметка «Новое» снимается. */
+    fun markTermsRead() {
+        _state.update { if (it.newTerms.isEmpty()) it else it.copy(newTerms = emptySet()) }
+    }
+
+    /** «Не сейчас»: напоминание не показывается до конца игрового дня. */
+    fun dismissReminder(reminder: Reminder) {
+        _state.update {
+            val day = it.game.period.number
+            val already = if (it.remindersPeriod == day) it.dismissedReminders else emptySet()
+            it.copy(dismissedReminders = already + reminder.id, remindersPeriod = day)
+        }
     }
 
     /**

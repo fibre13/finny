@@ -171,6 +171,25 @@ class PersistenceTest {
     }
 
     @Test
+    fun `встреченные слова и отложенные напоминания переживают перезапуск`() = runBlocking {
+        val first = viewModel()
+        first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        first.chooseGoal("scooter")
+        first.confirmPlan(needs = 15, wants = 0, savings = 5)
+        first.markTermsRead()
+        first.buy("food")
+        first.dismissReminder(ru.onefortwo.finny.ui.state.Reminder.TASK)
+        val before = first.state.value
+        assertTrue("после прочтения новым стало только слово покупки", before.newTerms.isNotEmpty())
+
+        val after = viewModel().state.value
+        assertEquals(before.knownTerms, after.knownTerms)
+        assertEquals(before.newTerms, after.newTerms)
+        assertEquals(setOf("task"), after.dismissedReminders)
+        assertEquals(before.game.period.number, after.remindersPeriod)
+    }
+
+    @Test
     fun `сброс профиля удаляет и полученные цели`() = runBlocking {
         val first = viewModel()
         first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)

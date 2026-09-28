@@ -10,14 +10,37 @@ import ru.onefortwo.finny.economy.BudgetCategory
  *
  * Первый день ведётся по шагам «Шаг N из 6» в порядке Приложения А ТЗ:
  * мечта → план → нужное → задание → радость → конец дня. Со второго дня
- * выделяется только доска плана, пока план не составлен.
+ * выделяется доска плана, пока план не составлен, а после плана — по одному
+ * напоминанию о деле, которое ребёнок мог забыть (см. [Reminder]).
  */
 
 /** Куда указывает подсказка. */
-enum class GuideTarget { PLAN, SHOP, TASKS, SAVINGS, FINISH }
+enum class GuideTarget { PLAN, SHOP, TASKS, SAVINGS, GLOSSARY, FINISH }
 
-/** Подсказка: номер шага (0 — без номера, со второго дня), предмет и текст. */
-data class GuideStep(val number: Int, val target: GuideTarget, val text: String) {
+/**
+ * Напоминание двора со второго дня. Порядок — порядок игрового дня:
+ * нужное, задание, новое слово, конец дня. Каждое откладывается кнопкой
+ * «Не сейчас» до конца игрового дня: напоминание зовёт, но не давит
+ * (ТЗ 3.5). Системных уведомлений нет — только на дворе, когда ребёнок
+ * сам открыл приложение.
+ */
+enum class Reminder(val id: String, val target: GuideTarget, val text: String) {
+    NEEDS("needs", GuideTarget.SHOP, "Я проголодался. Купишь нужное в лавке?"),
+    TASK("task", GuideTarget.TASKS, "Стало скучно. Разгадаешь загадку?"),
+    WORD("word", GuideTarget.GLOSSARY, "Есть новое слово. Загляни в словарик!"),
+    FINISH("finish", GuideTarget.FINISH, "Все дела готовы. Можно заканчивать день!"),
+}
+
+/**
+ * Подсказка: номер шага (0 — без номера, со второго дня), предмет и текст.
+ * У напоминания есть [reminder]: его можно отложить «Не сейчас».
+ */
+data class GuideStep(
+    val number: Int,
+    val target: GuideTarget,
+    val text: String,
+    val reminder: Reminder? = null,
+) {
     val total: Int get() = YardGuide.TOTAL
 }
 
@@ -43,7 +66,7 @@ object YardGuide {
             return if (!period.isPlanConfirmed) {
                 GuideStep(0, GuideTarget.PLAN, "Новый день: раздели монеты в «Плане»")
             } else {
-                null
+                reminder(state, today)?.let { GuideStep(0, it.target, it.text, it) }
             }
         }
 
@@ -61,6 +84,23 @@ object YardGuide {
             period.canFinish ->
                 GuideStep(6, GuideTarget.FINISH, "Всё сделано! Нажми «Закончить день»")
             else -> null
+        }
+    }
+
+    /**
+     * Первое неотложенное напоминание по порядку дня или `null`. Про задание
+     * не напоминается, когда экранное время на сегодня вышло: приложение не
+     * подталкивает продолжать сверх предела.
+     */
+    fun reminder(state: AppState, today: String): Reminder? {
+        val period = state.game.period
+        return Reminder.entries.firstOrNull { reminder ->
+            !state.isReminderDismissed(reminder) && when (reminder) {
+                Reminder.NEEDS -> period.purchases.none { it.category == BudgetCategory.NEEDS }
+                Reminder.TASK -> state.paidTasksToday == 0 && !state.isTimeUp(today)
+                Reminder.WORD -> state.newTerms.isNotEmpty()
+                Reminder.FINISH -> period.canFinish
+            }
         }
     }
 }

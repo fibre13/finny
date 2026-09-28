@@ -24,6 +24,7 @@ import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.IconTile
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SectionCard
+import ru.onefortwo.finny.ui.common.StatusPill
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.softShadow
 import ru.onefortwo.finny.ui.theme.FinnyTheme
@@ -33,6 +34,8 @@ import ru.onefortwo.finny.ui.theme.FinnyTheme
 fun GlossaryScreen(
     entries: List<GlossaryEntry>,
     onBack: () -> Unit,
+    /** Слова, впервые встреченные в игре и ещё не прочитанные: отмечены «Новое». */
+    newTerms: Set<String> = emptySet(),
 ) {
     ScreenScaffold(
         eyebrow = "Финансовые слова — просто",
@@ -48,7 +51,7 @@ fun GlossaryScreen(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                entries.forEach { entry -> GlossaryRow(entry) }
+                entries.forEach { entry -> GlossaryRow(entry, isNew = entry.term in newTerms) }
             }
             Spacer(modifier = Modifier.padding(bottom = CardSpacing))
         }
@@ -57,10 +60,11 @@ fun GlossaryScreen(
 
 /**
  * Слово словарика: плитка с первой буквой, термин и объяснение.
- * Буква — только украшение и не озвучивается.
+ * Буква — только украшение и не озвучивается. Слово, впервые встреченное
+ * в игре, отмечено плашкой «Новое» — словом, а не только цветом.
  */
 @Composable
-private fun GlossaryRow(entry: GlossaryEntry) {
+private fun GlossaryRow(entry: GlossaryEntry, isNew: Boolean = false) {
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.medium
 
@@ -84,6 +88,9 @@ private fun GlossaryRow(entry: GlossaryEntry) {
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
+            if (isNew) {
+                StatusPill(text = "Новое", modifier = Modifier.padding(bottom = 4.dp))
+            }
             Text(
                 text = entry.term,
                 style = MaterialTheme.typography.titleMedium,

@@ -95,6 +95,18 @@ data class ProfileEntity(
     /** Сколько новых заданий оплачено в игровом дне [paidTasksPeriod]. */
     val paidTasksPeriod: Int = 0,
     val paidTasksCount: Int = 0,
+
+    /** Слова словарика, встреченные в игре; через «|». */
+    @ColumnInfo(defaultValue = "")
+    val knownTerms: String = "",
+
+    /** Встреченные, но ещё не прочитанные в словарике слова; через «|». */
+    @ColumnInfo(defaultValue = "")
+    val newTerms: String = "",
+
+    /** Напоминания, отложенные кнопкой «Не сейчас»: «номер дня:код|код». */
+    @ColumnInfo(defaultValue = "")
+    val dismissedReminders: String = "",
 ) {
     companion object {
         /** Профиль в приложении один, поэтому ключ фиксирован. */

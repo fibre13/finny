@@ -125,6 +125,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.unit.Constraints
 import ru.onefortwo.finny.ui.state.GuideStep
 import ru.onefortwo.finny.ui.state.GuideTarget
+import ru.onefortwo.finny.ui.state.Reminder
+import ru.onefortwo.finny.ui.common.MinTouchTarget
+import androidx.compose.foundation.layout.wrapContentHeight
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.max
@@ -285,6 +288,10 @@ fun YardScreen(
     onSpeechShown: () -> Unit = {},
     onSleepingTap: () -> Unit = {},
     onArrivalShown: () -> Unit = {},
+    /** Открыть следующее задание сразу — для напоминания о задании. */
+    onOpenTask: (() -> Unit)? = null,
+    /** «Не сейчас» у напоминания двора. */
+    onDismissReminder: (Reminder) -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -517,7 +524,7 @@ fun YardScreen(
                     YardObject(
                         art, colors, "yard_glossary", "Словарик",
                         description = "Словарик: финансовые слова",
-                        onPlaced = { places["glossary"] = it.center },
+                        onPlaced = { places["glossary"] = it.center; bounds[GuideTarget.GLOSSARY] = it },
                         onClick = { runTo(places["glossary"], onOpenGlossary) },
                     )
                 }
@@ -642,10 +649,16 @@ fun YardScreen(
                 onClick = when (guide.target) {
                     GuideTarget.PLAN -> ({ runTo(places["plan"], onOpenPlan) })
                     GuideTarget.SHOP -> ({ runTo(places["shop"], onOpenShop) })
-                    GuideTarget.TASKS -> ({ runTo(places["tasks"], onOpenTasks) })
+                    // Напоминание о задании ведёт сразу к заданию, а не к списку.
+                    GuideTarget.TASKS -> {
+                        val open = if (guide.reminder == Reminder.TASK && onOpenTask != null) onOpenTask else onOpenTasks
+                        ({ runTo(places["tasks"], open) })
+                    }
                     GuideTarget.SAVINGS -> ({ runTo(places["savings"], onOpenSavings) })
+                    GuideTarget.GLOSSARY -> ({ runTo(places["glossary"], onOpenGlossary) })
                     GuideTarget.FINISH -> null
                 },
+                onDismiss = guide.reminder?.let { reminder -> { onDismissReminder(reminder) } },
             )
         }
 
@@ -1210,13 +1223,19 @@ private fun GuideBubble(
     target: Rect,
     onClick: (() -> Unit)?,
     below: Boolean = false,
+    /** «Не сейчас» — только у напоминаний со второго дня. */
+    onDismiss: (() -> Unit)? = null,
 ) {
     val motion = motionAllowed()
     val bob = rememberInfiniteTransition(label = "guide")
     val phase by bob.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "bob")
     val lift = if (motion) sin(phase * 2 * PI.toFloat()) * 3f else 0f
     val numbered = step.number > 0
-    val spoken = if (numbered) "Подсказка, шаг ${step.number} из ${step.total}: ${step.text}" else "Подсказка: ${step.text}"
+    val spoken = when {
+        numbered -> "Подсказка, шаг ${step.number} из ${step.total}: ${step.text}"
+        step.reminder != null -> "Напоминание: ${step.text}"
+        else -> "Подсказка: ${step.text}"
+    }
     Layout(
         modifier = Modifier.fillMaxSize(),
         content = {
@@ -1245,6 +1264,19 @@ private fun GuideBubble(
                     )
                 }
                 Text(text = step.text, style = MaterialTheme.typography.titleSmall)
+                if (onDismiss != null) {
+                    Text(
+                        text = "Не сейчас",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = FinnyTheme.colors.onSurfaceMuted,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .heightIn(min = MinTouchTarget)
+                            .clickable(role = Role.Button, onClick = onDismiss)
+                            .wrapContentHeight(Alignment.CenterVertically)
+                            .padding(horizontal = 8.dp),
+                    )
+                }
             }
             Box(
                 modifier = Modifier

@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.economy.PurchaseRecord
 import org.junit.Assert.assertEquals
+import ru.onefortwo.finny.ui.state.GuideStep
+import ru.onefortwo.finny.ui.state.Reminder
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -1128,5 +1130,37 @@ class ScreenRenderTest {
 
         compose.onNodeWithText("Бюджет").assertIsDisplayed()
         compose.onNodeWithText("Копилка").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `новое слово в словарике отмечено словом «Новое»`() {
+        compose.setContent {
+            FinnyTheme { GlossaryScreen(entries = content.glossary(), onBack = {}, newTerms = setOf("Бюджет")) }
+        }
+
+        compose.onAllNodesWithText("НОВОЕ").assertCountEquals(1)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `напоминание на дворе откладывается кнопкой «Не сейчас»`() {
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        var dismissed: Reminder? = null
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                    guide = GuideStep(0, Reminder.WORD.target, Reminder.WORD.text, Reminder.WORD),
+                    onDismissReminder = { dismissed = it },
+                )
+            }
+        }
+
+        compose.onNodeWithText(Reminder.WORD.text, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Не сейчас", useUnmergedTree = true).performClick()
+        assertEquals(Reminder.WORD, dismissed)
     }
 }

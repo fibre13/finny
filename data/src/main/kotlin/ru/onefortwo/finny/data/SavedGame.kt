@@ -56,7 +56,31 @@ data class SavedGame(
     /** Сколько новых заданий оплачено в игровом дне [paidTasksPeriod]. */
     val paidTasksPeriod: Int = 0,
     val paidTasksCount: Int = 0,
+
+    /** Слова словарика, встреченные в игре. */
+    val knownTerms: Set<String> = emptySet(),
+
+    /** Встреченные, но ещё не прочитанные в словарике слова. */
+    val newTerms: Set<String> = emptySet(),
+
+    /** Напоминания, отложенные «Не сейчас» в игровом дне [remindersPeriod]. */
+    val dismissedReminders: Set<String> = emptySet(),
+    val remindersPeriod: Int = 0,
 )
+
+/** Набор строк в столбце: значения через «|». */
+private fun Set<String>.joinTerms(): String = sorted().joinToString("|")
+
+private fun String.splitTerms(): Set<String> = split('|').filter { it.isNotBlank() }.toSet()
+
+/** Отложенные напоминания в столбце: «номер дня:код|код». */
+private fun encodeReminders(period: Int, ids: Set<String>): String =
+    if (ids.isEmpty()) "" else "$period:${ids.joinTerms()}"
+
+private fun decodeReminders(text: String): Pair<Int, Set<String>> {
+    val period = text.substringBefore(':', "").toIntOrNull() ?: return 0 to emptySet()
+    return period to text.substringAfter(':').splitTerms()
+}
 
 /** Набор записей базы данных, соответствующий одному [SavedGame]. */
 data class GameRecords(
@@ -100,6 +124,9 @@ fun SavedGame.toRecords(): GameRecords {
         timeLimitEnabled = timeLimitEnabled,
         paidTasksPeriod = paidTasksPeriod,
         paidTasksCount = paidTasksCount,
+        knownTerms = knownTerms.joinTerms(),
+        newTerms = newTerms.joinTerms(),
+        dismissedReminders = encodeReminders(remindersPeriod, dismissedReminders),
     )
 
     val purchases = game.period.purchases.map { record ->
@@ -196,6 +223,8 @@ fun GameRecords.toSavedGame(): SavedGame {
         history = outcomes,
     )
 
+    val (remindersPeriod, dismissed) = decodeReminders(profile.dismissedReminders)
+
     return SavedGame(
         petName = profile.petName,
         speciesId = profile.speciesId,
@@ -214,6 +243,10 @@ fun GameRecords.toSavedGame(): SavedGame {
         achievedGoalIds = achievedGoals.map { it.goalId }.toSet(),
         paidTasksPeriod = profile.paidTasksPeriod,
         paidTasksCount = profile.paidTasksCount,
+        knownTerms = profile.knownTerms.splitTerms(),
+        newTerms = profile.newTerms.splitTerms(),
+        dismissedReminders = dismissed,
+        remindersPeriod = remindersPeriod,
     )
 }
 

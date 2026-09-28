@@ -99,7 +99,21 @@ data class AppState(
      * Показывается отдельным окном, а не карточкой среди других призывов.
      */
     val arrival: FeedbackMessage? = null,
+
+    /** Слова словарика, встреченные в игре (см. [GlossaryTerms]). */
+    val knownTerms: Set<String> = emptySet(),
+
+    /** Встреченные, но ещё не прочитанные в словарике: отмечены «Новое». */
+    val newTerms: Set<String> = emptySet(),
+
+    /** Напоминания двора, отложенные «Не сейчас» в игровом дне [remindersPeriod]. */
+    val dismissedReminders: Set<String> = emptySet(),
+    val remindersPeriod: Int = 0,
 ) {
+    /** Напоминание отложено до конца текущего игрового дня. */
+    fun isReminderDismissed(reminder: Reminder): Boolean =
+        remindersPeriod == game.period.number && reminder.id in dismissedReminders
+
     /** Профиль создан и можно вести игру. */
     val hasProfile: Boolean get() = profile != null
 
@@ -174,6 +188,10 @@ fun SavedGame.toAppState(): AppState = AppState(
     achievedGoalIds = achievedGoalIds,
     paidTasksPeriod = paidTasksPeriod,
     paidTasksCount = paidTasksCount,
+    knownTerms = knownTerms,
+    newTerms = newTerms,
+    dismissedReminders = dismissedReminders,
+    remindersPeriod = remindersPeriod,
 )
 
 /** Переводит состояние приложения в сохраняемый вид; null, если профиля нет. */
@@ -198,5 +216,9 @@ fun AppState.toSavedGame(): SavedGame? {
         achievedGoalIds = achievedGoalIds,
         paidTasksPeriod = paidTasksPeriod,
         paidTasksCount = paidTasksCount,
+        knownTerms = knownTerms,
+        newTerms = newTerms,
+        dismissedReminders = dismissedReminders,
+        remindersPeriod = remindersPeriod,
     )
 }

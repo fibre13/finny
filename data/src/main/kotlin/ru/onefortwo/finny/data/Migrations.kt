@@ -168,6 +168,20 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+/**
+ * Версия 8 → 9: слова словарика, встреченные в игре, непрочитанные новые
+ * слова и напоминания, отложенные кнопкой «Не сейчас». Пустые значения
+ * означают «ещё ничего»: встреченные слова отметятся по состоянию игры при
+ * первом запуске новой версии.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `profile` ADD COLUMN `knownTerms` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `profile` ADD COLUMN `newTerms` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `profile` ADD COLUMN `dismissedReminders` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 /** Все переходы, известные приложению. Порядок не важен. */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2,
@@ -177,4 +191,5 @@ val ALL_MIGRATIONS = arrayOf(
     MIGRATION_5_6,
     MIGRATION_6_7,
     MIGRATION_7_8,
+    MIGRATION_8_9,
 )

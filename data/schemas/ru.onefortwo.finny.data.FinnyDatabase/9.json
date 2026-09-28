@@ -1,0 +1,457 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 9,
+    "identityHash": "96810fba737d52560218ee00ee3d2922",
+    "entities": [
+      {
+        "tableName": "profile",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `petName` TEXT NOT NULL, `speciesId` TEXT NOT NULL, `colorId` TEXT NOT NULL, `accessoryId` TEXT NOT NULL, `isDemo` INTEGER NOT NULL, `balance` INTEGER NOT NULL, `savedCoins` INTEGER NOT NULL, `goalId` TEXT, `goalPrice` INTEGER, `care` INTEGER NOT NULL, `joy` INTEGER NOT NULL, `growthPoints` INTEGER NOT NULL, `periodNumber` INTEGER NOT NULL, `planNeeds` INTEGER, `planWants` INTEGER, `planSavings` INTEGER, `depositedThisPeriod` INTEGER NOT NULL, `difficulty` TEXT NOT NULL, `lastFinishedDate` TEXT, `usageDate` TEXT, `usageMinutes` INTEGER NOT NULL, `timeLimitEnabled` INTEGER NOT NULL, `paidTasksPeriod` INTEGER NOT NULL, `paidTasksCount` INTEGER NOT NULL, `knownTerms` TEXT NOT NULL DEFAULT '', `newTerms` TEXT NOT NULL DEFAULT '', `dismissedReminders` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "petName",
+            "columnName": "petName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "speciesId",
+            "columnName": "speciesId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "colorId",
+            "columnName": "colorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessoryId",
+            "columnName": "accessoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDemo",
+            "columnName": "isDemo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balance",
+            "columnName": "balance",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "savedCoins",
+            "columnName": "savedCoins",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "goalId",
+            "columnName": "goalId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "goalPrice",
+            "columnName": "goalPrice",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "care",
+            "columnName": "care",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "joy",
+            "columnName": "joy",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "growthPoints",
+            "columnName": "growthPoints",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "periodNumber",
+            "columnName": "periodNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planNeeds",
+            "columnName": "planNeeds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "planWants",
+            "columnName": "planWants",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "planSavings",
+            "columnName": "planSavings",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "depositedThisPeriod",
+            "columnName": "depositedThisPeriod",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "difficulty",
+            "columnName": "difficulty",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastFinishedDate",
+            "columnName": "lastFinishedDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "usageDate",
+            "columnName": "usageDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "usageMinutes",
+            "columnName": "usageMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeLimitEnabled",
+            "columnName": "timeLimitEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paidTasksPeriod",
+            "columnName": "paidTasksPeriod",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paidTasksCount",
+            "columnName": "paidTasksCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "knownTerms",
+            "columnName": "knownTerms",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "newTerms",
+            "columnName": "newTerms",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "dismissedReminders",
+            "columnName": "dismissedReminders",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "current_purchases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `itemId` TEXT NOT NULL, `price` INTEGER NOT NULL, `category` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "itemId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "price",
+            "columnName": "price",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "period_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`number` INTEGER NOT NULL, `planNeeds` INTEGER NOT NULL, `planWants` INTEGER NOT NULL, `planSavings` INTEGER NOT NULL, `spentNeeds` INTEGER NOT NULL, `spentWants` INTEGER NOT NULL, `deposited` INTEGER NOT NULL, `needsCovered` INTEGER NOT NULL, `withinPlan` INTEGER NOT NULL, `savedSomething` INTEGER NOT NULL, `careBefore` INTEGER NOT NULL, `joyBefore` INTEGER NOT NULL, `careAfter` INTEGER NOT NULL, `joyAfter` INTEGER NOT NULL, `pointsBefore` INTEGER NOT NULL, `pointsAfter` INTEGER NOT NULL, `incomeSource` TEXT, `incomeAmount` INTEGER, `incomeBalanceAfter` INTEGER, PRIMARY KEY(`number`))",
+        "fields": [
+          {
+            "fieldPath": "number",
+            "columnName": "number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planNeeds",
+            "columnName": "planNeeds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planWants",
+            "columnName": "planWants",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "planSavings",
+            "columnName": "planSavings",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spentNeeds",
+            "columnName": "spentNeeds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spentWants",
+            "columnName": "spentWants",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deposited",
+            "columnName": "deposited",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "needsCovered",
+            "columnName": "needsCovered",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "withinPlan",
+            "columnName": "withinPlan",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "savedSomething",
+            "columnName": "savedSomething",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "careBefore",
+            "columnName": "careBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "joyBefore",
+            "columnName": "joyBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "careAfter",
+            "columnName": "careAfter",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "joyAfter",
+            "columnName": "joyAfter",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pointsBefore",
+            "columnName": "pointsBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pointsAfter",
+            "columnName": "pointsAfter",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "incomeSource",
+            "columnName": "incomeSource",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "incomeAmount",
+            "columnName": "incomeAmount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "incomeBalanceAfter",
+            "columnName": "incomeBalanceAfter",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "number"
+          ]
+        }
+      },
+      {
+        "tableName": "completed_tasks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`taskId` TEXT NOT NULL, PRIMARY KEY(`taskId`))",
+        "fields": [
+          {
+            "fieldPath": "taskId",
+            "columnName": "taskId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "taskId"
+          ]
+        }
+      },
+      {
+        "tableName": "owned_accessories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accessoryId` TEXT NOT NULL, PRIMARY KEY(`accessoryId`))",
+        "fields": [
+          {
+            "fieldPath": "accessoryId",
+            "columnName": "accessoryId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accessoryId"
+          ]
+        }
+      },
+      {
+        "tableName": "owned_scenery",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sceneryId` TEXT NOT NULL, PRIMARY KEY(`sceneryId`))",
+        "fields": [
+          {
+            "fieldPath": "sceneryId",
+            "columnName": "sceneryId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sceneryId"
+          ]
+        }
+      },
+      {
+        "tableName": "display_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `themeMode` TEXT NOT NULL, `highContrast` INTEGER NOT NULL, `motionEnabled` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "themeMode",
+            "columnName": "themeMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "highContrast",
+            "columnName": "highContrast",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motionEnabled",
+            "columnName": "motionEnabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "achieved_goals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`goalId` TEXT NOT NULL, PRIMARY KEY(`goalId`))",
+        "fields": [
+          {
+            "fieldPath": "goalId",
+            "columnName": "goalId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "goalId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '96810fba737d52560218ee00ee3d2922')"
+    ]
+  }
+}
