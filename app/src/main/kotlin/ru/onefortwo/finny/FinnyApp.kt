@@ -1,5 +1,6 @@
 package ru.onefortwo.finny
 
+import ru.onefortwo.finny.content.Accessories
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,6 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -31,7 +36,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
+import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.content.withNumbers
+import ru.onefortwo.finny.content.named
+import ru.onefortwo.finny.content.PetPartsContent
+import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.common.PetFigure
+import ru.onefortwo.finny.ui.state.AppState
+import ru.onefortwo.finny.ui.state.PetReaction
+import ru.onefortwo.finny.ui.state.PetReactions
+import androidx.compose.foundation.layout.width
 import ru.onefortwo.finny.ui.common.FinnyNavigationBar
 import ru.onefortwo.finny.ui.common.LocalMotionEnabled
 import ru.onefortwo.finny.ui.common.FinnyNavigationRail
@@ -40,6 +54,8 @@ import ru.onefortwo.finny.ui.screens.AdultScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.HistoryScreen
 import ru.onefortwo.finny.ui.screens.MainScreen
+import ru.onefortwo.finny.ui.screens.YardScreen
+import ru.onefortwo.finny.ui.screens.GiftScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
@@ -50,6 +66,7 @@ import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.screens.WardrobeScreen
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.YardGuide
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /** Маршруты навигации. */
@@ -144,11 +161,9 @@ fun FinnyApp(viewModel: GameViewModel) {
             .fillMaxSize()
             .background(FinnyTheme.colors.appBackground),
     ) {
-        if (tab != null && state.hasProfile && expanded) {
-            FinnyNavigationRail(selected = tab, onSelect = onSelectTab)
-        }
+        // ТЕСТ: навигационных панелей нет — разделы открываются со двора.
         Column(modifier = Modifier.weight(1f)) {
-            val bottomBar = tab != null && state.hasProfile && !expanded
+            val bottomBar = false
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -165,6 +180,7 @@ fun FinnyApp(viewModel: GameViewModel) {
                 CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
                     AppNavHost(navController = navController, viewModel = viewModel)
                 }
+                if (state.isDemo || state.demoPending) DemoWatermark()
             }
             if (bottomBar && tab != null) {
                 FinnyNavigationBar(selected = tab, onSelect = onSelectTab)
@@ -183,6 +199,7 @@ private fun AppNavHost(
     val content = viewModel.content
     val today = viewModel.today()
     val balance = state.game.balance
+    val petName = state.profile?.petName ?: "Финни"
 
     NavHost(
         navController = navController,
@@ -191,10 +208,8 @@ private fun AppNavHost(
         startDestination = if (state.hasProfile) Routes.MAIN else Routes.ONBOARDING,
     ) {
         composable(Routes.ONBOARDING) {
-            OnboardingScreen(
-                onContinue = { navController.navigate(Routes.PET_SETUP) },
-                step = 1,
-            )
+            // ТЕСТ: знакомство начинается с подарка.
+            GiftScreen(onOpen = { navController.navigate(Routes.PET_SETUP) })
         }
 
         composable(Routes.HELP) {
@@ -210,7 +225,11 @@ private fun AppNavHost(
         composable(Routes.PET_SETUP) {
             PetSetupScreen(
                 parts = content.petParts(),
+                nameFilter = content.nameFilter(),
                 onBack = { navController.popBackStack() },
+                // В демонстрационном режиме заранее отмечен набор «Посложнее»:
+                // эксперт видит задания с делением; выбор можно поменять.
+                initialDifficulty = if (state.demoPending) Difficulty.HARDER else null,
                 onDone = { name, appearance, difficulty ->
                     viewModel.createProfile(
                         petName = name,
@@ -236,28 +255,40 @@ private fun AppNavHost(
                 ?: TaskQueue.repeatSuggestion(availableTasks, state.game.period.number)
 
             val reactions by viewModel.reactions.collectAsStateWithLifecycle()
+            val speech by viewModel.speech.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) {
+                viewModel.startNewDayIfDue()
+                viewModel.greetIfPending()
+            }
 
-            MainScreen(
+            // ТЕСТ: главная — двор питомца; разделы открываются предметами.
+            YardScreen(
                 state = state,
                 parts = content.petParts(),
                 activeTask = activeTask,
+                guide = YardGuide.step(state, today),
+                onSleepingTap = viewModel::sleepingHint,
+                onArrivalShown = viewModel::dismissArrival,
+                speech = speech,
+                onSpeechShown = viewModel::speechShown,
+                goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
+                today = today,
                 reaction = reactions.firstOrNull(),
                 onReactionPlayed = viewModel::reactionPlayed,
-                onOpenPet = { navController.openTab(NavSection.PET) },
-                goalTitle = goalTitle,
                 onDismissMessage = viewModel::dismissMessage,
                 onOpenPlan = { navController.navigate(Routes.PLAN) },
                 onOpenShop = { navController.navigate(Routes.SHOP) },
                 onOpenSavings = { navController.navigate(Routes.SAVINGS) },
                 onOpenGlossary = { navController.navigate(Routes.GLOSSARY) },
+                onOpenTasks = { navController.navigate(Routes.TASKS) },
+                onOpenPet = { navController.navigate(Routes.WARDROBE) },
+                onOpenProgress = { navController.navigate(Routes.HISTORY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenAdult = { navController.navigate(Routes.ADULT) },
-                today = today,
                 onFinishPeriod = {
                     viewModel.finishPeriod()
                     navController.navigate(Routes.RESULT)
                 },
-                onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
             )
         }
 
@@ -292,6 +323,7 @@ private fun AppNavHost(
                 pet = state.game.pet,
                 balance = balance,
                 todayPurchases = state.game.period.purchases,
+                planConfirmed = state.game.period.isPlanConfirmed,
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
                 onBuy = viewModel::buy,
@@ -301,10 +333,12 @@ private fun AppNavHost(
 
         composable(Routes.TASKS) {
             TasksScreen(
-                tasks = content.tasks(state.difficulty),
+                tasks = content.tasks(state.difficulty).map { it.named(petName) },
                 completedIds = state.completedTaskIds,
-                balance = balance,
                 onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
+                onBack = { navController.popBackStack() },
+                // После неудачного дня задание помощи — сверху.
+                recoveryFirst = state.lastOutcome?.isSetback == true,
             )
         }
 
@@ -318,7 +352,7 @@ private fun AppNavHost(
             // они относились бы уже к другому условию.
             val seed = rememberSaveable(taskId) { Random.nextLong() }
             val task = remember(taskId, seed) {
-                taskId?.let { content.task(it)?.withNumbers(Random(seed)) }
+                taskId?.let { content.task(it)?.withNumbers(Random(seed))?.named(petName) }
             }
 
             if (task == null) {
@@ -338,10 +372,10 @@ private fun AppNavHost(
                 )
                 TaskDetailScreen(
                     task = task,
-                    balance = balance,
                     onAnswer = { answer -> viewModel.answerTask(task, answer) },
                     onBack = { navController.popBackStack() },
-                    nextTask = nextTask,
+                    nextTask = nextTask?.named(petName),
+                    petFigure = { happy -> TaskPet(state, content.petParts(), happy) },
                     // Текущее задание заменяется следующим, а не остаётся под
                     // ним в стеке: «Назад» из следующего ведёт туда, откуда
                     // пришли, а не к уже решённому заданию.
@@ -369,6 +403,9 @@ private fun AppNavHost(
                 onPreviewWithdrawal = viewModel::previewWithdrawal,
                 onWithdraw = viewModel::withdraw,
                 onBack = { navController.popBackStack() },
+                profile = state.profile,
+                parts = content.petParts(),
+                afterClaim = state.achievedGoalIds.isNotEmpty(),
             )
         }
 
@@ -413,6 +450,7 @@ private fun AppNavHost(
                 achievedGoalTitles = content.goals()
                     .filter { it.id in state.achievedGoalIds }
                     .map { it.title },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -428,12 +466,13 @@ private fun AppNavHost(
                 onOpenShop = {
                     navController.navigate(Routes.SHOP) { popUpTo(Routes.MAIN) }
                 },
+                onBack = { navController.popBackStack() },
             )
         }
 
         composable(Routes.GLOSSARY) {
             GlossaryScreen(
-                entries = content.glossary(),
+                entries = content.glossary().map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -456,15 +495,16 @@ private fun AppNavHost(
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
                 },
+                // Демонстрационный режим начинается, как обычная игра, с подарка.
                 onStartDemo = {
                     viewModel.startDemo()
-                    navController.navigate(Routes.MAIN) {
+                    navController.navigate(Routes.ONBOARDING) {
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
                 },
                 onResetDemo = {
                     viewModel.resetDemo()
-                    navController.navigate(Routes.MAIN) {
+                    navController.navigate(Routes.ONBOARDING) {
                         popUpTo(Routes.MAIN) { inclusive = true }
                     }
                 },
@@ -472,6 +512,59 @@ private fun AppNavHost(
             )
         }
     }
+}
+
+/**
+ * Водяной знак демонстрационного режима: одна строка поверх всех экранов.
+ * Стоит выше середины: на дворе — над холмами, где нет предметов и
+ * подсказок, и не ложится на текст облачка. Полупрозрачный и не перехватывает нажатия; для TalkBack режим назван
+ * на табличке дня, поэтому знак не озвучивается.
+ */
+@Composable
+private fun DemoWatermark() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 190.dp)
+            .clearAndSetSemantics { },
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Text(
+            text = "Демо режим",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = FinnyTheme.colors.onSurface.copy(alpha = 0.16f),
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/**
+ * ТЕСТ: питомец ребёнка в ответе на задание: радуется при верном ответе,
+ * спокоен при ошибке — без грусти и упрёка.
+ */
+@Composable
+private fun TaskPet(state: AppState, parts: PetPartsContent, happy: Boolean) {
+    val profile = state.profile ?: return
+    val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
+    val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
+    PetFigure(
+        petName = profile.petName,
+        speciesId = profile.appearance.speciesId,
+        speciesTitle = species?.title ?: "Питомец",
+        accessoryId = profile.appearance.accessoryId,
+        accessoryTitle = Accessories.title(parts, profile.appearance.accessoryId),
+        colorHex = color?.hex ?: "#CCCCCC",
+        stage = state.game.stage,
+        care = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
+        joy = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
+        size = 120.dp,
+        caption = false,
+        plain = true,
+        reaction = if (happy) PetReaction(PetReactions.PLAY, id = 1L) else null,
+        modifier = Modifier.width(120.dp),
+    )
 }
 
 /** Заставка на время чтения сохранённого состояния. */

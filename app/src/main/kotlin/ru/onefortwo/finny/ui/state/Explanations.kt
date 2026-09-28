@@ -95,7 +95,10 @@ object Explanations {
      * «половина от первого раза» была бы неверна.
      */
     fun reward(source: IncomeSource, amount: Coins, repeat: Boolean = false): String =
-        if (repeat) {
+        if (amount.amount == 0) {
+            // ТЕСТ: монеты платятся за первые задания дня.
+            "Монеты за задания на сегодня уже получены. Завтра можно заработать снова"
+        } else if (repeat) {
             "${incomeSource(source)} ещё раз: +${coins(amount)}, за повтор — половина награды"
         } else {
             "${incomeSource(source)}: +${coins(amount)}"

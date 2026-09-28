@@ -1,0 +1,14 @@
+# 12 12
+# pivot 0 0
+............
+.........EE.
+........KEEK
+......EEKEEK
+.....KEEKEEK
+...EEKEEKEEK
+..KEEKEEKEEK
+EEKEEKEEKEEK
+EEKEEKEEKEEK
+KKKKKKKKKKKK
+............
+............

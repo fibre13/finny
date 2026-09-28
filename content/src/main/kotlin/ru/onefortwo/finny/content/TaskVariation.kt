@@ -137,6 +137,8 @@ private val PLACEHOLDER = Regex("""\{(\w+)(?::([а-яё]+))?\}""")
 internal fun String.fill(values: Map<String, Int>): String =
     PLACEHOLDER.replace(this) { match ->
         val name = match.groupValues[1]
+        // ТЕСТ: «{name}» — имя питомца, его подставляет named().
+        if (name == "name") return@replace match.value
         val number = values[name] ?: error("В тексте есть «$name», а значения нет")
         val noun = match.groupValues[2]
         if (noun.isEmpty()) number.toString() else withNoun(number, noun)
@@ -152,13 +154,8 @@ fun TaskContent.withNumbers(random: Random): TaskContent {
     val variation = vary ?: return this
     val values = variation.draw(random)
 
-    fun String.text() = fill(values)
-
-    return when (this) {
+    val numbered = when (this) {
         is AllocateTask -> copy(
-            prompt = prompt.text(),
-            explanationCorrect = explanationCorrect.text(),
-            explanationWrong = explanationWrong.text(),
             amount = variation.amount?.let { evaluate(it, values) } ?: amount,
             rules = rules.mapIndexed { index, rule ->
                 val expression = variation.ruleMins.getOrNull(index)
@@ -167,9 +164,6 @@ fun TaskContent.withNumbers(random: Random): TaskContent {
         )
 
         is PickTask -> copy(
-            prompt = prompt.text(),
-            explanationCorrect = explanationCorrect.text(),
-            explanationWrong = explanationWrong.text(),
             options = options.map { option ->
                 val expression = variation.prices[option.id]
                 if (expression == null) option else option.copy(price = evaluate(expression, values))
@@ -177,16 +171,48 @@ fun TaskContent.withNumbers(random: Random): TaskContent {
         )
 
         is NumberTask -> copy(
-            prompt = prompt.text(),
-            explanationCorrect = explanationCorrect.text(),
-            explanationWrong = explanationWrong.text(),
             answer = variation.answer?.let { evaluate(it, values) } ?: answer,
         )
 
+        is ChoiceTask -> this
+    }
+    return numbered.mapTexts { it.fill(values) }
+}
+
+/**
+ * ТЕСТ: имя питомца вместо «{name}» во всех текстах задания. Имя стоит
+ * только в именительном падеже: придуманное имя не склоняется надёжно.
+ */
+fun TaskContent.named(petName: String): TaskContent = mapTexts { it.replace("{name}", petName) }
+
+/** Применяет [f] ко всем текстам задания, которые видит ребёнок. */
+fun TaskContent.mapTexts(f: (String) -> String): TaskContent {
+    fun String?.t() = this?.let(f)
+    return when (this) {
+        is AllocateTask -> copy(
+            title = f(title), prompt = f(prompt),
+            explanationCorrect = f(explanationCorrect), explanationWrong = f(explanationWrong),
+            petCorrect = petCorrect.t(), petWrong = petWrong.t(), context = context.t(), hint = hint.t(),
+        )
+
+        is PickTask -> copy(
+            title = f(title), prompt = f(prompt),
+            explanationCorrect = f(explanationCorrect), explanationWrong = f(explanationWrong),
+            petCorrect = petCorrect.t(), petWrong = petWrong.t(), context = context.t(), hint = hint.t(),
+            options = options.map { it.copy(title = f(it.title), note = it.note.t()) },
+        )
+
+        is NumberTask -> copy(
+            title = f(title), prompt = f(prompt),
+            explanationCorrect = f(explanationCorrect), explanationWrong = f(explanationWrong),
+            petCorrect = petCorrect.t(), petWrong = petWrong.t(), context = context.t(), hint = hint.t(),
+        )
+
         is ChoiceTask -> copy(
-            prompt = prompt.text(),
-            explanationCorrect = explanationCorrect.text(),
-            explanationWrong = explanationWrong.text(),
+            title = f(title), prompt = f(prompt),
+            explanationCorrect = f(explanationCorrect), explanationWrong = f(explanationWrong),
+            petCorrect = petCorrect.t(), petWrong = petWrong.t(), context = context.t(), hint = hint.t(),
+            options = options.map { it.copy(title = f(it.title), outcome = f(it.outcome), note = it.note.t(), pet = it.pet.t()) },
         )
     }
 }

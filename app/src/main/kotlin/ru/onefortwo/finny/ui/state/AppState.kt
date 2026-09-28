@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.state
 
+import ru.onefortwo.finny.content.Accessories
 import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.data.SavedGame
 import ru.onefortwo.finny.economy.GameState
@@ -52,6 +53,13 @@ data class AppState(
     /** Сохранённое состояние прочитано с устройства. */
     val isLoaded: Boolean = false,
 
+    /**
+     * Взрослый включил демонстрационный режим, и ребёнок проходит знакомство:
+     * профиль, созданный в конце знакомства, будет тестовым. Не сохраняется:
+     * до создания профиля сохранять нечего.
+     */
+    val demoPending: Boolean = false,
+
     /** Класс ребёнка: задаёт сложность заданий (ТЗ 2.5.8). */
     val difficulty: Difficulty = Difficulty.SIMPLE,
 
@@ -78,6 +86,19 @@ data class AppState(
 
     /** Цели, которые ребёнок уже накопил и получил. */
     val achievedGoalIds: Set<String> = emptySet(),
+
+    /**
+     * ТЕСТ: сколько новых заданий оплачено монетами в игровом дне
+     * [paidTasksPeriod]. Монеты платятся за первые [TaskPay.PER_DAY].
+     */
+    val paidTasksPeriod: Int = 0,
+    val paidTasksCount: Int = 0,
+
+    /**
+     * ТЕСТ: пришли монеты — стартовые или карманные на новый день.
+     * Показывается отдельным окном, а не карточкой среди других призывов.
+     */
+    val arrival: FeedbackMessage? = null,
 ) {
     /** Профиль создан и можно вести игру. */
     val hasProfile: Boolean get() = profile != null
@@ -107,10 +128,24 @@ data class AppState(
 
     /** Доступно ли украшение для гардероба: без украшения — всегда. */
     fun isAccessoryAvailable(accessoryId: String): Boolean =
-        accessoryId == PetAppearanceDefaults.NONE || accessoryId in ownedAccessories
+        Accessories.list(accessoryId).all { it in ownedAccessories }
+
+    /** Сколько новых заданий уже оплачено сегодня. */
+    val paidTasksToday: Int get() = if (paidTasksPeriod == game.period.number) paidTasksCount else 0
+
+    /**
+     * ТЕСТ: день закрыт, питомец спит до новых календарных суток. В обычном
+     * режиме карманные придут при первом входе в новые сутки.
+     */
+    fun isSleeping(today: String): Boolean = isDayFinished(today)
 
     /** Куплена ли обстановка с таким кодом. */
     fun hasScenery(sceneryId: String): Boolean = sceneryId in ownedScenery
+}
+
+/** ТЕСТ: монеты за задания — только за первые новые задания дня. */
+object TaskPay {
+    const val PER_DAY = 2
 }
 
 /** Значения внешности, доступные без покупки. */
@@ -137,6 +172,8 @@ fun SavedGame.toAppState(): AppState = AppState(
     ownedAccessories = ownedAccessories,
     ownedScenery = ownedScenery,
     achievedGoalIds = achievedGoalIds,
+    paidTasksPeriod = paidTasksPeriod,
+    paidTasksCount = paidTasksCount,
 )
 
 /** Переводит состояние приложения в сохраняемый вид; null, если профиля нет. */
@@ -159,5 +196,7 @@ fun AppState.toSavedGame(): SavedGame? {
         ownedAccessories = ownedAccessories,
         ownedScenery = ownedScenery,
         achievedGoalIds = achievedGoalIds,
+        paidTasksPeriod = paidTasksPeriod,
+        paidTasksCount = paidTasksCount,
     )
 }

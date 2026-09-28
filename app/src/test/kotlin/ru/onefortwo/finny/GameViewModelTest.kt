@@ -53,7 +53,14 @@ class GameViewModelTest {
     }
 
     /** Модель без сохранения: проверяются правила, а не работа с базой. */
-    private fun viewModel(): GameViewModel = GameViewModel(content, repository = null).apply {
+    /** Дата по часам устройства: сценарии на несколько дней переводят её вперёд. */
+    private var day = java.time.LocalDate.of(2026, 9, 28)
+
+    private fun viewModel(): GameViewModel = GameViewModel(
+        content,
+        repository = null,
+        dates = ru.onefortwo.finny.ui.state.DateProvider { day.toString() },
+    ).apply {
         createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
     }
 
@@ -70,12 +77,11 @@ class GameViewModelTest {
     }
 
     @Test
-    fun `сообщение о стартовом начислении содержит источник и сумму`() {
-        val message = viewModel().state.value.message
+    fun `о стартовых монетах сообщает отдельное окно с суммой`() {
+        val arrival = viewModel().state.value.arrival
 
-        assertNotNull(message)
-        assertTrue(message!!.text.contains("Стартовые монеты"))
-        assertTrue(message.text.contains("50"))
+        assertNotNull(arrival)
+        assertTrue(arrival!!.text.contains("50 монет"))
     }
 
     @Test
@@ -401,6 +407,7 @@ class GameViewModelTest {
             model.buy("food")
             model.buy("ball")
             model.finishPeriod()
+            nextMorning(model)
         }
 
         val game = model.state.value.game
@@ -422,6 +429,7 @@ class GameViewModelTest {
             model.buy("food")
             model.buy("ball")
             model.finishPeriod()
+            nextMorning(model)
         }
         val pointsBefore = model.state.value.game.growthPoints
 
@@ -452,5 +460,11 @@ class GameViewModelTest {
         assertEquals(0, state.completedTaskIds.size)
         assertEquals(1, state.game.period.number)
         assertEquals(0, state.game.savings.saved.amount)
+    }
+
+    /** ТЕСТ: новые сутки — карманные приходят при первом входе. */
+    private fun nextMorning(model: GameViewModel) {
+        day = day.plusDays(1)
+        model.startNewDayIfDue()
     }
 }

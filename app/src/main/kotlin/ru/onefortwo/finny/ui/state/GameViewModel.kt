@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,12 +14,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.onefortwo.finny.content.Accessories
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.ItemCategory
 import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskContent
+import ru.onefortwo.finny.content.TaskTopic
 import ru.onefortwo.finny.content.check
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.data.GameRepository
@@ -28,6 +31,7 @@ import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.DepositResult
 import ru.onefortwo.finny.economy.GameState
+import ru.onefortwo.finny.economy.startNewDay
 import ru.onefortwo.finny.economy.IncomeSource
 import ru.onefortwo.finny.economy.PeriodCompletion
 import ru.onefortwo.finny.economy.PlanConfirmation
@@ -76,6 +80,8 @@ class GameViewModel(
     val content: ContentRepository,
     private val repository: GameRepository?,
     private val dates: DateProvider = DateProvider { LocalDate.now().toString() },
+    private val hours: () -> Int = { LocalTime.now().hour },
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
 
     /** Сегодняшняя дата по часам устройства. */
@@ -101,6 +107,27 @@ class GameViewModel(
         _reactions.update { queued ->
             (queued + PetReaction(kind, ++reactionCount, stageBefore)).takeLast(PetReactions.MAX_QUEUED)
         }
+    }
+
+    /**
+     * ТЕСТ: реплика питомца в облачке на дворе. Приветствие готовится
+     * при каждом возвращении в приложение и показывается один раз.
+     */
+    private val _speech = MutableStateFlow<String?>(null)
+    val speech: StateFlow<String?> = _speech.asStateFlow()
+    private var greetPending = true
+
+    /** Двор открыт: если ребёнок только что вошёл, питомец здоровается. */
+    fun greetIfPending() {
+        val current = _state.value
+        if (!greetPending || !current.hasProfile) return
+        greetPending = false
+        _speech.value = PetSpeech.greeting(current.usageDate, dates.today(), hours())
+    }
+
+    /** Реплика показана — облачко убирается. */
+    fun speechShown() {
+        _speech.value = null
     }
 
     /** Реакция проиграна или пропущена — убирается из очереди. */
@@ -177,12 +204,19 @@ class GameViewModel(
     /** Создаёт локальный профиль: игровое имя и внешность, без личных данных. */
     fun createProfile(petName: String, appearance: PetAppearance, difficulty: Difficulty) {
         _reactions.value = emptyList()
-        _state.value = freshProfile(
+        val previous = _state.value
+        val demo = previous.demoPending
+        val profile = freshProfile(
             petName = petName.trim(),
             appearance = appearance,
-            isDemo = false,
+            isDemo = demo,
             difficulty = difficulty,
+            keepUsage = previous,
         )
+        // В демонстрационном режиме цель выбрана заранее: сценарий проверки
+        // проходится подряд, без лишних шагов (ТЗ 2.5.13).
+        val goal = if (demo) content.goals().firstOrNull { it.id == DEMO_GOAL_ID } else null
+        _state.value = if (goal == null) profile else profile.copy(game = profile.game.chooseGoal(goal.toDomain()))
     }
 
     /** Полный сброс профиля; доступен взрослому (ТЗ 2.5.12, 3.5). */
@@ -198,29 +232,24 @@ class GameViewModel(
     }
 
     /**
-     * Включает демонстрационный режим: создаёт тестовый профиль с
-     * фиксированными данными и выбранной целью, чтобы обязательный сценарий
-     * проходился подряд без ожидания календарных сроков (ТЗ 2.5.13).
+     * Включает демонстрационный режим. Игра начинается так же, как обычная:
+     * подарок, выбор питомца и имени. Профиль, созданный в конце знакомства,
+     * тестовый: этапы идут подряд без ожидания календарных сроков, цель
+     * выбрана заранее (ТЗ 2.5.13).
      */
     fun startDemo() {
         _reactions.value = emptyList()
-        val demo = freshProfile(
-            petName = DEMO_PET_NAME,
-            appearance = DEMO_APPEARANCE,
-            isDemo = true,
-            difficulty = DEMO_DIFFICULTY,
-            keepUsage = _state.value,
+        val previous = _state.value
+        _state.value = AppState(
+            isLoaded = true,
+            demoPending = true,
+            usageDate = previous.usageDate,
+            usageMinutes = previous.usageMinutes,
+            timeLimitEnabled = previous.timeLimitEnabled,
         )
-        val goal = content.goals().firstOrNull { it.id == DEMO_GOAL_ID }
-
-        _state.value = if (goal == null) {
-            demo
-        } else {
-            demo.copy(game = demo.game.chooseGoal(goal.toDomain()))
-        }
     }
 
-    /** Возвращает тестовый профиль к исходному состоянию (ТЗ 2.5.13). */
+    /** Возвращает тестовый профиль к исходному состоянию — к подарку (ТЗ 2.5.13). */
     fun resetDemo() = startDemo()
 
     /** Начальное состояние профиля со стартовым бюджетом. */
@@ -249,19 +278,54 @@ class GameViewModel(
             timeLimitEnabled = keepUsage?.timeLimitEnabled ?: true,
             // Украшение, выбранное при создании питомца, доступно в гардеробе
             // без покупки: иначе его нельзя было бы вернуть, сняв однажды.
-            ownedAccessories = setOfNotNull(
-                appearance.accessoryId.takeIf { it != PetAppearanceDefaults.NONE },
-            ),
-            message = Explanations.income(
-                source = IncomeSource.START_BUDGET,
-                amount = IncomeSource.START_BUDGET.amount,
-                balanceAfter = game.balance,
+            ownedAccessories = Accessories.list(appearance.accessoryId).toSet(),
+            arrival = FeedbackMessage(
+                text = "Тебе дали ${Explanations.coins(IncomeSource.START_BUDGET.amount)}.",
+                nextStep = "На них ты будешь заботиться о питомце: кормить, радовать и копить на мечту.",
             ),
         )
     }
 
     fun dismissMessage() {
         _state.update { it.copy(message = null) }
+    }
+
+    /** Окно «Пришли монеты» прочитано. */
+    fun dismissArrival() {
+        _state.update { it.copy(arrival = null) }
+    }
+
+    /**
+     * ТЕСТ: новые календарные сутки — начинается новый игровой день.
+     * Если прошлый день закрыт в обычном режиме, карманные на новый день
+     * были отложены; они приходят сейчас, при первом входе в новые сутки.
+     * Не в полночь: работа в фоне не нужна, а пропуск дня ничем не грозит.
+     */
+    fun startNewDayIfDue() {
+        val current = _state.value
+        val finished = current.lastFinishedDate ?: return
+        if (current.isDemo || !current.hasProfile || finished >= dates.today()) return
+        val (game, event) = current.game.startNewDay()
+        _state.value = current.copy(
+            game = game,
+            lastFinishedDate = null,
+            arrival = FeedbackMessage(
+                text = "Новый день! Карманные: +${Explanations.coins(event.amount)}.",
+                nextStep = "Теперь у тебя ${Explanations.coins(event.balanceAfter)}. Раздели их в «Плане».",
+            ),
+        )
+    }
+
+    /** ТЕСТ: питомец спит — разделы дня откроются завтра. */
+    fun sleepingHint() {
+        _state.update {
+            it.copy(
+                message = FeedbackMessage(
+                    text = "$petName спит. Новый день начнётся завтра — тогда придут и монеты.",
+                    nextStep = "Пока можно заглянуть в словарик или в гардероб.",
+                ),
+            )
+        }
     }
 
     // --- План бюджета ----------------------------------------------------
@@ -385,20 +449,17 @@ class GameViewModel(
      */
     fun claimGoal() {
         val current = _state.value
-        val title = current.game.savings.goal
-            ?.let { goal -> content.goals().firstOrNull { it.id == goal.id }?.title }
-            ?: return
         val (game, goal) = current.game.claimGoal() ?: return
 
+        // Отклика внизу нет: праздник уже был на экране копилки, а остаток
+        // называет плашка «В копилке N монет — это старт для новой мечты».
+        // Питомец радуется награде, когда ребёнок вернётся на главную.
+        react(PetReactions.REWARD)
         _state.update {
             it.copy(
                 game = game,
                 achievedGoalIds = it.achievedGoalIds + goal.id,
-                message = FeedbackMessage(
-                    text = "Ты накопил на «$title» и получил её. " +
-                        "В копилке осталось ${Explanations.coins(game.savings.saved)}.",
-                    nextStep = "Выбери следующую цель — копить станет на что.",
-                ),
+                message = null,
             )
         }
     }
@@ -482,15 +543,35 @@ class GameViewModel(
     fun answerTask(task: TaskContent, answer: TaskAnswer): AnsweredTask {
         val taskId = task.id
         val check = task.check(answer)
-        val repeat = taskId in _state.value.completedTaskIds
-        val reward = if (repeat) check.reward.amount.half() else check.reward.amount
+        val current = _state.value
+        // ТЕСТ: круг заданий. Когда решены все задания уровня, следующий
+        // ответ начинает новый круг: звёзды на списке — заново.
+        val levelIds = content.tasks(current.difficulty)
+            .filter { it.topic != TaskTopic.RECOVERY }
+            .map { it.id }
+            .toSet()
+        val roundDone = levelIds.isNotEmpty() && current.completedTaskIds.containsAll(levelIds)
+        val solvedBefore = if (roundDone && taskId in levelIds) current.completedTaskIds - levelIds else current.completedTaskIds
+        val repeat = taskId in solvedBefore
+        // ТЕСТ: монеты — за первые TaskPay.PER_DAY заданий дня, считая и
+        // повторы; «Помоги Финни» — путь восстановления, оплачивается всегда.
+        val counted = check.reward != IncomeSource.RECOVERY_TASK
+        val overLimit = counted && current.paidTasksToday >= TaskPay.PER_DAY
+        val reward = when {
+            overLimit -> Coins.ZERO
+            repeat -> check.reward.amount.half()
+            else -> check.reward.amount
+        }
 
-        val (game, event) = _state.value.game.earn(check.reward, reward)
+        val (game, event) = current.game.earn(check.reward, reward)
         if (event.amount.amount > 0) react(PetReactions.REWARD)
+        val paid = counted && !overLimit
         _state.update {
             it.copy(
                 game = game,
-                completedTaskIds = it.completedTaskIds + taskId,
+                completedTaskIds = solvedBefore + taskId,
+                paidTasksPeriod = if (paid) it.game.period.number else it.paidTasksPeriod,
+                paidTasksCount = if (paid) it.paidTasksToday + 1 else it.paidTasksCount,
                 message = Explanations.income(
                     source = event.source,
                     amount = event.amount,
@@ -506,7 +587,9 @@ class GameViewModel(
     // --- Игровой период --------------------------------------------------
 
     fun finishPeriod() {
-        when (val result = _state.value.game.finishPeriod()) {
+        // ТЕСТ: в обычном режиме карманные на новый день приходят завтра,
+        // при первом входе; в демонстрационном — сразу (ТЗ 2.5.13).
+        when (val result = _state.value.game.finishPeriod(payIncome = _state.value.isDemo)) {
             is PeriodCompletion.Success -> {
                 if (result.outcome.stageAdvanced) react(PetReactions.GROW, result.outcome.stageBefore)
                 _state.update {
@@ -547,6 +630,10 @@ class GameViewModel(
      * при этом запись в базу происходит не чаще раза в минуту.
      */
     fun onSessionStart() {
+        // ТЕСТ: поворот экрана — не новый вход: приветствие только после
+        // паузы дольше минуты или при первом открытии.
+        if (stoppedAt == 0L || clock() - stoppedAt > GREET_AFTER_MS) greetPending = true
+        startNewDayIfDue()
         if (usageTicker?.isActive == true) return
 
         usageTicker = viewModelScope.launch {
@@ -558,7 +645,10 @@ class GameViewModel(
     }
 
     /** Приложение ушло с переднего плана: счётчик останавливается. */
+    private var stoppedAt = 0L
+
     fun onSessionStop() {
+        stoppedAt = clock()
         usageTicker?.cancel()
         usageTicker = null
     }
@@ -630,15 +720,9 @@ class GameViewModel(
     }
 
     private companion object {
-        /** Фиксированные данные тестового профиля для экспертной проверки. */
-        const val DEMO_PET_NAME = "Финни"
+        /** Цель тестового профиля: выбрана заранее для экспертной проверки. */
         const val DEMO_GOAL_ID = "scooter"
-        val DEMO_DIFFICULTY = Difficulty.HARDER
         const val MINUTE_MILLIS = 60_000L
-        val DEMO_APPEARANCE = PetAppearance(
-            speciesId = "cat",
-            colorId = "ginger",
-            accessoryId = "bow",
-        )
+        const val GREET_AFTER_MS = 60_000L
     }
 }

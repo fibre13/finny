@@ -78,6 +78,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -775,6 +777,8 @@ fun CheckOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     swatch: (@Composable () -> Unit)? = null,
+    /** Подпись видна; без неё название только озвучивается (плитка-картинка). */
+    showTitle: Boolean = true,
 ) {
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.small
@@ -790,7 +794,10 @@ fun CheckOption(
                 shape = shape,
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .semantics { stateDescription = if (selected) "выбрано" else "не выбрано" },
+            .semantics {
+                stateDescription = if (selected) "выбрано" else "не выбрано"
+                if (!showTitle) contentDescription = title
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -799,13 +806,15 @@ fun CheckOption(
         ) {
             if (swatch != null) {
                 swatch()
-                Spacer(modifier = Modifier.size(4.dp))
+                if (showTitle) Spacer(modifier = Modifier.size(4.dp))
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-            )
+            if (showTitle) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         if (selected) {
             CheckIcon(
@@ -1277,7 +1286,10 @@ fun FinnyTextField(
                 text = errorText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.errorText,
-                modifier = Modifier.padding(top = 6.dp),
+                // Ошибку TalkBack зачитывает сразу, без перехода к ней.
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .semantics { liveRegion = LiveRegionMode.Assertive },
             )
         } else if (supportingText != null) {
             SupportingText(supportingText, modifier = Modifier.padding(top = 6.dp))
@@ -1643,6 +1655,10 @@ fun PetFigure(
      * ширину и высоту, поля — продолжение неба, холмов и травы.
      */
     fillArea: Boolean = false,
+    /** Фигура без светлой плитки — поверх своего фона (праздник в копилке). */
+    plain: Boolean = false,
+    /** Спит: глаза закрыты (двор, конец дня). */
+    sleeping: Boolean = false,
 ) {
     val art = rememberPixelArt()
     val motion = rememberPetMotion(art.animation, care, joy, reaction, onReactionEnd)
@@ -1728,11 +1744,12 @@ fun PetFigure(
                 HashMap<MotionFrame, ImageBitmap>()
             }
             // Облака на карточке не видны: кадр неба не различает изображения.
-            val image = frames.getOrPut(motion.copy(sky = 0)) {
+            val still = motion.copy(sky = 0, blink = motion.blink || sleeping)
+            val image = frames.getOrPut(still) {
                 pixelImage(
                     composePet(
                         art, speciesId, stage, colorHex, accessoryId, care, joy,
-                        frame = motion.breath, blink = motion.blink, dy = motion.dy,
+                        frame = still.breath, blink = still.blink, dy = still.dy,
                         reaction = motion.reaction, reactionTick = motion.reactionTick,
                         stageBefore = motion.stageBefore,
                     ),
@@ -1743,8 +1760,13 @@ fun PetFigure(
             Box(
                 modifier = Modifier
                     .size(size)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(FinnyTheme.colors.surface)
+                    .then(
+                        if (plain) {
+                            Modifier
+                        } else {
+                            Modifier.clip(MaterialTheme.shapes.large).background(FinnyTheme.colors.surface)
+                        },
+                    )
                     .then(describePet),
                 contentAlignment = Alignment.Center,
             ) {

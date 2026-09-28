@@ -99,8 +99,19 @@ class TaskVariationTest {
     fun `в текстах заданий не остаётся мест подстановки`() {
         tasks.forEach { source ->
             repeat(20) { seed ->
-                val task = source.withNumbers(Random(seed))
-                listOf(task.prompt, task.explanationCorrect, task.explanationWrong).forEach { text ->
+                // Имя питомца подставляется отдельно — перед показом.
+                val task = source.withNumbers(Random(seed)).named("Тест")
+                val options = when (task) {
+                    is PickTask -> task.options.flatMap { listOfNotNull(it.title, it.note) }
+                    is ChoiceTask -> task.options.flatMap { listOfNotNull(it.title, it.outcome, it.note, it.pet) }
+                    else -> emptyList()
+                }
+                (
+                    listOfNotNull(
+                        task.title, task.prompt, task.explanationCorrect, task.explanationWrong,
+                        task.context, task.hint, task.petCorrect, task.petWrong,
+                    ) + options
+                ).forEach { text ->
                     assertFalse(
                         "Задание ${task.id}: в тексте осталось место подстановки — $text",
                         text.contains('{'),
@@ -120,7 +131,8 @@ class TaskVariationTest {
     @Test
     fun `числа меняются от прохождения к прохождению`() {
         tasks.filter { it.vary != null }.forEach { source ->
-            val prompts = draws(source.id, count = 20).map { it.prompt }.toSet()
+            // Числа могут стоять в условии или в игровом событии над ним.
+            val prompts = draws(source.id, count = 20).map { it.prompt + it.context.orEmpty() }.toSet()
 
             assertTrue(
                 "Задание ${source.id}: условие ни разу не изменилось",
@@ -160,9 +172,10 @@ class TaskVariationTest {
                     "Задание ${task.id}: сумма ${task.amount} меньше обязательного $required",
                     task.amount > required,
                 )
+                // ТЕСТ: слагаемые (корм и вода) — в событии, сумма — в объяснении.
                 assertTrue(
-                    "Задание ${task.id}: обязательное $required не названо в условии",
-                    task.prompt.contains(required.toString()),
+                    "Задание ${task.id}: обязательное $required не названо в объяснении",
+                    task.explanationCorrect.contains(required.toString()),
                 )
             }
         }
@@ -214,9 +227,10 @@ class TaskVariationTest {
                 val ball = task.options.first { it.id == "ball" }.price!!
 
                 assertTrue("Задание $id: корм $food, мячик $ball", food < ball)
+                // ТЕСТ: сумму ребёнок не считает — цены названы в условии.
                 assertTrue(
-                    "Задание $id: в условии нет суммы ${food + ball}",
-                    task.prompt.contains((food + ball).toString()),
+                    "Задание $id: в условии нет цен $food и $ball",
+                    task.prompt.contains(food.toString()) && task.prompt.contains(ball.toString()),
                 )
             }
         }

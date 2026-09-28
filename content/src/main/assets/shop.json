@@ -83,5 +83,15 @@
     "stat_delta": 10,
     "effect": "{name} будет тёплым и нарядным",
     "unlocks_accessory": "scarf"
+  },
+  {
+    "id": "hat",
+    "title": "Шапочка",
+    "category": "wants",
+    "price": 8,
+    "stat": "joy",
+    "stat_delta": 10,
+    "effect": "{name} будет в тёплой шапочке",
+    "unlocks_accessory": "hat"
   }
 ]

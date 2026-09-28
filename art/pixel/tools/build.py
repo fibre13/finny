@@ -216,7 +216,7 @@ def main():
 
     sprites = {}
     broken = set()  # файлы есть, но не разобраны из-за ошибок выше
-    kinds = ("pet", "face", "accessory", "scene", "goal", "fx")
+    kinds = ("pet", "face", "accessory", "scene", "goal", "fx", "yard")
     for kind in kinds:
         d = os.path.join(SRC, kind)
         if not os.path.isdir(d):

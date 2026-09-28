@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
@@ -41,6 +43,7 @@ import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskQueue
+import ru.onefortwo.finny.content.TaskTopic
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.BudgetPlan
@@ -51,6 +54,7 @@ import ru.onefortwo.finny.economy.IncomeSource
 import ru.onefortwo.finny.economy.PeriodCompletion
 import ru.onefortwo.finny.economy.PlanConfirmation
 import ru.onefortwo.finny.economy.chooseGoal
+import ru.onefortwo.finny.economy.buy
 import ru.onefortwo.finny.economy.confirmPlan
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
@@ -60,6 +64,7 @@ import ru.onefortwo.finny.ui.common.LocalMotionEnabled
 import ru.onefortwo.finny.ui.common.MotionFrame
 import ru.onefortwo.finny.ui.common.rememberPetMotion
 import ru.onefortwo.finny.ui.screens.AdultScreen
+import ru.onefortwo.finny.ui.screens.GiftScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
@@ -72,6 +77,7 @@ import ru.onefortwo.finny.ui.screens.SavingsScreen
 import ru.onefortwo.finny.ui.screens.ShopScreen
 import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
+import ru.onefortwo.finny.ui.screens.YardScreen
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.FeedbackMessage
@@ -113,19 +119,32 @@ class ScreenRenderTest {
     }
 
     @Test
+    fun `подарок называет цель и три решения и открывается кнопкой`() {
+        var opened = false
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme { GiftScreen(onOpen = { opened = true }) }
+            }
+        }
+
+        // ТЗ 2.5.1: цель игры и три типа решений.
+        compose.onNodeWithText("на нужное — чтобы был сыт").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("на «Хочу» — чтобы радовался").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("в копилку — на большую мечту").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Шаг 1 из 3").assertExists()
+        compose.onNodeWithText("Открыть подарок").performScrollTo().performClick()
+        assertTrue(opened)
+    }
+
+    @Test
     @Config(qualifiers = "w360dp-h800dp")
     fun `шаги знакомства помещаются на телефоне 360 на 800 без прокрутки`() {
         // Эталонный телефон 720 × 1600, 320 dpi: под строкой состояния
         // (24 dp) и системной панелью (48 dp) экрану остаётся 728 dp.
-        var step by mutableStateOf(1)
         compose.setContent {
             FinnyTheme {
                 Box(modifier = Modifier.height(728.dp)) {
-                    if (step == 1) {
-                        OnboardingScreen(onContinue = {}, step = 1)
-                    } else {
-                        PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> })
-                    }
+                    PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> })
                 }
             }
         }
@@ -135,26 +154,49 @@ class ScreenRenderTest {
             assertTrue("Кнопка «$button» ниже края экрана: $bottom > $limit", bottom <= limit)
         }
 
-        assertFits("Дальше")
-
-        step = 2
-        compose.waitForIdle()
-        assertFits("Выбрать")
-
+        // Шаг 2 — кто будет другом.
+        assertFits("Далее")
+        compose.onNodeWithText("Далее").performClick()
         // Шаг 3 до выбора — худший случай: под кнопкой причина её недоступности.
-        compose.onNodeWithText("Выбрать").performClick()
-        assertFits("Проверить выбор")
-        // Причина выводится; её положение здесь не проверяется: Robolectric
-        // отводит каждой строке текста около 35 px независимо от стиля, и
-        // высоты получаются больше, чем на устройстве. Поэтому проверка
-        // кнопок строже реальной: на эмуляторе 360 × 800 причина помещается.
-        compose.onNodeWithText("Выбери задания и придумай имя, и кнопка станет доступной.")
-            .assertExists()
+        // Положение причины здесь не проверяется: Robolectric отводит строке
+        // текста около 35 px, и высоты получаются больше, чем на устройстве.
+        assertFits("Далее")
+        compose.onNodeWithText("Придумай имя и выбери задания.").assertExists()
 
         compose.onNodeWithText("Попроще").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("Финни")
-        compose.onNodeWithText("Проверить выбор").performClick()
-        assertFits("Начать первый день")
+        compose.onNodeWithText("Далее").performClick()
+        // Финал: имя питомца и «Начать игру».
+        compose.onNodeWithText("Привет!").assertExists()
+        compose.onNodeWithText("Финни").assertExists()
+        assertFits("Начать игру")
+    }
+
+    @Test
+    fun `недопустимое имя стирается, показывается ошибка, дальше не пройти`() {
+        compose.setContent {
+            FinnyTheme {
+                PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }, nameFilter = content.nameFilter())
+            }
+        }
+        compose.onNodeWithText("Далее").performScrollTo().performClick()
+        compose.onNodeWithText("Попроще").performScrollTo().performClick()
+
+        // Корень «дурак» стирается сразу, на вводе.
+        compose.onNode(hasSetTextAction()).performTextInput("Дурак")
+        compose.onNodeWithText("Так не принято называть питомцев. Придумай другое имя.").performScrollTo().assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assert(
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(
+                androidx.compose.ui.semantics.SemanticsProperties.EditableText,
+                androidx.compose.ui.text.AnnotatedString(""),
+            ),
+        )
+        compose.onNodeWithText("Далее").performScrollTo().assertIsNotEnabled()
+
+        // Нормальное имя принимается, ошибка уходит.
+        compose.onNode(hasSetTextAction()).performTextInput("Барсик")
+        compose.onNodeWithText("Так не принято называть питомцев. Придумай другое имя.").assertDoesNotExist()
+        compose.onNodeWithText("Далее").performScrollTo().assertIsEnabled()
     }
 
     @Test
@@ -163,20 +205,17 @@ class ScreenRenderTest {
             FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }) }
         }
 
-        // Шаг 2 — внешность, шаг 3 — сложность заданий и имя.
-        compose.onNodeWithText("Выбрать").performScrollTo().performClick()
+        // Шаг 2 — внешность, шаг 3 — имя и сложность заданий.
+        compose.onNodeWithText("Далее").performScrollTo().performClick()
 
-        compose.onNodeWithText("Какие задания тебе по силам")
-            .performScrollTo()
-            .assertIsDisplayed()
+        compose.onNodeWithText("Какие задания?").performScrollTo().assertIsDisplayed()
         // Поле имени названо для программы чтения с экрана своей подписью.
-        compose.onNodeWithContentDescription("Как назовём").performScrollTo().assertIsDisplayed()
-        // Пока сложность и имя не выбраны, дальше пройти нельзя: задания
-        // начинаются сразу после создания питомца.
-        compose.onNodeWithText("Проверить выбор").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Выбери задания и придумай имя, и кнопка станет доступной.")
-            .performScrollTo()
-            .assertIsDisplayed()
+        compose.onNodeWithContentDescription("Имя питомца").performScrollTo().assertIsDisplayed()
+        // Подсказка ТЗ 3.5: настоящее имя не нужно.
+        compose.onNodeWithText("Придумай игровое имя — настоящее писать не нужно.").performScrollTo().assertIsDisplayed()
+        // Пока сложность и имя не выбраны, дальше пройти нельзя.
+        compose.onNodeWithText("Далее").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Придумай имя и выбери задания.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -185,9 +224,15 @@ class ScreenRenderTest {
             FinnyTheme { PetSetupScreen(parts = content.petParts(), onDone = { _, _, _ -> }) }
         }
 
-        compose.onNodeWithText("Кто это").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Какого цвета").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Украшение").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Кто будет твоим другом?").assertIsDisplayed()
+        // Виды — картинками, названия озвучиваются.
+        listOf("Котёнок", "Щенок", "Крольчонок").forEach {
+            compose.onNodeWithContentDescription(it).performScrollTo().assertIsDisplayed()
+        }
+        // ТЕСТ: цвета — кружками без подписей, но TalkBack их называет.
+        compose.onNodeWithText("Окрас").assertDoesNotExist()
+        compose.onNodeWithText("Серый").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Серый", substring = true).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -297,7 +342,7 @@ class ScreenRenderTest {
 
         // Кнопка ищется по описанию для программы чтения с экрана:
         // у трёх направлений одинаковые подписи «+5».
-        compose.onNodeWithContentDescription("Копилка: прибавить 5").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Копим на мечту: прибавить 5").performScrollTo().performClick()
 
         compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(
@@ -419,7 +464,7 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Хочу: прибавить 1").performScrollTo().performClick()
         repeat(4) {
-            compose.onNodeWithContentDescription("Копилка: прибавить 1").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("Копим на мечту: прибавить 1").performScrollTo().performClick()
         }
 
         compose.onNodeWithText("Все монеты распределены.").performScrollTo().assertIsDisplayed()
@@ -542,7 +587,7 @@ class ScreenRenderTest {
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
 
         compose.onNodeWithText(
-            "Награда за задание ещё раз: +5 монет, за повтор — половина награды.",
+            "Награда за задание ещё раз: +5 монет, за повтор — половина награды",
         )
             .performScrollTo()
             .assertIsDisplayed()
@@ -588,7 +633,7 @@ class ScreenRenderTest {
 
         compose.onNodeWithText("Нужное").assertIsDisplayed()
         compose.onNodeWithText("Хочу").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Копилка").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Копим на мечту").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("0 из 50").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Остаток 50 монет — можно оставить на всякий случай.")
             .performScrollTo()
@@ -681,28 +726,7 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `экран заданий показывает темы`() {
-        compose.setContent {
-            FinnyTheme {
-                TasksScreen(
-                    tasks = simpleTasks,
-                    completedIds = emptySet(),
-                    onOpenTask = {},
-                    onBack = {},
-                )
-            }
-        }
-
-        // Тема подписана на каждой карточке; первые три новых задания —
-        // по одному на каждую обязательную тему.
-        compose.onNodeWithText("Новые задания").assertIsDisplayed()
-        compose.onAllNodesWithText("Планирование бюджета").assertCountEquals(2)
-        compose.onAllNodesWithText("Формирование сбережений").assertCountEquals(2)
-        compose.onAllNodesWithText("Платежи и покупки").assertCountEquals(2)
-    }
-
-    @Test
-    fun `решённые задания уходят из новых в отдельный раздел`() {
+    fun `экран заданий показывает звёзды и короткие карточки с темой`() {
         val queue = TaskQueue.ordered(simpleTasks)
         val opened = mutableListOf<String>()
         compose.setContent {
@@ -716,32 +740,28 @@ class ScreenRenderTest {
             }
         }
 
-        // Решённое задание выводится один раз — в «Уже решал», а не ещё и в новых.
+        // ТЕСТ: звёзды — решённые в этом круге из заданий уровня.
+        compose.onNodeWithContentDescription("Звёзды: 1 из ${queue.size}").assertIsDisplayed()
+        // Каждое задание — один раз, без «Уже решал» и длинных пояснений.
         compose.onAllNodesWithText(queue[0].title).assertCountEquals(1)
-        compose.onNodeWithText("Новые задания").assertIsDisplayed()
-        compose.onNodeWithText("Уже решал").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Решить ещё раз").performScrollTo().performClick()
-        compose.onNodeWithText("Если день не удался").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Уже решал", substring = true).assertDoesNotExist()
+        compose.onAllNodesWithText("Планирование").assertCountEquals(simpleTasks.count { it.topic == TaskTopic.BUDGET_PLANNING })
+        compose.onNode(hasContentDescriptionPrefix("${queue[0].title},")).performScrollTo().performClick()
         assertEquals(listOf(queue[0].id), opened)
     }
 
     @Test
-    fun `когда новых нет, список говорит об этом прямо`() {
-        val solved = TaskQueue.ordered(simpleTasks).map { it.id }.toSet()
+    fun `после неудачного дня задание помощи стоит первым`() {
         compose.setContent {
             FinnyTheme {
-                TasksScreen(tasks = simpleTasks, completedIds = solved, onOpenTask = {}, onBack = {})
+                TasksScreen(tasks = simpleTasks, completedIds = emptySet(), onOpenTask = {}, onBack = {}, recoveryFirst = true)
             }
         }
-
-        compose.onNodeWithText("Новых заданий нет").assertIsDisplayed()
-        compose.onNodeWithText(
-            "Новые задания закончились. Любое из тех, что уже решал, можно решить ещё раз — они ниже.",
-        )
-            .assertIsDisplayed()
-        // «Помоги Финни» в очередь не входит и не решено — утверждать,
-        // что решены все задания, экран не должен.
-        compose.onNodeWithText("Все задания", substring = true).assertDoesNotExist()
+        val help = simpleTasks.first { it.topic == TaskTopic.RECOVERY }
+        val first = compose.onNode(hasContentDescriptionPrefix("${help.title},")).fetchSemanticsNode().positionInRoot.y
+        val other = compose.onNode(hasContentDescriptionPrefix("${TaskQueue.ordered(simpleTasks).first().title},"))
+            .fetchSemanticsNode().positionInRoot.y
+        assertTrue("задание помощи не первое", first < other)
     }
 
     @Test
@@ -774,7 +794,10 @@ class ScreenRenderTest {
         compose.onNodeWithText(task.options.first().title).performScrollTo().performClick()
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
 
-        compose.onNodeWithText("Следующее задание: ${next.title}").performScrollTo().performClick()
+        // Одна карточка следующего задания с кнопкой «Начать →» и «Готово».
+        compose.onNodeWithText(next.title).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Начать →").performScrollTo().performClick()
+        compose.onNodeWithText("Готово").assertExists()
         assertTrue("Переход к следующему заданию не сработал", nextOpened)
         compose.onNodeWithText("Готово").performScrollTo().assertIsDisplayed()
     }
@@ -939,7 +962,7 @@ class ScreenRenderTest {
         }
 
         // Худший случай по высоте: копилка без цели, причина в три строки.
-        compose.onNodeWithContentDescription("Копилка: прибавить 5").performClick()
+        compose.onNodeWithContentDescription("Копим на мечту: прибавить 5").performClick()
 
         val bottom = compose.onNodeWithText("Утвердить план").fetchSemanticsNode().boundsInRoot.bottom
         val limit = with(compose.density) { 728.dp.toPx() }
@@ -1033,6 +1056,242 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Закрыть сообщение").performClick()
         assertFalse(shown)
     }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `двор открывает разделы предметами, питомцем и табличкой прогресса`() {
+        val opened = mutableListOf<String>()
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state,
+                        parts = content.petParts(),
+                        activeTask = content.tasks(Difficulty.HARDER).first(),
+                        goal = null,
+                        today = "2026-09-26",
+                        onDismissMessage = {},
+                        onOpenPlan = { opened += "plan" },
+                        onOpenShop = { opened += "shop" },
+                        onOpenSavings = { opened += "savings" },
+                        onOpenGlossary = { opened += "glossary" },
+                        onOpenTasks = { opened += "tasks" },
+                        onOpenPet = { opened += "pet" },
+                        onOpenProgress = { opened += "progress" },
+                        onOpenHelp = { opened += "help" },
+                        onOpenAdult = { opened += "adult" },
+                        onFinishPeriod = { opened += "finish" },
+                    )
+                }
+            }
+        }
+
+        // Без движений раздел открывается сразу, без перебежки питомца.
+        compose.onNodeWithContentDescription("Покупки: лавка для питомца").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("План на день").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Словарик: финансовые слова").performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Задания. На доске:")).performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Копилка:")).performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Финни")).performScrollTo().performClick()
+        compose.onNode(hasContentDescriptionPrefix("Мой прогресс.")).performClick()
+        compose.onNodeWithContentDescription("Как играть").performClick()
+        compose.onNodeWithContentDescription("Для взрослого").performClick()
+        assertEquals(
+            listOf("shop", "plan", "glossary", "tasks", "savings", "pet", "progress", "help", "adult"),
+            opened,
+        )
+        // План не составлен — отметка передана словами.
+        compose.onNodeWithContentDescription("План на день").assert(
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(
+                androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "не составлен",
+            ),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `подсказка первого дня видна над предметом и открывает его раздел`() {
+        val opened = mutableListOf<String>()
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        val guide = ru.onefortwo.finny.ui.state.YardGuide.step(state, "2026-09-26")
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state,
+                        parts = content.petParts(),
+                        activeTask = content.tasks(Difficulty.HARDER).first(),
+                        goal = null,
+                        today = "2026-09-26",
+                        onDismissMessage = {},
+                        onOpenPlan = { opened += "plan" },
+                        onOpenShop = { opened += "shop" },
+                        onOpenSavings = { opened += "savings" }, onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {},
+                        onOpenProgress = {}, onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                        guide = guide,
+                    )
+                }
+            }
+        }
+        val bubble = compose.onNode(hasContentDescriptionPrefix("Подсказка, шаг 1 из 6"))
+        bubble.assertIsDisplayed()
+        // Первый шаг — мечта: облачко под сундучком, питомца над ним не закрывает.
+        val px = compose.density.density
+        val b = bubble.fetchSemanticsNode()
+        val chest = compose.onNode(hasContentDescriptionPrefix("Копилка:")).fetchSemanticsNode()
+        assertTrue("облачко выше низа сундучка", b.positionInRoot.y / px >= (chest.positionInRoot.y + chest.size.height) / px - 8)
+        assertTrue("облачко выходит за экран", b.positionInRoot.x >= 0 && (b.positionInRoot.x + b.size.width) / px <= 360.5f)
+        bubble.performClick()
+        assertEquals(listOf("savings"), opened)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `питомец здоровается на дворе и прощается перед концом дня`() {
+        var finished = false
+        val game = GameState.newProfile().let { g ->
+            (g.confirmPlan(BudgetPlan(Coins(10), Coins(0), Coins(0))) as
+                PlanConfirmation.Success).state
+        }.let { g ->
+            (g.buy(content.shopItems().first { it.id == "food" }.toDomain()) as ru.onefortwo.finny.economy.PurchaseResult.Success).state
+        }
+        val state = AppState(isLoaded = true, profile = profile, game = game)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides true) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state,
+                        parts = content.petParts(),
+                        activeTask = null,
+                        goal = null,
+                        today = "2026-09-26",
+                        onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                        onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                        onOpenHelp = {}, onOpenAdult = {},
+                        onFinishPeriod = { finished = true },
+                        speech = "Привет! Как дела?",
+                    )
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithText("Привет! Как дела?").assertExists()
+
+        compose.onNodeWithText("Закончить день").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithText("Пока! Приходи завтра — я буду ждать!").assertExists()
+        assertFalse("день закончился раньше прощания", finished)
+        compose.mainClock.advanceTimeBy(6000)
+        assertTrue("день не закончился после прощания", finished)
+    }
+
+    /**
+     * Раскладка двора на экране [widthDp] × [heightDp]: предметы и питомец не
+     * накладываются и не выходят за экран, двор — колонка не шире 480 dp,
+     * сцена во всю ширину экрана, но не выше 480 × 100 / 180 dp.
+     */
+    private fun checkYardLayout(widthDp: Int, heightDp: Int) {
+        // ТЕСТ: на планшете в портрете луг увеличен в k раз.
+        val k = ru.onefortwo.finny.ui.screens.yardScaleFor(widthDp.dp, heightDp.dp)
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state,
+                    parts = content.petParts(),
+                    activeTask = content.tasks(Difficulty.HARDER).first(),
+                    goal = content.goals().first(),
+                    today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                )
+            }
+        }
+        val px = compose.density.density
+        // Полные границы, а не обрезанные видимой областью: на низком экране
+        // двор прокручивается, и часть предметов ниже края.
+        fun bounds(matcher: androidx.compose.ui.test.SemanticsMatcher) =
+            compose.onNode(matcher).fetchSemanticsNode().let { n ->
+                androidx.compose.ui.geometry.Rect(
+                    n.positionInRoot.x / px, n.positionInRoot.y / px,
+                    (n.positionInRoot.x + n.size.width) / px, (n.positionInRoot.y + n.size.height) / px,
+                )
+            }
+        val objects = mapOf(
+            "лавка" to bounds(hasContentDescriptionPrefix("Покупки:")),
+            "доска заданий" to bounds(hasContentDescriptionPrefix("Задания.")),
+            "доска плана" to bounds(hasContentDescriptionPrefix("План на день")),
+            "книга" to bounds(hasContentDescriptionPrefix("Словарик:")),
+            "питомец" to bounds(hasContentDescriptionPrefix("Финни")),
+            "сундучок" to bounds(hasContentDescriptionPrefix("Копилка:")),
+        )
+        val tolerance = 0.5f
+        objects.forEach { (name, r) ->
+            assertTrue("$name выходит за экран: $r", r.left >= -tolerance && r.right <= widthDp + tolerance)
+        }
+        val names = objects.keys.toList()
+        for (i in names.indices) for (j in i + 1 until names.size) {
+            val a = objects.getValue(names[i])
+            val b = objects.getValue(names[j])
+            // Сундучок растянут на ширину двора, но стоит отдельным рядом.
+            if ("сундучок" in listOf(names[i], names[j])) {
+                assertTrue("${names[i]} и ${names[j]} наложились по высоте", a.bottom <= b.top + tolerance || b.bottom <= a.top + tolerance)
+            } else {
+                assertTrue("${names[i]} и ${names[j]} наложились: $a / $b", !a.overlaps(b))
+            }
+        }
+        val lefts = objects.filterKeys { it != "сундучок" }.values
+        val span = lefts.maxOf { it.right } - lefts.minOf { it.left }
+        assertTrue("двор шире ${480 * k} dp: $span; $objects", span <= 480f * k + tolerance)
+        val scene = bounds(hasContentDescriptionPrefix("Двор."))
+        assertEquals("сцена не во всю ширину", widthDp.toFloat(), scene.width, 1f)
+        assertTrue("сцена выше ${480 * k * 100 / 180} dp: ${scene.height}", scene.height <= 480f * k * 100 / 180 + 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp")
+    fun `на низком телефоне кнопка конца дня видна без прокрутки`() {
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                )
+            }
+        }
+        // ТЕСТ: кнопка закреплена внизу, вне прокрутки двора.
+        compose.onNodeWithText("Закончить день").assertIsDisplayed()
+        val bottom = compose.onNodeWithText("Закончить день").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("кнопка ниже экрана: $bottom", bottom <= 640 * compose.density.density + 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `двор на телефоне 360 на 800`() = checkYardLayout(360, 800)
+
+    @Test
+    @Config(qualifiers = "w800dp-h360dp-land")
+    fun `двор на телефоне в альбомной ориентации`() = checkYardLayout(800, 360)
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp")
+    fun `двор на планшете в портрете`() = checkYardLayout(800, 1280)
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land")
+    fun `двор на планшете в альбомной ориентации`() = checkYardLayout(1280, 800)
+
+    private fun hasContentDescriptionPrefix(prefix: String) =
+        androidx.compose.ui.test.SemanticsMatcher("описание начинается с «$prefix»") { node ->
+            node.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { null }
+                ?.any { it.startsWith(prefix) } == true
+        }
 
     /** Набор уровня «Попроще»: семь заданий, из них одно — восстановления. */
     private val simpleTasks get() = content.tasks(Difficulty.SIMPLE)

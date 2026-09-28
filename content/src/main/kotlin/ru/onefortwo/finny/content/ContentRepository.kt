@@ -44,6 +44,10 @@ class ContentRepository(private val source: AssetSource) {
         ContentParser.parseGlossary(source.read(FILE_GLOSSARY))
     }
 
+    private val nameFilterCache: NameFilter by lazy {
+        NameFilter(ContentParser.parseForbiddenWords(source.read(FILE_FORBIDDEN_WORDS)))
+    }
+
     private val pixelArtCache: PixelArt by lazy {
         PixelArtParser.parse(source.read(FILE_PIXEL_ART))
     }
@@ -86,12 +90,16 @@ class ContentRepository(private val source: AssetSource) {
     /** Справочный раздел с объяснением основных терминов (ТЗ 2.5.11). */
     fun glossary(): List<GlossaryEntry> = glossaryCache
 
+    /** Проверка игрового имени питомца: список слов — в `forbidden_words.json`. */
+    fun nameFilter(): NameFilter = nameFilterCache
+
     private companion object {
         const val FILE_SHOP = "shop.json"
         const val FILE_GOALS = "goals.json"
         const val FILE_TASKS = "tasks.json"
         const val FILE_PET_PARTS = "pet_parts.json"
         const val FILE_GLOSSARY = "glossary.json"
+        const val FILE_FORBIDDEN_WORDS = "forbidden_words.json"
 
         /** Собирается из `art/pixel` командой `python art/pixel/tools/build.py`. */
         const val FILE_PIXEL_ART = "pixel_art.json"

@@ -79,6 +79,8 @@ fun ShopScreen(
      * последнее действие, поэтому покупки дня видны здесь.
      */
     todayPurchases: List<PurchaseRecord> = emptyList(),
+    /** ТЕСТ: план дня утверждён; иначе мягко напоминается о нём. */
+    planConfirmed: Boolean = true,
     message: FeedbackMessage?,
     onDismissMessage: () -> Unit,
     onBuy: (String) -> Unit,
@@ -99,6 +101,19 @@ fun ShopScreen(
         bottomPadding = 16.dp,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Покупка до плана не запрещена, но порядок ТЗ 2.5.5 — план раньше.
+            if (!planConfirmed) {
+                SectionCard(
+                    tone = CardTone.Warning,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    bottomSpacing = 0.dp,
+                ) {
+                    Text(
+                        text = "Сначала составь план — так проще не потратить лишнего.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
             SectionCard(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                 bottomSpacing = 0.dp,
@@ -317,6 +332,7 @@ private fun glyphOf(itemId: String): LineGlyph = when (itemId) {
     "tent" -> LineGlyph.TENT
     "stickers" -> LineGlyph.STICKERS
     "scarf" -> LineGlyph.CLOTHES
+    "hat" -> LineGlyph.CLOTHES
     else -> LineGlyph.SHOP
 }
 

@@ -13,7 +13,7 @@ enum class BudgetCategory(val displayName: String) {
     WANTS("Хочу"),
 
     /** Накопления на финансовую цель. */
-    SAVINGS("Копилка"),
+    SAVINGS("Копим на мечту"),
 }
 
 /**

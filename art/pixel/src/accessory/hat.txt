@@ -1,0 +1,9 @@
+# 12 7
+# pivot 6 6
+.....yy.....
+....KyyK....
+..KKRRRRKK..
+.KRRRRRRRRK.
+KRRrRRRRrRRK
+KccccccccccK
+.KKKKKKKKKK.

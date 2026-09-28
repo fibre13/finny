@@ -151,6 +151,17 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+/**
+ * Версия 7 → 8: счётчик новых заданий, оплаченных монетами за игровой день.
+ * Монеты платятся за первые два новых задания дня.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `profile` ADD COLUMN `paidTasksPeriod` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `profile` ADD COLUMN `paidTasksCount` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 /** Все переходы, известные приложению. Порядок не важен. */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2,
@@ -159,4 +170,5 @@ val ALL_MIGRATIONS = arrayOf(
     MIGRATION_4_5,
     MIGRATION_5_6,
     MIGRATION_6_7,
+    MIGRATION_7_8,
 )

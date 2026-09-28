@@ -227,7 +227,12 @@ fun GameState.withdraw(amount: Coins): WithdrawalResult {
  * Стадия развития пересчитывается по накопленным очкам и не понижается,
  * поскольку очки только накапливаются (ТЗ 2.5.10).
  */
-fun GameState.finishPeriod(): PeriodCompletion {
+/**
+ * [payIncome] — начислить карманные на следующий день сразу. Если `false`,
+ * они начисляются позже через [startNewDay]: в обычном режиме — при первом
+ * входе в новые календарные сутки.
+ */
+fun GameState.finishPeriod(payIncome: Boolean = true): PeriodCompletion {
     val plan = period.plan ?: return PeriodCompletion.PlanNotConfirmed
     if (!period.canFinish) return PeriodCompletion.NoDecision
 
@@ -252,7 +257,11 @@ fun GameState.finishPeriod(): PeriodCompletion {
         period = PeriodState(number = period.number + 1),
     )
 
-    val (withIncome, incomeEvent) = afterDecay.earn(IncomeSource.POCKET_MONEY)
+    val (withIncome, incomeEvent) = if (payIncome) {
+        afterDecay.earn(IncomeSource.POCKET_MONEY)
+    } else {
+        afterDecay to null
+    }
 
     val outcome = PeriodOutcome(
         number = period.number,
@@ -275,3 +284,6 @@ fun GameState.finishPeriod(): PeriodCompletion {
         outcome = outcome,
     )
 }
+
+/** Начисляет карманные на новый день, если при закрытии прошлого они отложены. */
+fun GameState.startNewDay(): Pair<GameState, IncomeEvent> = earn(IncomeSource.POCKET_MONEY)
