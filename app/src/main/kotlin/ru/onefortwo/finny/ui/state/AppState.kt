@@ -85,6 +85,19 @@ data class AppState(
 
     /** Цели, которые ребёнок уже накопил и получил. */
     val achievedGoalIds: Set<String> = emptySet(),
+
+    /**
+     * ТЕСТ: сколько новых заданий оплачено монетами в игровом дне
+     * [paidTasksPeriod]. Монеты платятся за первые [TaskPay.PER_DAY].
+     */
+    val paidTasksPeriod: Int = 0,
+    val paidTasksCount: Int = 0,
+
+    /**
+     * ТЕСТ: пришли монеты — стартовые или карманные на новый день.
+     * Показывается отдельным окном, а не карточкой среди других призывов.
+     */
+    val arrival: FeedbackMessage? = null,
 ) {
     /** Профиль создан и можно вести игру. */
     val hasProfile: Boolean get() = profile != null
@@ -116,8 +129,22 @@ data class AppState(
     fun isAccessoryAvailable(accessoryId: String): Boolean =
         accessoryId == PetAppearanceDefaults.NONE || accessoryId in ownedAccessories
 
+    /** Сколько новых заданий уже оплачено сегодня. */
+    val paidTasksToday: Int get() = if (paidTasksPeriod == game.period.number) paidTasksCount else 0
+
+    /**
+     * ТЕСТ: день закрыт, питомец спит до новых календарных суток. В обычном
+     * режиме карманные придут при первом входе в новые сутки.
+     */
+    fun isSleeping(today: String): Boolean = isDayFinished(today)
+
     /** Куплена ли обстановка с таким кодом. */
     fun hasScenery(sceneryId: String): Boolean = sceneryId in ownedScenery
+}
+
+/** ТЕСТ: монеты за задания — только за первые новые задания дня. */
+object TaskPay {
+    const val PER_DAY = 2
 }
 
 /** Значения внешности, доступные без покупки. */
@@ -144,6 +171,8 @@ fun SavedGame.toAppState(): AppState = AppState(
     ownedAccessories = ownedAccessories,
     ownedScenery = ownedScenery,
     achievedGoalIds = achievedGoalIds,
+    paidTasksPeriod = paidTasksPeriod,
+    paidTasksCount = paidTasksCount,
 )
 
 /** Переводит состояние приложения в сохраняемый вид; null, если профиля нет. */
@@ -166,5 +195,7 @@ fun AppState.toSavedGame(): SavedGame? {
         ownedAccessories = ownedAccessories,
         ownedScenery = ownedScenery,
         achievedGoalIds = achievedGoalIds,
+        paidTasksPeriod = paidTasksPeriod,
+        paidTasksCount = paidTasksCount,
     )
 }

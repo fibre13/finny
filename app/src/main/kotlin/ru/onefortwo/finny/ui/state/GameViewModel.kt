@@ -29,6 +29,7 @@ import ru.onefortwo.finny.economy.BudgetPlan
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.DepositResult
 import ru.onefortwo.finny.economy.GameState
+import ru.onefortwo.finny.economy.startNewDay
 import ru.onefortwo.finny.economy.IncomeSource
 import ru.onefortwo.finny.economy.PeriodCompletion
 import ru.onefortwo.finny.economy.PlanConfirmation
@@ -277,16 +278,53 @@ class GameViewModel(
             ownedAccessories = setOfNotNull(
                 appearance.accessoryId.takeIf { it != PetAppearanceDefaults.NONE },
             ),
-            message = Explanations.income(
-                source = IncomeSource.START_BUDGET,
-                amount = IncomeSource.START_BUDGET.amount,
-                balanceAfter = game.balance,
+            arrival = FeedbackMessage(
+                text = "Тебе дали ${Explanations.coins(IncomeSource.START_BUDGET.amount)}.",
+                nextStep = "На них ты будешь заботиться о питомце: кормить, радовать и копить на мечту.",
             ),
         )
     }
 
     fun dismissMessage() {
         _state.update { it.copy(message = null) }
+    }
+
+    /** Окно «Пришли монеты» прочитано. */
+    fun dismissArrival() {
+        _state.update { it.copy(arrival = null) }
+    }
+
+    /**
+     * ТЕСТ: новые календарные сутки — начинается новый игровой день.
+     * Если прошлый день закрыт в обычном режиме, карманные на новый день
+     * были отложены; они приходят сейчас, при первом входе в новые сутки.
+     * Не в полночь: работа в фоне не нужна, а пропуск дня ничем не грозит.
+     */
+    fun startNewDayIfDue() {
+        val current = _state.value
+        val finished = current.lastFinishedDate ?: return
+        if (current.isDemo || !current.hasProfile || finished >= dates.today()) return
+        val (game, event) = current.game.startNewDay()
+        _state.value = current.copy(
+            game = game,
+            lastFinishedDate = null,
+            arrival = FeedbackMessage(
+                text = "Новый день! Карманные: +${Explanations.coins(event.amount)}.",
+                nextStep = "Теперь у тебя ${Explanations.coins(event.balanceAfter)}. Раздели их в «Плане».",
+            ),
+        )
+    }
+
+    /** ТЕСТ: питомец спит — разделы дня откроются завтра. */
+    fun sleepingHint() {
+        _state.update {
+            it.copy(
+                message = FeedbackMessage(
+                    text = "$petName спит. Новый день начнётся завтра — тогда придут и монеты.",
+                    nextStep = "Пока можно заглянуть в словарик или в гардероб.",
+                ),
+            )
+        }
     }
 
     // --- План бюджета ----------------------------------------------------
@@ -504,15 +542,27 @@ class GameViewModel(
     fun answerTask(task: TaskContent, answer: TaskAnswer): AnsweredTask {
         val taskId = task.id
         val check = task.check(answer)
-        val repeat = taskId in _state.value.completedTaskIds
-        val reward = if (repeat) check.reward.amount.half() else check.reward.amount
+        val current = _state.value
+        val repeat = taskId in current.completedTaskIds
+        // ТЕСТ: монеты — за первые TaskPay.PER_DAY заданий дня, считая и
+        // повторы; «Помоги Финни» — путь восстановления, оплачивается всегда.
+        val counted = check.reward != IncomeSource.RECOVERY_TASK
+        val overLimit = counted && current.paidTasksToday >= TaskPay.PER_DAY
+        val reward = when {
+            overLimit -> Coins.ZERO
+            repeat -> check.reward.amount.half()
+            else -> check.reward.amount
+        }
 
-        val (game, event) = _state.value.game.earn(check.reward, reward)
+        val (game, event) = current.game.earn(check.reward, reward)
         if (event.amount.amount > 0) react(PetReactions.REWARD)
+        val paid = counted && !overLimit
         _state.update {
             it.copy(
                 game = game,
                 completedTaskIds = it.completedTaskIds + taskId,
+                paidTasksPeriod = if (paid) it.game.period.number else it.paidTasksPeriod,
+                paidTasksCount = if (paid) it.paidTasksToday + 1 else it.paidTasksCount,
                 message = Explanations.income(
                     source = event.source,
                     amount = event.amount,
@@ -528,7 +578,9 @@ class GameViewModel(
     // --- Игровой период --------------------------------------------------
 
     fun finishPeriod() {
-        when (val result = _state.value.game.finishPeriod()) {
+        // ТЕСТ: в обычном режиме карманные на новый день приходят завтра,
+        // при первом входе; в демонстрационном — сразу (ТЗ 2.5.13).
+        when (val result = _state.value.game.finishPeriod(payIncome = _state.value.isDemo)) {
             is PeriodCompletion.Success -> {
                 if (result.outcome.stageAdvanced) react(PetReactions.GROW, result.outcome.stageBefore)
                 _state.update {
@@ -570,6 +622,7 @@ class GameViewModel(
      */
     fun onSessionStart() {
         greetPending = true
+        startNewDayIfDue()
         if (usageTicker?.isActive == true) return
 
         usageTicker = viewModelScope.launch {

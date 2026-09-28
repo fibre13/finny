@@ -52,6 +52,10 @@ data class SavedGame(
 
     /** Цели, на которые уже накоплено и которые ребёнок получил. */
     val achievedGoalIds: Set<String> = emptySet(),
+
+    /** Сколько новых заданий оплачено в игровом дне [paidTasksPeriod]. */
+    val paidTasksPeriod: Int = 0,
+    val paidTasksCount: Int = 0,
 )
 
 /** Набор записей базы данных, соответствующий одному [SavedGame]. */
@@ -94,6 +98,8 @@ fun SavedGame.toRecords(): GameRecords {
         usageDate = usageDate,
         usageMinutes = usageMinutes,
         timeLimitEnabled = timeLimitEnabled,
+        paidTasksPeriod = paidTasksPeriod,
+        paidTasksCount = paidTasksCount,
     )
 
     val purchases = game.period.purchases.map { record ->
@@ -206,6 +212,8 @@ fun GameRecords.toSavedGame(): SavedGame {
         ownedAccessories = ownedAccessories.map { it.accessoryId }.toSet(),
         ownedScenery = ownedScenery.map { it.sceneryId }.toSet(),
         achievedGoalIds = achievedGoals.map { it.goalId }.toSet(),
+        paidTasksPeriod = profile.paidTasksPeriod,
+        paidTasksCount = profile.paidTasksCount,
     )
 }
 

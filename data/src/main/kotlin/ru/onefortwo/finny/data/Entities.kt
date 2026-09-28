@@ -91,6 +91,10 @@ data class ProfileEntity(
 
     /** Ограничение экранного времени включено; выключается взрослым. */
     val timeLimitEnabled: Boolean = true,
+
+    /** Сколько новых заданий оплачено в игровом дне [paidTasksPeriod]. */
+    val paidTasksPeriod: Int = 0,
+    val paidTasksCount: Int = 0,
 ) {
     companion object {
         /** Профиль в приложении один, поэтому ключ фиксирован. */

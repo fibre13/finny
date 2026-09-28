@@ -165,6 +165,16 @@ fun PeriodResultScreen(
                 }
             }
 
+            // ТЕСТ: в обычном режиме карманные придут завтра, при первом входе.
+            if (outcome.nextPeriodIncome == null && nextDayTomorrow) {
+                SectionCard(title = "Новый день", tone = CardTone.Coin) {
+                    Text(
+                        text = "$petName ляжет спать. Завтра, когда ты зайдёшь, придут карманные монеты.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
             if (outcome.isSetback) {
                 SecondaryButton(
                     text = "Выполнить задание «Помоги Финни»",
@@ -173,7 +183,7 @@ fun PeriodResultScreen(
                 )
             }
 
-            PrimaryButton(text = "Начать новый день", onClick = onContinue)
+            PrimaryButton(text = if (nextDayTomorrow) "Спокойной ночи" else "Начать новый день", onClick = onContinue)
         }
     }
 }

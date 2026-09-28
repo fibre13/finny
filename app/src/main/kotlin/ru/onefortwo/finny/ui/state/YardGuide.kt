@@ -3,17 +3,20 @@ package ru.onefortwo.finny.ui.state
 import ru.onefortwo.finny.economy.BudgetCategory
 
 /*
- * ТЕСТ (ветка test/kopilka-a): подсказки первого дня на дворе. Над
- * предметом, к которому пора идти, появляется облачко «Шаг N из 6».
- * Шаг выводится из состояния игры, а не хранится отдельно: подсказка
- * сама переходит дальше, когда ребёнок сделал нужное, и исчезает после
- * первого дня.
+ * ТЕСТ (ветка test/kopilka-a): одна цель на экране. Над предметом, к
+ * которому пора идти, появляется облачко; остальные предметы спокойны.
+ * Шаг выводится из состояния игры, а не хранится отдельно: подсказка сама
+ * переходит дальше, когда ребёнок сделал нужное.
+ *
+ * Первый день ведётся по шагам «Шаг N из 6» в порядке Приложения А ТЗ:
+ * мечта → план → нужное → задание → радость → конец дня. Со второго дня
+ * выделяется только доска плана, пока план не составлен.
  */
 
 /** Куда указывает подсказка. */
 enum class GuideTarget { PLAN, SHOP, TASKS, SAVINGS, FINISH }
 
-/** Подсказка: номер шага, предмет и текст. */
+/** Подсказка: номер шага (0 — без номера, со второго дня), предмет и текст. */
 data class GuideStep(val number: Int, val target: GuideTarget, val text: String) {
     val total: Int get() = YardGuide.TOTAL
 }
@@ -21,45 +24,43 @@ data class GuideStep(val number: Int, val target: GuideTarget, val text: String)
 object YardGuide {
     const val TOTAL = 6
 
-    /** Обстановка, которую подсказка предлагает купить: домик-палатка. */
-    const val HOUSE = "house"
-
     /**
-     * Шаг подсказки для [state] или `null`, если подсказывать нечего.
+     * Шаг подсказки для [state] на дату [today] или `null`, если выделять
+     * нечего: пока открыто окно «Пришли монеты», пока питомец спит и когда
+     * всё на день сделано.
      *
-     * Порядок следует правилам игры: сначала план — период начинается его
-     * подтверждением (ТЗ 2.5.5), и покупка до плана не попала бы в сравнение
-     * плана с фактом честно. Потом корм, задание, домик, копилка и конец дня.
-     * [housePrice] — цена домика из каталога.
+     * Мечта — раньше плана: без цели монеты в копилку не отложить, и ребёнок
+     * сначала узнаёт, ради чего экономить (Прил. А, шаг 4). План — раньше
+     * покупок: распределение делается до начала периода (ТЗ 2.5.5).
      */
-    fun step(state: AppState, housePrice: Int?): GuideStep? {
+    fun step(state: AppState, today: String): GuideStep? {
         val game = state.game
-        if (state.profile == null || game.period.number != 1 || game.history.isNotEmpty()) return null
+        if (state.profile == null || state.arrival != null || state.isSleeping(today)) return null
         val period = game.period
-        val balance = game.balance.amount
 
-        if (!period.isPlanConfirmed) {
-            return GuideStep(1, GuideTarget.PLAN, "Начни здесь: составь план на день")
-        }
-        if (period.purchases.none { it.category == BudgetCategory.NEEDS }) {
-            return GuideStep(2, GuideTarget.SHOP, "Пора покормить питомца: купи корм в лавке")
-        }
-        if (state.completedTaskIds.isEmpty()) {
-            return GuideStep(3, GuideTarget.TASKS, "Реши задание — получишь монеты")
-        }
-        if (housePrice != null && !state.hasScenery(HOUSE)) {
-            return if (balance < housePrice) {
-                GuideStep(4, GuideTarget.TASKS, "Реши ещё задание: домик стоит ${Explanations.coins(housePrice)}")
+        val firstDay = period.number == 1 && game.history.isEmpty()
+        if (!firstDay) {
+            return if (!period.isPlanConfirmed) {
+                GuideStep(0, GuideTarget.PLAN, "Новый день: раздели монеты в «Плане»")
             } else {
-                GuideStep(4, GuideTarget.SHOP, "Купи домик-палатку: в нём питомец будет спать")
+                null
             }
         }
-        if (game.savings.saved.amount == 0 && balance > 0) {
-            return GuideStep(5, GuideTarget.SAVINGS, "Отложи монеты в сундучок — на мечту")
+
+        return when {
+            game.savings.goal == null ->
+                GuideStep(1, GuideTarget.SAVINGS, "Выбери мечту — на что будем копить?")
+            !period.isPlanConfirmed ->
+                GuideStep(2, GuideTarget.PLAN, "Раздели монеты: на нужное, на радость и в копилку")
+            period.purchases.none { it.category == BudgetCategory.NEEDS } ->
+                GuideStep(3, GuideTarget.SHOP, "Пора покормить питомца: купи корм в лавке")
+            state.completedTaskIds.isEmpty() ->
+                GuideStep(4, GuideTarget.TASKS, "Реши задание — заработаешь монеты")
+            period.purchases.none { it.category == BudgetCategory.WANTS } ->
+                GuideStep(5, GuideTarget.SHOP, "Купи что-нибудь для радости")
+            period.canFinish ->
+                GuideStep(6, GuideTarget.FINISH, "Всё сделано! Нажми «Закончить день»")
+            else -> null
         }
-        if (period.canFinish) {
-            return GuideStep(6, GuideTarget.FINISH, "Всё сделано! Нажми «Закончить день»")
-        }
-        return null
     }
 }

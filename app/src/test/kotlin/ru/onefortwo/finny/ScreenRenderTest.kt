@@ -1134,7 +1134,7 @@ class ScreenRenderTest {
     fun `подсказка первого дня видна над предметом и открывает его раздел`() {
         val opened = mutableListOf<String>()
         val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
-        val guide = ru.onefortwo.finny.ui.state.YardGuide.step(state, housePrice = 25)
+        val guide = ru.onefortwo.finny.ui.state.YardGuide.step(state, "2026-09-26")
         compose.setContent {
             CompositionLocalProvider(LocalMotionEnabled provides false) {
                 FinnyTheme {
@@ -1147,7 +1147,7 @@ class ScreenRenderTest {
                         onDismissMessage = {},
                         onOpenPlan = { opened += "plan" },
                         onOpenShop = { opened += "shop" },
-                        onOpenSavings = {}, onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {},
+                        onOpenSavings = { opened += "savings" }, onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {},
                         onOpenProgress = {}, onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
                         guide = guide,
                     )
@@ -1156,14 +1156,14 @@ class ScreenRenderTest {
         }
         val bubble = compose.onNode(hasContentDescriptionPrefix("Подсказка, шаг 1 из 6"))
         bubble.assertIsDisplayed()
-        // Облачко стоит над доской плана: хвостик указывает на неё.
+        // Первый шаг — мечта: облачко под сундучком, питомца над ним не закрывает.
         val px = compose.density.density
         val b = bubble.fetchSemanticsNode()
-        val plan = compose.onNodeWithContentDescription("План на день").fetchSemanticsNode()
-        assertTrue("облачко ниже доски плана", (b.positionInRoot.y + b.size.height) / px <= plan.positionInRoot.y / px + 8)
+        val chest = compose.onNode(hasContentDescriptionPrefix("Копилка:")).fetchSemanticsNode()
+        assertTrue("облачко выше низа сундучка", b.positionInRoot.y / px >= (chest.positionInRoot.y + chest.size.height) / px - 8)
         assertTrue("облачко выходит за экран", b.positionInRoot.x >= 0 && (b.positionInRoot.x + b.size.width) / px <= 360.5f)
         bubble.performClick()
-        assertEquals(listOf("plan"), opened)
+        assertEquals(listOf("savings"), opened)
     }
 
     @Test

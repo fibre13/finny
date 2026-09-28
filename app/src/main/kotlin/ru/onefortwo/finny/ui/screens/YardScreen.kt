@@ -100,6 +100,9 @@ import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
 import ru.onefortwo.finny.ui.theme.FinnyTheme
+import ru.onefortwo.finny.ui.common.FinnyDialog
+import ru.onefortwo.finny.ui.common.PrimaryButton
+import ru.onefortwo.finny.ui.state.FeedbackMessage
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.layout.layout
 import ru.onefortwo.finny.ui.state.PetSpeech
@@ -225,6 +228,8 @@ fun YardScreen(
     guide: GuideStep? = null,
     speech: String? = null,
     onSpeechShown: () -> Unit = {},
+    onSleepingTap: () -> Unit = {},
+    onArrivalShown: () -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -293,6 +298,10 @@ fun YardScreen(
     val dayFinished = state.isDayFinished(today)
     val reason = when {
         dayFinished -> "Закончить день можно завтра."
+        // Пока идут шаги первого дня, причина не зовёт в другой раздел:
+        // куда идти, говорит подсказка.
+        guide != null && guide.number > 0 && guide.target != GuideTarget.FINISH &&
+            !game.period.canFinish -> "Откроется, когда дела дня будут сделаны."
         !game.period.isPlanConfirmed -> "Сначала составь план."
         !game.period.canFinish -> "Сначала купи или отложи монеты."
         else -> null
@@ -344,14 +353,15 @@ fun YardScreen(
                 art = art,
                 height = yardWidth * art.sceneHeight / art.sceneWidth,
                 state = state,
-                snoring = snoring && state.hasScenery("house"),
+                snoring = (snoring || dayFinished) && state.hasScenery("house"),
                 tentDoor = tentDoor,
                 origin = sceneOrigin,
             ) {
                 Header(
                     art = art,
                     colors = colors,
-                    day = game.period.number,
+                    // Пока питомец спит, идёт ещё прошлый день: новый начнётся завтра.
+                    day = if (dayFinished) game.period.number - 1 else game.period.number,
                     demo = state.isDemo,
                     petName = profile.petName,
                     balance = game.balance.amount,
@@ -375,19 +385,20 @@ fun YardScreen(
                         art, colors, "yard_shop", "Покупки",
                         description = "Покупки: лавка для питомца",
                         onPlaced = { places["shop"] = it.center; bounds[GuideTarget.SHOP] = it },
-                        onClick = { runTo(places["shop"], onOpenShop) },
+                        onClick = { if (dayFinished) onSleepingTap() else runTo(places["shop"], onOpenShop) },
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     val board = when {
                         state.isTimeUp(today) -> "На сегодня хватит. Приходи завтра!"
-                        activeTask != null -> activeTask.title
+                        dayFinished -> "Задания — завтра."
+                        activeTask != null -> "Задание: ${activeTask.title}"
                         else -> "Заданий пока нет."
                     }
                     YardObject(
                         art, colors, "yard_tasks", "Задания",
                         description = "Задания. На доске: $board",
                         onPlaced = { places["tasks"] = it.center; bounds[GuideTarget.TASKS] = it },
-                        onClick = { runTo(places["tasks"], onOpenTasks) },
+                        onClick = { if (dayFinished) onSleepingTap() else runTo(places["tasks"], onOpenTasks) },
                         overlay = {
                             Text(
                                 text = board,
@@ -406,13 +417,15 @@ fun YardScreen(
                     modifier = Modifier.fillMaxWidth().zIndex(1f),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    val planMissing = !game.period.isPlanConfirmed && !dayFinished
+                    // Отметка «!» — только когда подсказки нет: иначе на плане
+                    // два призыва сразу.
+                    val planMissing = !game.period.isPlanConfirmed && !dayFinished && guide == null
                     YardObject(
                         art, colors, "yard_plan", "План",
                         description = "План на день",
                         state = if (planMissing) "не составлен" else null,
                         onPlaced = { places["plan"] = it.center; bounds[GuideTarget.PLAN] = it },
-                        onClick = { runTo(places["plan"], onOpenPlan) },
+                        onClick = { if (dayFinished) onSleepingTap() else runTo(places["plan"], onOpenPlan) },
                         overlay = { if (planMissing) Badge(colors, Modifier.align(Alignment.TopEnd)) },
                     )
                     // Питомец рисуется поверх соседей по ряду: иначе, подбежав к
@@ -424,18 +437,20 @@ fun YardScreen(
                             reaction = reaction,
                             onReactionPlayed = onReactionPlayed,
                             hopping = hopping,
-                            sleeping = snoring,
-                            desire = desireOf(game.pet.care.level, game.pet.joy.level),
+                            sleeping = snoring || dayFinished,
+                            // Облачко-желание — только без подсказки: подсказка
+                            // уже говорит, куда идти.
+                            desire = if (guide != null || dayFinished) null else desireOf(game.pet.care.level, game.pet.joy.level),
                             speech = if (farewell) PetSpeech.FAREWELL else speech,
                             onSpeechClick = onSpeechShown,
                             art = art,
                             colors = colors,
                             modifier = Modifier
                                 .offset { IntOffset(hop.value.x.roundToInt(), hop.value.y.roundToInt()) }
-                                .alpha(petAlpha.value)
+                                .alpha(if (dayFinished && state.hasScenery("house")) 0f else petAlpha.value)
                                 .onGloballyPositioned { petCenter = it.boundsInRoot().center },
                             onClick = { if (!busy) onOpenPet() },
-                            snoringHere = snoring && !state.hasScenery("house"),
+                            snoringHere = (snoring || dayFinished) && !state.hasScenery("house"),
                         )
                     }
                     YardObject(
@@ -454,12 +469,18 @@ fun YardScreen(
                     onPlaced = { places["savings"] = it.center; bounds[GuideTarget.SAVINGS] = it },
                     onClick = { runTo(places["savings"], onOpenSavings) },
                 )
-                FinishDayButton(
-                    colors = colors,
-                    reason = reason,
-                    onClick = { finishDay() },
-                    onPlaced = { bounds[GuideTarget.FINISH] = it },
-                )
+                if (dayFinished) {
+                    SleepPlate(colors = colors, petName = profile.petName)
+                } else {
+                    FinishDayButton(
+                        colors = colors,
+                        reason = reason,
+                        // Кнопка пульсирует, только когда до неё дошла очередь.
+                        highlight = guide == null || guide.target == GuideTarget.FINISH,
+                        onClick = { finishDay() },
+                        onPlaced = { bounds[GuideTarget.FINISH] = it },
+                    )
+                }
                 Spacer(modifier = Modifier.height(10.dp))
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
@@ -474,6 +495,9 @@ fun YardScreen(
                 colors = colors,
                 step = guide,
                 target = target.translate(-yardOrigin),
+                // Сундучок стоит под питомцем: облачко над ним закрыло бы
+                // питомца, поэтому оно снизу.
+                below = guide.target == GuideTarget.SAVINGS,
                 onClick = when (guide.target) {
                     GuideTarget.PLAN -> ({ runTo(places["plan"], onOpenPlan) })
                     GuideTarget.SHOP -> ({ runTo(places["shop"], onOpenShop) })
@@ -482,6 +506,12 @@ fun YardScreen(
                     GuideTarget.FINISH -> null
                 },
             )
+        }
+
+        // Пришли монеты — отдельным окном: это первое, что видит ребёнок.
+        val arrival = state.arrival
+        if (arrival != null) {
+            ArrivalDialog(art = art, message = arrival, onDismiss = onArrivalShown)
         }
 
         val message = state.message
@@ -973,8 +1003,15 @@ private fun ChestRow(
 }
 
 @Composable
-private fun FinishDayButton(colors: YardColors, reason: String?, onClick: () -> Unit, onPlaced: (Rect) -> Unit) {
+private fun FinishDayButton(
+    colors: YardColors,
+    reason: String?,
+    highlight: Boolean,
+    onClick: () -> Unit,
+    onPlaced: (Rect) -> Unit,
+) {
     val enabled = reason == null
+    val pulsing = enabled && highlight
     val pulse = rememberPulse()
     Column(
         modifier = Modifier
@@ -987,7 +1024,7 @@ private fun FinishDayButton(colors: YardColors, reason: String?, onClick: () -> 
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
                 .graphicsLayer {
-                    val s = if (enabled) pulse.value else 1f
+                    val s = if (pulsing) pulse.value else 1f
                     scaleX = s
                     scaleY = s
                 }
@@ -1026,12 +1063,19 @@ private fun FinishDayButton(colors: YardColors, reason: String?, onClick: () -> 
  * если движения включены. TalkBack зачитывает новый шаг сам.
  */
 @Composable
-private fun GuideBubble(colors: YardColors, step: GuideStep, target: Rect, onClick: (() -> Unit)?) {
+private fun GuideBubble(
+    colors: YardColors,
+    step: GuideStep,
+    target: Rect,
+    onClick: (() -> Unit)?,
+    below: Boolean = false,
+) {
     val motion = motionAllowed()
     val bob = rememberInfiniteTransition(label = "guide")
     val phase by bob.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "bob")
     val lift = if (motion) sin(phase * 2 * PI.toFloat()) * 3f else 0f
-    val spoken = "Подсказка, шаг ${step.number} из ${step.total}: ${step.text}"
+    val numbered = step.number > 0
+    val spoken = if (numbered) "Подсказка, шаг ${step.number} из ${step.total}: ${step.text}" else "Подсказка: ${step.text}"
     Layout(
         modifier = Modifier.fillMaxSize(),
         content = {
@@ -1052,11 +1096,13 @@ private fun GuideBubble(colors: YardColors, step: GuideStep, target: Rect, onCli
                     }
                     .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
             ) {
-                Text(
-                    text = "Шаг ${step.number} из ${step.total}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = FinnyTheme.colors.onSurfaceMuted,
-                )
+                if (numbered) {
+                    Text(
+                        text = "Шаг ${step.number} из ${step.total}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = FinnyTheme.colors.onSurfaceMuted,
+                    )
+                }
                 Text(text = step.text, style = MaterialTheme.typography.titleSmall)
             }
             Box(
@@ -1067,12 +1113,14 @@ private fun GuideBubble(colors: YardColors, step: GuideStep, target: Rect, onCli
                         // Хвостик ступеньками: верхний ряд закрывает нижнюю
                         // кромку таблички, и облачко выглядит цельным.
                         val c = max(1f, floor(YARD_CELL.toPx()))
+                        // Под предметом хвостик смотрит вверх: широкий ряд — внизу.
                         for (row in 0 until 4) {
                             val from = row
                             val to = 7 - row
-                            drawRect(colors.outline, Offset(from * c, row * c), Size((to - from + 1) * c, c))
+                            val y = (if (below) 3 - row else row) * c
+                            drawRect(colors.outline, Offset(from * c, y), Size((to - from + 1) * c, c))
                             if (to - from >= 2) {
-                                drawRect(colors.card, Offset((from + 1) * c, row * c), Size((to - from - 1) * c, c))
+                                drawRect(colors.card, Offset((from + 1) * c, y), Size((to - from - 1) * c, c))
                             }
                         }
                     },
@@ -1088,10 +1136,52 @@ private fun GuideBubble(colors: YardColors, step: GuideStep, target: Rect, onCli
             val cx = target.center.x.roundToInt()
             val right = (constraints.maxWidth - margin - panel.width).coerceAtLeast(margin)
             val x = (cx - panel.width / 2).coerceIn(margin, right)
-            val tailTop = target.top.roundToInt() - tail.height + overlap
-            val panelTop = (tailTop - panel.height + overlap).coerceAtLeast(0)
-            panel.place(x, panelTop)
-            tail.place(cx - tail.width / 2, panelTop + panel.height - overlap, zIndex = 1f)
+            if (below) {
+                val tailTop = target.bottom.roundToInt() - overlap
+                val panelTop = (tailTop + tail.height - overlap).coerceAtMost(constraints.maxHeight - panel.height)
+                panel.place(x, panelTop)
+                tail.place(cx - tail.width / 2, panelTop - tail.height + overlap, zIndex = 1f)
+            } else {
+                val tailTop = target.top.roundToInt() - tail.height + overlap
+                val panelTop = (tailTop - panel.height + overlap).coerceAtLeast(0)
+                panel.place(x, panelTop)
+                tail.place(cx - tail.width / 2, panelTop + panel.height - overlap, zIndex = 1f)
+            }
         }
     }
+}
+
+/** ТЕСТ: вместо «Закончить день», пока питомец спит до новых суток. */
+@Composable
+private fun SleepPlate(colors: YardColors, petName: String) {
+    Text(
+        text = "$petName спит. Новый день начнётся завтра",
+        style = MaterialTheme.typography.titleMedium,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    )
+}
+
+/** ТЕСТ: окно «Пришли монеты» — стартовые или карманные на новый день. */
+@Composable
+private fun ArrivalDialog(art: PixelArt, message: FeedbackMessage, onDismiss: () -> Unit) {
+    FinnyDialog(
+        title = "Пришли монеты",
+        onDismiss = onDismiss,
+        content = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Sprite(art, "coin_0", cell = 4.dp)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(text = message.text, style = MaterialTheme.typography.titleMedium)
+            }
+            message.nextStep?.let {
+                Text(text = it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 10.dp))
+            }
+        },
+        actions = { PrimaryButton(text = "Дальше", onClick = onDismiss) },
+    )
 }

@@ -246,15 +246,19 @@ private fun AppNavHost(
 
             val reactions by viewModel.reactions.collectAsStateWithLifecycle()
             val speech by viewModel.speech.collectAsStateWithLifecycle()
-            LaunchedEffect(Unit) { viewModel.greetIfPending() }
+            LaunchedEffect(Unit) {
+                viewModel.startNewDayIfDue()
+                viewModel.greetIfPending()
+            }
 
             // ТЕСТ: главная — двор питомца; разделы открываются предметами.
-            val housePrice = content.shopItems().firstOrNull { it.unlocksScenery == YardGuide.HOUSE }?.price
             YardScreen(
                 state = state,
                 parts = content.petParts(),
                 activeTask = activeTask,
-                guide = YardGuide.step(state, housePrice),
+                guide = YardGuide.step(state, today),
+                onSleepingTap = viewModel::sleepingHint,
+                onArrivalShown = viewModel::dismissArrival,
                 speech = speech,
                 onSpeechShown = viewModel::speechShown,
                 goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
@@ -309,6 +313,7 @@ private fun AppNavHost(
                 pet = state.game.pet,
                 balance = balance,
                 todayPurchases = state.game.period.purchases,
+                planConfirmed = state.game.period.isPlanConfirmed,
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
                 onBuy = viewModel::buy,

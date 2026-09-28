@@ -82,7 +82,10 @@ class PersistenceTest {
     }
 
     /** Модель с настоящим хранилищем и фиксированной датой. */
-    private fun viewModel() = GameViewModel(content, repository, dates = { TODAY })
+    /** Дата по часам устройства; многодневные сценарии переводят её вперёд. */
+    private var clock = TODAY
+
+    private fun viewModel() = GameViewModel(content, repository, dates = { clock })
 
     @Test
     fun `выключенные движения сохраняются и переживают сброс профиля`() = runBlocking {
@@ -195,6 +198,9 @@ class PersistenceTest {
             first.buy("food")
             first.buy("ball")
             first.finishPeriod()
+            // ТЕСТ: карманные на новый день приходят в новые сутки.
+            clock = java.time.LocalDate.parse(clock).plusDays(1).toString()
+            first.startNewDayIfDue()
         }
 
         val after = viewModel().state.value
