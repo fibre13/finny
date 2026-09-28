@@ -37,6 +37,14 @@ import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.content.withNumbers
+import ru.onefortwo.finny.content.named
+import ru.onefortwo.finny.content.PetPartsContent
+import ru.onefortwo.finny.economy.StatLevel
+import ru.onefortwo.finny.ui.common.PetFigure
+import ru.onefortwo.finny.ui.state.AppState
+import ru.onefortwo.finny.ui.state.PetReaction
+import ru.onefortwo.finny.ui.state.PetReactions
+import androidx.compose.foundation.layout.width
 import ru.onefortwo.finny.ui.common.FinnyNavigationBar
 import ru.onefortwo.finny.ui.common.LocalMotionEnabled
 import ru.onefortwo.finny.ui.common.FinnyNavigationRail
@@ -190,6 +198,7 @@ private fun AppNavHost(
     val content = viewModel.content
     val today = viewModel.today()
     val balance = state.game.balance
+    val petName = state.profile?.petName ?: "Финни"
 
     NavHost(
         navController = navController,
@@ -323,11 +332,12 @@ private fun AppNavHost(
 
         composable(Routes.TASKS) {
             TasksScreen(
-                tasks = content.tasks(state.difficulty),
+                tasks = content.tasks(state.difficulty).map { it.named(petName) },
                 completedIds = state.completedTaskIds,
-                balance = balance,
                 onOpenTask = { id -> navController.navigate("${Routes.TASK}/$id") },
                 onBack = { navController.popBackStack() },
+                // После неудачного дня задание помощи — сверху.
+                recoveryFirst = state.lastOutcome?.isSetback == true,
             )
         }
 
@@ -341,7 +351,7 @@ private fun AppNavHost(
             // они относились бы уже к другому условию.
             val seed = rememberSaveable(taskId) { Random.nextLong() }
             val task = remember(taskId, seed) {
-                taskId?.let { content.task(it)?.withNumbers(Random(seed)) }
+                taskId?.let { content.task(it)?.withNumbers(Random(seed))?.named(petName) }
             }
 
             if (task == null) {
@@ -361,10 +371,10 @@ private fun AppNavHost(
                 )
                 TaskDetailScreen(
                     task = task,
-                    balance = balance,
                     onAnswer = { answer -> viewModel.answerTask(task, answer) },
                     onBack = { navController.popBackStack() },
-                    nextTask = nextTask,
+                    nextTask = nextTask?.named(petName),
+                    petFigure = { happy -> TaskPet(state, content.petParts(), happy) },
                     // Текущее задание заменяется следующим, а не остаётся под
                     // ним в стеке: «Назад» из следующего ведёт туда, откуда
                     // пришли, а не к уже решённому заданию.
@@ -461,7 +471,7 @@ private fun AppNavHost(
 
         composable(Routes.GLOSSARY) {
             GlossaryScreen(
-                entries = content.glossary(),
+                entries = content.glossary().map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -527,6 +537,34 @@ private fun DemoWatermark() {
             softWrap = false,
         )
     }
+}
+
+/**
+ * ТЕСТ: питомец ребёнка в ответе на задание: радуется при верном ответе,
+ * спокоен при ошибке — без грусти и упрёка.
+ */
+@Composable
+private fun TaskPet(state: AppState, parts: PetPartsContent, happy: Boolean) {
+    val profile = state.profile ?: return
+    val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
+    val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
+    val accessory = parts.accessories.firstOrNull { it.id == profile.appearance.accessoryId }
+    PetFigure(
+        petName = profile.petName,
+        speciesId = profile.appearance.speciesId,
+        speciesTitle = species?.title ?: "Питомец",
+        accessoryId = profile.appearance.accessoryId,
+        accessoryTitle = accessory?.title ?: "без украшения",
+        colorHex = color?.hex ?: "#CCCCCC",
+        stage = state.game.stage,
+        care = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
+        joy = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
+        size = 120.dp,
+        caption = false,
+        plain = true,
+        reaction = if (happy) PetReaction(PetReactions.PLAY, id = 1L) else null,
+        modifier = Modifier.width(120.dp),
+    )
 }
 
 /** Заставка на время чтения сохранённого состояния. */

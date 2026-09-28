@@ -43,6 +43,7 @@ import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskQueue
+import ru.onefortwo.finny.content.TaskTopic
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.BudgetPlan
@@ -128,7 +129,7 @@ class ScreenRenderTest {
 
         // ТЗ 2.5.1: цель игры и три типа решений.
         compose.onNodeWithText("на нужное — чтобы был сыт").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("на развлечения — чтобы радовался").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("на «Хочу» — чтобы радовался").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("в копилку — на большую мечту").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("Шаг 1 из 3").assertExists()
         compose.onNodeWithText("Открыть подарок").performScrollTo().performClick()
@@ -340,7 +341,7 @@ class ScreenRenderTest {
 
         // Кнопка ищется по описанию для программы чтения с экрана:
         // у трёх направлений одинаковые подписи «+5».
-        compose.onNodeWithContentDescription("Копилка: прибавить 5").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Копим на мечту: прибавить 5").performScrollTo().performClick()
 
         compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(
@@ -460,9 +461,9 @@ class ScreenRenderTest {
 
         compose.onNodeWithText("Ответить").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Развлечения: прибавить 1").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Хочу: прибавить 1").performScrollTo().performClick()
         repeat(4) {
-            compose.onNodeWithContentDescription("Копилка: прибавить 1").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("Копим на мечту: прибавить 1").performScrollTo().performClick()
         }
 
         compose.onNodeWithText("Все монеты распределены.").performScrollTo().assertIsDisplayed()
@@ -585,7 +586,7 @@ class ScreenRenderTest {
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
 
         compose.onNodeWithText(
-            "Награда за задание ещё раз: +5 монет, за повтор — половина награды.",
+            "Награда за задание ещё раз: +5 монет, за повтор — половина награды",
         )
             .performScrollTo()
             .assertIsDisplayed()
@@ -630,8 +631,8 @@ class ScreenRenderTest {
         }
 
         compose.onNodeWithText("Нужное").assertIsDisplayed()
-        compose.onNodeWithText("Развлечения").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Копилка").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Хочу").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Копим на мечту").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("0 из 50").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Остаток 50 монет — можно оставить на всякий случай.")
             .performScrollTo()
@@ -724,28 +725,7 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `экран заданий показывает темы`() {
-        compose.setContent {
-            FinnyTheme {
-                TasksScreen(
-                    tasks = simpleTasks,
-                    completedIds = emptySet(),
-                    onOpenTask = {},
-                    onBack = {},
-                )
-            }
-        }
-
-        // Тема подписана на каждой карточке; первые три новых задания —
-        // по одному на каждую обязательную тему.
-        compose.onNodeWithText("Новые задания").assertIsDisplayed()
-        compose.onAllNodesWithText("Планирование бюджета").assertCountEquals(2)
-        compose.onAllNodesWithText("Формирование сбережений").assertCountEquals(2)
-        compose.onAllNodesWithText("Платежи и покупки").assertCountEquals(2)
-    }
-
-    @Test
-    fun `решённые задания уходят из новых в отдельный раздел`() {
+    fun `экран заданий показывает звёзды и короткие карточки с темой`() {
         val queue = TaskQueue.ordered(simpleTasks)
         val opened = mutableListOf<String>()
         compose.setContent {
@@ -759,32 +739,28 @@ class ScreenRenderTest {
             }
         }
 
-        // Решённое задание выводится один раз — в «Уже решал», а не ещё и в новых.
+        // ТЕСТ: звёзды — решённые в этом круге из заданий уровня.
+        compose.onNodeWithContentDescription("Звёзды: 1 из ${queue.size}").assertIsDisplayed()
+        // Каждое задание — один раз, без «Уже решал» и длинных пояснений.
         compose.onAllNodesWithText(queue[0].title).assertCountEquals(1)
-        compose.onNodeWithText("Новые задания").assertIsDisplayed()
-        compose.onNodeWithText("Уже решал").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Решить ещё раз").performScrollTo().performClick()
-        compose.onNodeWithText("Если день не удался").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Уже решал", substring = true).assertDoesNotExist()
+        compose.onAllNodesWithText("Планирование").assertCountEquals(simpleTasks.count { it.topic == TaskTopic.BUDGET_PLANNING })
+        compose.onNode(hasContentDescriptionPrefix("${queue[0].title},")).performScrollTo().performClick()
         assertEquals(listOf(queue[0].id), opened)
     }
 
     @Test
-    fun `когда новых нет, список говорит об этом прямо`() {
-        val solved = TaskQueue.ordered(simpleTasks).map { it.id }.toSet()
+    fun `после неудачного дня задание помощи стоит первым`() {
         compose.setContent {
             FinnyTheme {
-                TasksScreen(tasks = simpleTasks, completedIds = solved, onOpenTask = {}, onBack = {})
+                TasksScreen(tasks = simpleTasks, completedIds = emptySet(), onOpenTask = {}, onBack = {}, recoveryFirst = true)
             }
         }
-
-        compose.onNodeWithText("Новых заданий нет").assertIsDisplayed()
-        compose.onNodeWithText(
-            "Новые задания закончились. Любое из тех, что уже решал, можно решить ещё раз — они ниже.",
-        )
-            .assertIsDisplayed()
-        // «Помоги Финни» в очередь не входит и не решено — утверждать,
-        // что решены все задания, экран не должен.
-        compose.onNodeWithText("Все задания", substring = true).assertDoesNotExist()
+        val help = simpleTasks.first { it.topic == TaskTopic.RECOVERY }
+        val first = compose.onNode(hasContentDescriptionPrefix("${help.title},")).fetchSemanticsNode().positionInRoot.y
+        val other = compose.onNode(hasContentDescriptionPrefix("${TaskQueue.ordered(simpleTasks).first().title},"))
+            .fetchSemanticsNode().positionInRoot.y
+        assertTrue("задание помощи не первое", first < other)
     }
 
     @Test
@@ -817,7 +793,10 @@ class ScreenRenderTest {
         compose.onNodeWithText(task.options.first().title).performScrollTo().performClick()
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
 
-        compose.onNodeWithText("Следующее задание: ${next.title}").performScrollTo().performClick()
+        // Одна карточка следующего задания с кнопкой «Начать →» и «Готово».
+        compose.onNodeWithText(next.title).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Начать →").performScrollTo().performClick()
+        compose.onNodeWithText("Готово").assertExists()
         assertTrue("Переход к следующему заданию не сработал", nextOpened)
         compose.onNodeWithText("Готово").performScrollTo().assertIsDisplayed()
     }
@@ -982,7 +961,7 @@ class ScreenRenderTest {
         }
 
         // Худший случай по высоте: копилка без цели, причина в три строки.
-        compose.onNodeWithContentDescription("Копилка: прибавить 5").performClick()
+        compose.onNodeWithContentDescription("Копим на мечту: прибавить 5").performClick()
 
         val bottom = compose.onNodeWithText("Утвердить план").fetchSemanticsNode().boundsInRoot.bottom
         val limit = with(compose.density) { 728.dp.toPx() }

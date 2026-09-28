@@ -42,7 +42,15 @@ data class TaskCheck(
     val outcome: String? = null,
     /** Источник награды за выполненное задание. */
     val reward: IncomeSource,
+    /** ТЕСТ: реплика питомца в облачке; всегда есть, по умолчанию общая. */
+    val pet: String = if (isCorrect) PET_CORRECT else PET_WRONG,
+    /** ТЕСТ: картинка рядом с питомцем в ответе. */
+    val petIcon: String? = null,
 )
+
+/** ТЕСТ: реплики питомца, если в задании не заданы свои. */
+const val PET_CORRECT = "Ты молодец!"
+const val PET_WRONG = "Ничего, попробуем ещё!"
 
 /**
  * Проверяет ответ и формирует объяснение.
@@ -85,14 +93,15 @@ private fun ChoiceTask.checkChoice(answer: TaskAnswer.Chosen): TaskCheck {
             "В задании $id нет варианта ${answer.optionId}",
         )
 
-    return result(option.recommended, outcome = option.outcome)
+    return result(option.recommended, outcome = option.outcome, pet = option.pet).copy(petIcon = option.petIcon)
 }
 
 /** Собирает результат проверки с объяснением и наградой. */
-private fun TaskContent.result(isCorrect: Boolean, outcome: String? = null): TaskCheck = TaskCheck(
+private fun TaskContent.result(isCorrect: Boolean, outcome: String? = null, pet: String? = null): TaskCheck = TaskCheck(
     isCorrect = isCorrect,
     explanation = if (isCorrect) explanationCorrect else explanationWrong,
     outcome = outcome,
+    pet = pet ?: (if (isCorrect) petCorrect else petWrong) ?: (if (isCorrect) PET_CORRECT else PET_WRONG),
     reward = when {
         !isCorrect -> IncomeSource.TASK_PARTIAL
         topic == TaskTopic.RECOVERY -> IncomeSource.RECOVERY_TASK

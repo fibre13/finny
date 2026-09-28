@@ -236,7 +236,7 @@ fun GiftScreen(onOpen: () -> Unit) {
                         color = FinnyTheme.colors.onSurfaceMuted,
                     )
                     RuleRow(art, "icon_care", "на нужное — чтобы был сыт")
-                    RuleRow(art, "yard_ball", "на развлечения — чтобы радовался")
+                    RuleRow(art, "yard_ball", "на «Хочу» — чтобы радовался")
                     RuleRow(art, "coin_0", "в копилку — на большую мечту")
                     Text(
                         text = "Ошибиться не страшно: исправить можно завтра.",

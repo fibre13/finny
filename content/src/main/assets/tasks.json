@@ -4,8 +4,11 @@
     "id": "plan_split_easy",
     "topic": "budget_planning",
     "level": "easy",
+    "icon": "yard_plan",
     "title": "Раздели монеты на день",
-    "prompt": "У Финни {amount:монет} на день. Корм стоит {needs_min:монет}. Раздели все монеты: сколько на нужное, сколько на желаемое, сколько в копилку.",
+    "context": "{name} проголодался! Нужен корм — {food:монет} и вода — {water:монет}.",
+    "prompt": "У тебя {amount:монет} на день. Раздели их.",
+    "hint": "Распредели все {amount:монет}",
     "amount": 10,
     "rules": [
       {
@@ -13,13 +16,19 @@
         "min": 4
       }
     ],
-    "explanation_correct": "Верно! Сначала отложили {needs_min:монет} на корм — это нужное. Остальные монеты можно разделить между желаемым и копилкой.",
-    "explanation_wrong": "На корм нужно не меньше {needs_min:монет}: без еды Финни голодает. Остальные монеты раздели между желаемым и копилкой.",
+    "explanation_correct": "Верно! Сначала нужное: {needs_min:монет} на корм и воду. Остальное — на «Хочу» и на мечту.",
+    "explanation_wrong": "Почти получилось! На нужное — не меньше {needs_min:монет}: корм и вода. Остальное дели как хочешь.",
+    "pet_correct": "Спасибо! Я сыт и доволен!",
+    "pet_wrong": "Я немножко голодный… Давай ещё раз!",
     "vary": {
       "values": {
-        "needs_min": [
-          3,
-          5
+        "food": [
+          2,
+          4
+        ],
+        "water": [
+          1,
+          2
         ],
         "extra": [
           5,
@@ -27,6 +36,7 @@
         ]
       },
       "derived": {
+        "needs_min": "food+water",
         "amount": "needs_min+extra"
       },
       "amount": "amount",
@@ -40,8 +50,11 @@
     "id": "plan_split",
     "topic": "budget_planning",
     "level": "normal",
+    "icon": "yard_plan",
     "title": "Раздели монеты на день",
-    "prompt": "У Финни {amount:монет} на день. Корм стоит {needs_min:монет}. Раздели все монеты: сколько на нужное, сколько на желаемое, сколько в копилку.",
+    "context": "{name} проголодался! Нужен корм — {food:монет} и вода — {water:монет}.",
+    "prompt": "У тебя {amount:монет} на день. Раздели их.",
+    "hint": "Распредели все {amount:монет}",
     "amount": 30,
     "rules": [
       {
@@ -49,13 +62,19 @@
         "min": 10
       }
     ],
-    "explanation_correct": "Верно! Сначала отложили {needs_min:монет} на корм — это нужное. Остальные монеты можно разделить между желаемым и копилкой.",
-    "explanation_wrong": "На корм нужно не меньше {needs_min:монет}: без еды Финни голодает. Остальные монеты раздели между желаемым и копилкой.",
+    "explanation_correct": "Верно! Сначала нужное: {needs_min:монет} на корм и воду. Остальное — на «Хочу» и на мечту.",
+    "explanation_wrong": "Почти получилось! На нужное — не меньше {needs_min:монет}: корм и вода. Остальное дели как хочешь.",
+    "pet_correct": "Спасибо! Я сыт и доволен!",
+    "pet_wrong": "Я немножко голодный… Давай ещё раз!",
     "vary": {
       "values": {
-        "needs_min": [
-          8,
-          13
+        "food": [
+          6,
+          9
+        ],
+        "water": [
+          2,
+          4
         ],
         "extra": [
           12,
@@ -63,6 +82,7 @@
         ]
       },
       "derived": {
+        "needs_min": "food+water",
         "amount": "needs_min+extra"
       },
       "amount": "amount",
@@ -76,30 +96,37 @@
     "id": "plan_vs_fact_easy",
     "topic": "budget_planning",
     "level": "easy",
+    "icon": "yard_plan",
     "title": "Что не поместится в план",
-    "prompt": "В плане на «Развлечения» есть {plan:монет}. Отметь покупку, которая в этот план не поместится.",
+    "context": "На «Хочу» у тебя: {plan:монет}",
+    "prompt": "Выбери покупку, которая не поместится в план.",
+    "hint": "Сравни цену с планом",
     "options": [
       {
         "id": "stickers",
         "title": "Наклейки",
-        "price": 3
+        "price": 3,
+        "icon": "item_stickers"
       },
       {
         "id": "bow",
         "title": "Бантик",
-        "price": 5
+        "price": 5,
+        "icon": "bow_cat"
       },
       {
         "id": "ball",
         "title": "Мячик",
-        "price": 9
+        "price": 9,
+        "icon": "yard_ball"
       }
     ],
     "correct": [
       "ball"
     ],
-    "explanation_correct": "Верно! Мячик стоит {over:монет}, а в плане только {plan:монет}. План показывает, сколько можно потратить.",
-    "explanation_wrong": "Смотри на цену: мячик стоит {over:монет}, а в плане на «Развлечения» только {plan:монет}. Наклейки и бантик помещаются, а мячик — нет.",
+    "explanation_correct": "Верно! Мячик — {over:монет}. В плане — {plan}. План — это лимит на покупки.",
+    "explanation_wrong": "Почти получилось! Мячик — {over:монет}. Это больше, чем в плане, — {plan}. Сравнивай цену с планом!",
+    "pet_correct": "Здорово, ты следишь за планом!",
     "vary": {
       "values": {
         "plan": [
@@ -123,30 +150,37 @@
     "id": "plan_vs_fact",
     "topic": "budget_planning",
     "level": "normal",
+    "icon": "yard_plan",
     "title": "Что не поместится в план",
-    "prompt": "В плане на «Развлечения» есть {plan:монет}. Отметь покупку, которая в этот план не поместится.",
+    "context": "На «Хочу» у тебя: {plan:монет}",
+    "prompt": "Выбери покупку, которая не поместится в план.",
+    "hint": "Сравни цену с планом",
     "options": [
       {
         "id": "stickers",
         "title": "Наклейки",
-        "price": 4
+        "price": 4,
+        "icon": "item_stickers"
       },
       {
         "id": "ball",
         "title": "Мячик",
-        "price": 12
+        "price": 12,
+        "icon": "yard_ball"
       },
       {
         "id": "tent",
         "title": "Домик-палатка",
-        "price": 25
+        "price": 25,
+        "icon": "tent"
       }
     ],
     "correct": [
       "tent"
     ],
-    "explanation_correct": "Верно! Домик стоит {over:монет}, а в плане только {plan:монет}. План показывает, сколько можно потратить, чтобы монеты не кончились.",
-    "explanation_wrong": "Смотри на цену: домик стоит {over:монет}, а в плане на «Развлечения» только {plan:монет}. Наклейки и мячик помещаются, а домик — нет.",
+    "explanation_correct": "Верно! Домик — {over:монет}. В плане — {plan}. План — это лимит на покупки.",
+    "explanation_wrong": "Почти получилось! Домик — {over:монет}. Это больше, чем в плане, — {plan}. Сравнивай цену с планом!",
+    "pet_correct": "Здорово, ты следишь за планом!",
     "vary": {
       "values": {
         "plan": [
@@ -170,12 +204,14 @@
     "id": "save_gap_easy",
     "topic": "savings",
     "level": "easy",
+    "icon": "yard_savings",
     "title": "Сколько не хватает",
-    "prompt": "Бантик для Финни стоит {price:монет}. В копилке уже {saved:монет}. Сколько монет ещё не хватает?",
+    "prompt": "{name} хочет бантик за {price:монет}. В копилке уже {saved:монет}. Сколько ещё не хватает?",
     "answer": 4,
     "unit": "монет",
-    "explanation_correct": "Верно! Из {price} вычли {saved}, которые уже есть. Не хватает {gap:монет} — и бантик твой.",
-    "explanation_wrong": "Посчитаем вместе: нужно {price:монет}, в копилке {saved}. {price} без {saved} — это {gap:монет}.",
+    "explanation_correct": "Верно! {price} − {saved} = {gap:монет}. Скоро бантик!",
+    "explanation_wrong": "Почти получилось! {price} − {saved} = {gap:монет}. Из цены вычитай то, что уже есть.",
+    "pet_correct": "Ура, скоро бантик!",
     "vary": {
       "values": {
         "saved": [
@@ -198,12 +234,14 @@
     "id": "save_rate",
     "topic": "savings",
     "level": "normal",
+    "icon": "scooter",
     "title": "Сколько откладывать",
-    "prompt": "Самокат стоит {goal:монет}. Финни хочет купить его за {days:дней}. Сколько монет откладывать каждый день?",
+    "prompt": "Самокат — {goal:монет}. Нужно накопить за {days:дней}. Сколько откладывать каждый день?",
     "answer": 15,
     "unit": "монет",
-    "explanation_correct": "Верно! {goal} монет разделить на {days} — получится {per_day:монет} в день. Так копилка растёт понемногу, но каждый день.",
-    "explanation_wrong": "Посчитаем вместе: {goal} монет надо разделить на {days:дней}. Получится {per_day:монет} в день.",
+    "explanation_correct": "Верно! {goal} ÷ {days} = {per_day:монет} в день. Если откладывать регулярно, а не тратить на необязательное — например, на много сладкого, — копилка растёт каждый день и приближает мечту.",
+    "explanation_wrong": "Почти получилось! {goal} ÷ {days} = {per_day:монет} в день. Если откладывать их регулярно, накопишь на мечту!",
+    "pet_correct": "Скоро самокат!",
     "vary": {
       "values": {
         "per_day": [
@@ -226,55 +264,72 @@
     "id": "save_temptation",
     "topic": "savings",
     "level": "any",
+    "icon": "yard_savings",
     "title": "Копилка или игрушка",
-    "prompt": "В копилке 40 монет из 60 на самокат. Друг зовёт купить игрушку за 25 монет. Что сделаешь?",
+    "prompt": "В копилке накоплено 40 монет на самокат, который стоит 60. Друг зовёт купить игрушку за 25 монет. Что сделаешь?",
     "options": [
       {
         "id": "withdraw",
         "title": "Взять 25 монет из копилки",
-        "outcome": "В копилке останется 15 монет. До самоката станет дальше на 2 дня.",
-        "recommended": false
+        "outcome": "Ты залез в копилку — в ней осталось всего 15 монет. На самокат придётся копить заново.",
+        "recommended": false,
+        "icon": "yard_savings",
+        "pet": "Ой… Самокат будет позже. Но я подожду!",
+        "pet_icon": "scooter"
       },
       {
         "id": "wait",
         "title": "Не трогать копилку и подождать",
-        "outcome": "Копилка цела: 40 монет из 60. До самоката осталось совсем немного.",
-        "recommended": true
+        "outcome": "Копилка цела — 40 из 60. До самоката совсем немного.",
+        "recommended": true,
+        "icon": "item_hourglass",
+        "pet": "Ура! Ты не тронул копилку! Мы скоро купим самокат!",
+        "pet_icon": "scooter"
       },
       {
         "id": "cheaper",
         "title": "Купить что-то дешевле на свободные монеты",
-        "outcome": "И порадовался, и копилка осталась целой.",
-        "recommended": true
+        "outcome": "Ты потратил свободные монеты — копилка цела.",
+        "recommended": true,
+        "icon": "item_toycar",
+        "pet": "И поиграли, и копилка цела! Ты молодец!"
       }
     ],
-    "explanation_correct": "Копилка — это обещание самому себе. Пока её не трогаешь, цель становится ближе с каждым днём.",
-    "explanation_wrong": "Так тоже можно, но самокат придётся ждать дольше: монет в копилке стало меньше на 25."
+    "explanation_correct": "Копилка — обещание самому себе.",
+    "explanation_wrong": "Копилку лучше не трогать ради игрушки."
   },
   {
     "type": "pick",
     "id": "cart_fit_easy",
     "topic": "payments",
     "level": "easy",
+    "icon": "icon_care",
     "title": "Что отложить на завтра",
-    "prompt": "В кошельке {wallet:монет}. В корзине корм за {food} и мячик за {ball} — вместе {sum:монет}, это больше, чем есть. Отметь, что лучше отложить на завтра.",
+    "prompt": "В кошельке {wallet:монет}. Корм стоит {food:монет}, мячик — {ball:монет}. Выбери, что можно не покупать сегодня, а отложить на завтра.",
+    "hint": "Помни: нужное важнее желаемого!",
     "options": [
       {
         "id": "food",
         "title": "Корм",
-        "price": 4
+        "price": 4,
+        "icon": "icon_care",
+        "note": "нужное"
       },
       {
         "id": "ball",
         "title": "Мячик",
-        "price": 6
+        "price": 6,
+        "icon": "yard_ball",
+        "note": "хочу"
       }
     ],
     "correct": [
       "ball"
     ],
-    "explanation_correct": "Верно! Корм — это нужное, его берут сначала. Мячик подождёт до завтра, и Финни не останется голодным.",
-    "explanation_wrong": "Если отложить корм, Финни останется голодным. Сначала берут нужное, а желаемое ждёт следующего дня.",
+    "explanation_correct": "Верно! Корм — нужное, его покупают первым. Мячик подождёт.",
+    "explanation_wrong": "Почти получилось! Если отложить корм, {name} будет голодным. Сначала — нужное.",
+    "pet_correct": "Спасибо! Я наелся!",
+    "pet_wrong": "Я проголодался… Мячик бы подождал!",
     "vary": {
       "values": {
         "food": [
@@ -302,25 +357,33 @@
     "id": "cart_fit",
     "topic": "payments",
     "level": "normal",
+    "icon": "icon_care",
     "title": "Что отложить на завтра",
-    "prompt": "В кошельке {wallet:монет}. В корзине корм за {food} и мячик за {ball} — вместе {sum:монет}, это больше, чем есть. Отметь, что лучше отложить на завтра.",
+    "prompt": "В кошельке {wallet:монет}. Корм стоит {food:монет}, мячик — {ball:монет}. Выбери, что можно не покупать сегодня, а отложить на завтра.",
+    "hint": "Помни: нужное важнее желаемого!",
     "options": [
       {
         "id": "food",
         "title": "Корм",
-        "price": 10
+        "price": 4,
+        "icon": "icon_care",
+        "note": "нужное"
       },
       {
         "id": "ball",
         "title": "Мячик",
-        "price": 12
+        "price": 6,
+        "icon": "yard_ball",
+        "note": "хочу"
       }
     ],
     "correct": [
       "ball"
     ],
-    "explanation_correct": "Верно! Корм — это нужное, его берут сначала. Мячик подождёт до завтра, и Финни не останется голодным.",
-    "explanation_wrong": "Если отложить корм, Финни останется голодным. Сначала берут нужное, а желаемое ждёт следующего дня.",
+    "explanation_correct": "Верно! Корм — нужное, его покупают первым. Мячик подождёт.",
+    "explanation_wrong": "Почти получилось! Если отложить корм, {name} будет голодным. Сначала — нужное.",
+    "pet_correct": "Спасибо! Я наелся!",
+    "pet_wrong": "Я проголодался… Мячик бы подождал!",
     "vary": {
       "values": {
         "food": [
@@ -348,12 +411,14 @@
     "id": "change_count",
     "topic": "payments",
     "level": "any",
+    "icon": "item_stickers",
     "title": "Посчитай сдачу",
     "prompt": "Наклейки стоят {price:монет}. Ты дал {given:монет}. Сколько монет вернут сдачей?",
     "answer": 6,
     "unit": "монет",
-    "explanation_correct": "Верно! Из {given} вычли {price} — вернут {change:монет}. Сдачу всегда стоит пересчитать.",
-    "explanation_wrong": "Посчитаем вместе: было {given:монет}, наклейки стоят {price}. {given} без {price} — это {change:монет} сдачи.",
+    "explanation_correct": "Верно! {given} − {price} = {change:монет} сдачи. Сдачу всегда стоит пересчитать.",
+    "explanation_wrong": "Почти получилось! {given} − {price} = {change:монет} сдачи.",
+    "pet_correct": "Сдачу можно отложить!",
     "vary": {
       "values": {
         "price": [
@@ -376,29 +441,425 @@
     "id": "recover_help",
     "topic": "recovery",
     "level": "any",
-    "title": "Помоги Финни",
-    "prompt": "Финни загрустил и проголодался. С чего начать?",
+    "icon": "icon_care",
+    "title": "Помоги {name}",
+    "prompt": "{name} загрустил и проголодался. С чего начать?",
     "options": [
       {
         "id": "food",
         "title": "Купить корм",
-        "outcome": "Финни поел и повеселел. Забота выросла.",
-        "recommended": true
+        "outcome": "{name} поел и повеселел. Забота выросла.",
+        "recommended": true,
+        "icon": "icon_care",
+        "note": "нужное",
+        "pet": "Спасибо! Мне уже лучше!"
       },
       {
         "id": "toy",
         "title": "Купить игрушку",
-        "outcome": "Финни немного порадовался, но остался голодным.",
-        "recommended": false
+        "outcome": "{name} немного порадовался, но остался голодным.",
+        "recommended": false,
+        "icon": "yard_ball",
+        "note": "хочу",
+        "pet": "Весело… но я всё ещё голодный.",
+        "pet_icon": "item_empty_bowl"
       },
       {
         "id": "savings",
         "title": "Отложить все монеты в копилку",
-        "outcome": "Копилка выросла, но Финни так и не поел.",
-        "recommended": false
+        "outcome": "Копилка выросла, но {name} так и не поел.",
+        "recommended": false,
+        "icon": "yard_savings",
+        "pet": "Я голодный… Давай сначала поедим?",
+        "pet_icon": "item_empty_bowl"
       }
     ],
-    "explanation_correct": "Верно! Когда чего-то не хватает, начинают с нужного. Сытый Финни быстро повеселеет.",
-    "explanation_wrong": "Игрушки и копилка — это хорошо, но голодному Финни сначала нужен корм. Нужное идёт первым."
+    "explanation_correct": "Когда чего-то не хватает, начинают с нужного.",
+    "explanation_wrong": "Сначала нужное — корм."
+  },
+  {
+    "type": "number",
+    "id": "time_feed",
+    "topic": "time",
+    "level": "normal",
+    "icon": "item_clock",
+    "title": "Который час?",
+    "prompt": "Сейчас 8:00. {name} надо покормить через 2 часа. Во сколько кормить?",
+    "answer": 10,
+    "unit": "часов",
+    "clock": {
+      "from": 8,
+      "to": 10,
+      "choices": [
+        9,
+        10,
+        11
+      ]
+    },
+    "explanation_correct": "Верно! 8:00 + 2 часа = 10:00.",
+    "explanation_wrong": "Почти получилось! 8 + 2 = 10. Прибавь часы к текущему времени.",
+    "pet_correct": "Ура! Я поем в 10:00!",
+    "pet_wrong": "Я всё ещё жду еду…"
+  },
+  {
+    "type": "number",
+    "id": "time_wait",
+    "topic": "time",
+    "level": "normal",
+    "icon": "item_clock",
+    "title": "Сколько ждать?",
+    "prompt": "Сейчас 10:00. Лавка откроется в 12:00. Сколько часов ждать?",
+    "answer": 2,
+    "unit": "часов",
+    "clock": {
+      "from": 10,
+      "to": 12
+    },
+    "explanation_correct": "Верно! 12 − 10 = 2 часа.",
+    "explanation_wrong": "Почти получилось! 12 − 10 = 2. Из большего вычитай меньшее.",
+    "pet_correct": "Скоро пойдём за кормом!",
+    "pet_wrong": "Подождём ещё чуть-чуть…"
+  },
+  {
+    "type": "number",
+    "id": "save_weeks",
+    "topic": "savings",
+    "level": "normal",
+    "icon": "aquarium",
+    "title": "За сколько дней?",
+    "prompt": "Аквариум — 90 монет. Откладывай по 30 монет в день. Сколько дней копить?",
+    "answer": 3,
+    "unit": "дней",
+    "explanation_correct": "Верно! 90 ÷ 30 = 3 дня.",
+    "explanation_wrong": "Почти получилось! 90 ÷ 30 = 3. Делим цену на то, что откладываешь.",
+    "pet_correct": "Через 3 дня у меня будут рыбки!",
+    "pet_wrong": "Я подожду, мне не срочно!"
+  },
+  {
+    "type": "choice",
+    "id": "what_first",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "icon_care",
+    "title": "Что важнее?",
+    "prompt": "{name} доел весь корм. Ещё он хочет новую игрушку. Что купить первым?",
+    "options": [
+      {
+        "id": "food",
+        "title": "Корм",
+        "outcome": "{name} сыт — теперь можно играть.",
+        "recommended": true,
+        "icon": "icon_care",
+        "note": "нужное",
+        "pet": "Спасибо! Я наелся, теперь можно играть!",
+        "pet_icon": "icon_care"
+      },
+      {
+        "id": "toy",
+        "title": "Игрушка",
+        "outcome": "Игрушка есть, а миска пустая.",
+        "recommended": false,
+        "icon": "yard_ball",
+        "note": "хочу",
+        "pet": "Я голодный… Игрушка подождёт!",
+        "pet_icon": "item_empty_bowl"
+      }
+    ],
+    "explanation_correct": "Сначала нужное — потом хочу.",
+    "explanation_wrong": "Сначала нужное, потом хочу."
+  },
+  {
+    "type": "number",
+    "id": "change_visual",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "coin_0",
+    "title": "Сколько сдачи?",
+    "prompt": "Мячик — 8 монет. Ты дал 10. Сколько сдачи?",
+    "answer": 2,
+    "unit": "монет",
+    "coins": {
+      "paid": 10,
+      "price": 8
+    },
+    "explanation_correct": "Верно! 10 − 8 = 2 монеты.",
+    "explanation_wrong": "Почти получилось! 10 − 8 = 2. Из того, что дал, вычитай цену.",
+    "pet_correct": "Спасибо! Сдачу можно отложить!",
+    "pet_wrong": "Давай посчитаем вместе!"
+  },
+  {
+    "type": "choice",
+    "id": "enough",
+    "topic": "budget_planning",
+    "level": "easy",
+    "icon": "coin_0",
+    "title": "Хватит ли монет?",
+    "prompt": "У тебя 20 монет. Корм — 9, вода — 5. Хватит на всё?",
+    "options": [
+      {
+        "id": "yes",
+        "title": "Хватит",
+        "outcome": "Корм и вода — 14 монет.",
+        "recommended": true,
+        "icon": "item_yes",
+        "pet": "Ура! Всё купим!"
+      },
+      {
+        "id": "no",
+        "title": "Не хватит",
+        "outcome": "Корм и вода — 14 монет, а у тебя 20.",
+        "recommended": false,
+        "icon": "item_no",
+        "pet": "Считай внимательно!"
+      }
+    ],
+    "explanation_correct": "9 + 5 = 14. У тебя 20 — хватает с запасом!",
+    "explanation_wrong": "9 + 5 = 14. 20 больше 14 — хватает."
+  },
+  {
+    "type": "number",
+    "id": "discount",
+    "topic": "payments",
+    "level": "normal",
+    "icon": "tent",
+    "title": "Скидка",
+    "prompt": "Домик стоит 20 монет. Со скидкой — 15. Сколько сэкономишь?",
+    "answer": 5,
+    "unit": "монет",
+    "explanation_correct": "Верно! 20 − 15 = 5 монет скидки.",
+    "explanation_wrong": "Почти получилось! 20 − 15 = 5. Считай, сколько убрали от полной цены.",
+    "pet_correct": "Ура! Сэкономим 5 монет!",
+    "pet_wrong": "Давай пересчитаем!"
+  },
+  {
+    "type": "choice",
+    "id": "spend_all",
+    "topic": "savings",
+    "level": "any",
+    "icon": "item_empty_bowl",
+    "title": "Если потратить всё?",
+    "prompt": "Ты потратил все монеты на игрушки. Как себя почувствует {name}?",
+    "options": [
+      {
+        "id": "hungry",
+        "title": "{name} будет голодным",
+        "outcome": "На корм монет не осталось.",
+        "recommended": true,
+        "icon": "item_empty_bowl",
+        "pet": "Я грущу, когда голодный…",
+        "pet_icon": "item_empty_bowl"
+      },
+      {
+        "id": "happy",
+        "title": "{name} будет счастливым",
+        "outcome": "Игрушки есть, а миска пустая.",
+        "recommended": false,
+        "icon": "yard_ball",
+        "pet": "Подумай: без еды я грущу!",
+        "pet_icon": "item_empty_bowl"
+      },
+      {
+        "id": "nothing",
+        "title": "Ничего не случится",
+        "outcome": "Без корма питомец голодает.",
+        "recommended": false,
+        "icon": "item_shrug",
+        "pet": "Подумай: без еды я грущу!",
+        "pet_icon": "item_empty_bowl"
+      }
+    ],
+    "explanation_correct": "Сначала нужное, потом хочу.",
+    "explanation_wrong": "Без корма {name} грустит. Нужное — первым."
+  },
+  {
+    "type": "number",
+    "id": "remaining",
+    "topic": "budget_planning",
+    "level": "easy",
+    "icon": "icon_care",
+    "title": "Сколько осталось?",
+    "prompt": "У тебя 20 монет. Ты купил корм за 12. Сколько осталось?",
+    "answer": 8,
+    "unit": "монет",
+    "explanation_correct": "Верно! 20 − 12 = 8 монет.",
+    "explanation_wrong": "Почти получилось! 20 − 12 = 8. Из бюджета вычитай траты.",
+    "pet_correct": "8 монет можно отложить!",
+    "pet_wrong": "Считай: было — сколько потратил!"
+  },
+  {
+    "type": "choice",
+    "id": "wait_or_buy",
+    "topic": "savings",
+    "level": "any",
+    "icon": "item_hourglass",
+    "title": "Подождать или купить?",
+    "prompt": "Ты копишь на самокат — 60 монет. Накопил 50. Друг предлагает купить конфету за 10. Что сделаешь?",
+    "options": [
+      {
+        "id": "candy",
+        "title": "Купить конфету",
+        "outcome": "До самоката станет не хватать 20 монет.",
+        "recommended": false,
+        "icon": "item_candy",
+        "pet": "Конфета вкусная… но самокат интереснее, я давно его хотел!",
+        "pet_icon": "scooter"
+      },
+      {
+        "id": "wait",
+        "title": "Подождать и купить самокат",
+        "outcome": "Осталось 10 монет. Ещё чуть-чуть — и цель!",
+        "recommended": true,
+        "icon": "item_hourglass",
+        "pet": "Ура! Скоро самокат!",
+        "pet_icon": "scooter"
+      }
+    ],
+    "explanation_correct": "Терпение приближает мечту.",
+    "explanation_wrong": "Если купишь конфету — до самоката ещё 20 монет. Подожди!"
+  },
+  {
+    "type": "choice",
+    "id": "cheap_candy",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "item_candy",
+    "title": "Что дешевле?",
+    "prompt": "Одна конфета или 25 конфет? Выбери, что дешевле.",
+    "options": [
+      {
+        "id": "one",
+        "title": "Одна конфета",
+        "outcome": "Одна конфета — дешевле.",
+        "recommended": true,
+        "icon": "item_candy",
+        "pet": "Молодец!"
+      },
+      {
+        "id": "many",
+        "title": "25 конфет",
+        "outcome": "25 конфет — дороже.",
+        "recommended": false,
+        "icon": "item_candies",
+        "pet": "Попробуй ещё!"
+      }
+    ],
+    "explanation_correct": "Верно! Одна конфета стоит меньше, чем 25.",
+    "explanation_wrong": "Подумай: одна конфета — это одна. А 25 — целая гора. Что дешевле?"
+  },
+  {
+    "type": "choice",
+    "id": "cheap_notebook",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "item_notebook",
+    "title": "Что дешевле?",
+    "prompt": "Тетрадка или шуба? Выбери, что дешевле.",
+    "options": [
+      {
+        "id": "coat",
+        "title": "Шуба",
+        "outcome": "Шуба — дороже.",
+        "recommended": false,
+        "icon": "item_coat",
+        "pet": "Не расстраивайся, подумай ещё!"
+      },
+      {
+        "id": "notebook",
+        "title": "Тетрадка",
+        "outcome": "Тетрадка — дешевле.",
+        "recommended": true,
+        "icon": "item_notebook",
+        "pet": "Точно!"
+      }
+    ],
+    "explanation_correct": "Верно! Тетрадка стоит мало. Шуба — дорогая.",
+    "explanation_wrong": "Тетрадка маленькая, шуба большая и тёплая. Что дешевле?"
+  },
+  {
+    "type": "choice",
+    "id": "dear_house",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "item_house",
+    "title": "Что дороже?",
+    "prompt": "Построить дом или починить велосипед? Выбери, что дороже.",
+    "options": [
+      {
+        "id": "house",
+        "title": "Построить дом",
+        "outcome": "Построить дом — дороже.",
+        "recommended": true,
+        "icon": "item_house",
+        "pet": "Верно!"
+      },
+      {
+        "id": "bike",
+        "title": "Починить велосипед",
+        "outcome": "Починить велосипед — дешевле.",
+        "recommended": false,
+        "icon": "item_bike",
+        "pet": "Почти! Попробуешь снова?"
+      }
+    ],
+    "explanation_correct": "Верно! Дом — это большое и дорогое. Велосипед починить дешевле.",
+    "explanation_wrong": "Дом строят долго и дорого. Велосипед можно починить быстро."
+  },
+  {
+    "type": "choice",
+    "id": "cheap_water",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "item_water",
+    "title": "Что дешевле?",
+    "prompt": "Стакан воды или билет в кино? Выбери, что дешевле.",
+    "options": [
+      {
+        "id": "ticket",
+        "title": "Билет в кино",
+        "outcome": "Билет в кино — дороже.",
+        "recommended": false,
+        "icon": "item_ticket",
+        "pet": "Ничего, попробуй ещё раз!"
+      },
+      {
+        "id": "water",
+        "title": "Стакан воды",
+        "outcome": "Стакан воды — дешевле.",
+        "recommended": true,
+        "icon": "item_water",
+        "pet": "В точку!"
+      }
+    ],
+    "explanation_correct": "Верно! Вода почти ничего не стоит. Билет в кино — дороже.",
+    "explanation_wrong": "Вода — просто вода. А билет в кино — это целое приключение."
+  },
+  {
+    "type": "choice",
+    "id": "cheap_car",
+    "topic": "payments",
+    "level": "easy",
+    "icon": "item_toycar",
+    "title": "Что дешевле?",
+    "prompt": "Игрушечная машинка или настоящая машина? Выбери, что дешевле.",
+    "options": [
+      {
+        "id": "toy",
+        "title": "Игрушечная машинка",
+        "outcome": "Игрушечная машинка — дешевле.",
+        "recommended": true,
+        "icon": "item_toycar",
+        "pet": "Отлично!"
+      },
+      {
+        "id": "real",
+        "title": "Настоящая машина",
+        "outcome": "Настоящая машина — дороже.",
+        "recommended": false,
+        "icon": "item_car",
+        "pet": "Не беда! В следующий раз получится!"
+      }
+    ],
+    "explanation_correct": "Верно! Игрушечная — маленькая и дешёвая. Настоящая — дорогая.",
+    "explanation_wrong": "Игрушечная машинка — маленькая. Настоящая — большая и стоит очень дорого."
   }
 ]

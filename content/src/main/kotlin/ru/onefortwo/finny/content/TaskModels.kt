@@ -20,16 +20,20 @@ import ru.onefortwo.finny.economy.Difficulty
 @Serializable
 enum class TaskTopic(val displayName: String) {
     @SerialName("budget_planning")
-    BUDGET_PLANNING("Планирование бюджета"),
+    BUDGET_PLANNING("Планирование"),
 
     @SerialName("savings")
-    SAVINGS("Формирование сбережений"),
+    SAVINGS("Накопления"),
 
     @SerialName("payments")
-    PAYMENTS("Платежи и покупки"),
+    PAYMENTS("Покупки"),
+
+    /** ТЕСТ: задания на время — «деньги и время связаны». */
+    @SerialName("time")
+    TIME("Время"),
 
     @SerialName("recovery")
-    RECOVERY("Как всё исправить"),
+    RECOVERY("Помощь питомцу"),
 }
 
 /**
@@ -100,6 +104,21 @@ sealed interface TaskContent {
      * Подстановка описана в [TaskVariation].
      */
     val vary: TaskVariation?
+
+    /** ТЕСТ: реплика питомца в облачке после верного ответа. */
+    val petCorrect: String?
+
+    /** ТЕСТ: реплика питомца после ошибки — поддержка, без упрёка. */
+    val petWrong: String?
+
+    /** ТЕСТ: значок задания в списке — код спрайта из `art/pixel`. */
+    val icon: String?
+
+    /** ТЕСТ: игровое событие над условием: «{name} проголодался! …». */
+    val context: String?
+
+    /** ТЕСТ: короткая подсказка под вариантами: «Сравни цену с планом». */
+    val hint: String?
 }
 
 /** Ограничение на сумму по направлению в задании на распределение. */
@@ -124,6 +143,13 @@ data class AllocateTask(
     @SerialName("explanation_wrong")
     override val explanationWrong: String,
     override val vary: TaskVariation? = null,
+    @SerialName("pet_correct")
+    override val petCorrect: String? = null,
+    @SerialName("pet_wrong")
+    override val petWrong: String? = null,
+    override val icon: String? = null,
+    override val context: String? = null,
+    override val hint: String? = null,
     /** Сумма, которую нужно распределить полностью. */
     val amount: Int,
     val rules: List<AllocateRule> = emptyList(),
@@ -135,6 +161,10 @@ data class PickOption(
     val id: String,
     val title: String,
     val price: Int? = null,
+    /** ТЕСТ: картинка карточки — код спрайта. */
+    val icon: String? = null,
+    /** ТЕСТ: пометка под названием: «нужное», «хочу». */
+    val note: String? = null,
 )
 
 /** Отметить в списке подходящие элементы. */
@@ -151,6 +181,13 @@ data class PickTask(
     @SerialName("explanation_wrong")
     override val explanationWrong: String,
     override val vary: TaskVariation? = null,
+    @SerialName("pet_correct")
+    override val petCorrect: String? = null,
+    @SerialName("pet_wrong")
+    override val petWrong: String? = null,
+    override val icon: String? = null,
+    override val context: String? = null,
+    override val hint: String? = null,
     val options: List<PickOption>,
     val correct: List<String>,
 ) : TaskContent
@@ -169,9 +206,39 @@ data class NumberTask(
     @SerialName("explanation_wrong")
     override val explanationWrong: String,
     override val vary: TaskVariation? = null,
+    @SerialName("pet_correct")
+    override val petCorrect: String? = null,
+    @SerialName("pet_wrong")
+    override val petWrong: String? = null,
+    override val icon: String? = null,
+    override val context: String? = null,
+    override val hint: String? = null,
     val answer: Int,
     val unit: String = "монет",
+    /** ТЕСТ: циферблат — иллюстрация или способ ответа. */
+    val clock: ClockSpec? = null,
+    /** ТЕСТ: монеты рисунком: сколько дал и сколько стоит покупка. */
+    val coins: CoinsSpec? = null,
 ) : TaskContent
+
+/**
+ * ТЕСТ: циферблат в задании на время. [from] — сколько сейчас, [to] —
+ * до какого часа выделить отрезок. Если заданы [choices], ответ выбирается
+ * нажатием на один из этих часов, остальные часы не нажимаются.
+ */
+@Serializable
+data class ClockSpec(
+    val from: Int,
+    val to: Int? = null,
+    val choices: List<Int> = emptyList(),
+)
+
+/** ТЕСТ: монеты рисунком в задании на сдачу. */
+@Serializable
+data class CoinsSpec(
+    val paid: Int,
+    val price: Int,
+)
 
 /** Вариант решения с описанным последствием. */
 @Serializable
@@ -185,6 +252,15 @@ data class ChoiceOption(
      * вариантов: у задачи может быть более одного хорошего решения.
      */
     val recommended: Boolean = false,
+    /** ТЕСТ: картинка карточки — код спрайта. */
+    val icon: String? = null,
+    /** ТЕСТ: пометка под названием: «нужное», «хочу». */
+    val note: String? = null,
+    /** ТЕСТ: реплика питомца именно на этот выбор. */
+    val pet: String? = null,
+    /** ТЕСТ: картинка рядом с питомцем в ответе: полная или пустая миска, мечта. */
+    @SerialName("pet_icon")
+    val petIcon: String? = null,
 )
 
 /** Выбор решения в игровой ситуации с последствиями. */
@@ -201,5 +277,12 @@ data class ChoiceTask(
     @SerialName("explanation_wrong")
     override val explanationWrong: String,
     override val vary: TaskVariation? = null,
+    @SerialName("pet_correct")
+    override val petCorrect: String? = null,
+    @SerialName("pet_wrong")
+    override val petWrong: String? = null,
+    override val icon: String? = null,
+    override val context: String? = null,
+    override val hint: String? = null,
     val options: List<ChoiceOption>,
 ) : TaskContent

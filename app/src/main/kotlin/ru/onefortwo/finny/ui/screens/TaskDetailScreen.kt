@@ -60,6 +60,29 @@ import ru.onefortwo.finny.ui.common.TaskResultIcon
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.Explanations
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Dp
+import ru.onefortwo.finny.content.ClockSpec
+import ru.onefortwo.finny.content.CoinsSpec
+import ru.onefortwo.finny.content.PixelArt
+import ru.onefortwo.finny.economy.BudgetCategory
+import ru.onefortwo.finny.ui.common.rememberPixelArt
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Прохождение задания (ТЗ 2.5.8).
@@ -79,7 +102,9 @@ fun TaskDetailScreen(
      */
     nextTask: TaskContent? = null,
     onNextTask: () -> Unit = {},
-    balance: Coins? = null,
+    @Suppress("UNUSED_PARAMETER") balance: Coins? = null,
+    /** ТЕСТ: питомец ребёнка для реакции на ответ; `true` — радуется. */
+    petFigure: (@Composable (happy: Boolean) -> Unit)? = null,
 ) {
     var result by rememberSaveable(stateSaver = AnsweredTaskSaver) {
         mutableStateOf<AnsweredTask?>(null)
@@ -88,10 +113,15 @@ fun TaskDetailScreen(
     ScreenScaffold(
         eyebrow = task.topic.displayName,
         title = task.title,
-        balance = balance,
         onBack = onBack,
     ) {
         Column {
+            // ТЕСТ: игровое событие над условием — зачем решать задание.
+            task.context?.let {
+                SectionCard(tone = CardTone.Coin) {
+                    Text(text = it, style = MaterialTheme.typography.titleMedium)
+                }
+            }
             SectionCard(tone = CardTone.Sage) {
                 Text(
                     text = task.prompt,
@@ -114,6 +144,7 @@ fun TaskDetailScreen(
                     nextTask = nextTask,
                     onNextTask = onNextTask,
                     onBack = onBack,
+                    petFigure = petFigure,
                 )
             }
         }
@@ -136,29 +167,19 @@ private fun ResultCard(
     nextTask: TaskContent?,
     onNextTask: () -> Unit,
     onBack: () -> Unit,
+    petFigure: (@Composable (happy: Boolean) -> Unit)?,
 ) {
     val check = answered.check
+    val art = rememberPixelArt()
+    val colors = remember(art) { YardColors(art) }
     Column {
         SectionCard(
-            title = if (check.isCorrect) "Верно" else "Почти",
+            // ТЕСТ: мягче — «Почти получилось!», а не «Почти».
+            title = if (check.isCorrect) "Верно!" else "Почти получилось!",
             tone = if (check.isCorrect) CardTone.Success else CardTone.Warning,
             icon = { TaskResultIcon(correct = check.isCorrect) },
         ) {
             Column {
-                Text(
-                    text = Explanations.reward(
-                        source = check.reward,
-                        amount = answered.credited,
-                        repeat = answered.isRepeat,
-                    ) + ".",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (check.isCorrect) {
-                        FinnyTheme.colors.successText
-                    } else {
-                        FinnyTheme.colors.warningText
-                    },
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
                 if (check.outcome != null) {
                     Text(
                         text = check.outcome!!,
@@ -166,14 +187,40 @@ private fun ResultCard(
                         modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
-                SupportingText(check.explanation)
+                Text(text = check.explanation, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = Explanations.reward(
+                        source = check.reward,
+                        amount = answered.credited,
+                        repeat = answered.isRepeat,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FinnyTheme.colors.onSurfaceMuted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         }
-        if (nextTask != null) {
-            SectionCard(eyebrow = "Следующее задание", title = nextTask.title) {
-                SupportingText(nextTask.topic.displayName)
+
+        // ТЕСТ: питомец отвечает облачком — радуется или поддерживает.
+        if (petFigure != null) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SpeechBubble(colors = colors, text = check.pet)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    petFigure(check.isCorrect)
+                    check.petIcon?.let { icon ->
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TaskSprite(art, icon, 56.dp)
+                    }
+                }
             }
-            PrimaryButton(text = "Следующее задание: ${nextTask.title}", onClick = onNextTask)
+        }
+
+        // После ответа — одна карточка следующего задания и выход.
+        if (nextTask != null) {
+            NextTaskCard(art = art, task = nextTask, onStart = onNextTask)
             SecondaryButton(
                 text = "Готово",
                 onClick = onBack,
@@ -182,6 +229,43 @@ private fun ResultCard(
         } else {
             PrimaryButton(text = "Готово", onClick = onBack)
         }
+    }
+}
+
+/** ТЕСТ: карточка следующего задания с короткой кнопкой «Начать →». */
+@Composable
+private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) {
+    SectionCard(eyebrow = "Следующее задание", bottomSpacing = 0.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            task.icon?.let {
+                TaskSprite(art, it, 40.dp)
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = task.title, style = MaterialTheme.typography.titleMedium)
+                SupportingText(task.topic.displayName)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            PrimaryButton(text = "Начать →", onClick = onStart, modifier = Modifier.width(132.dp))
+        }
+    }
+}
+
+/** ТЕСТ: картинка из `art/pixel`, вписанная в квадрат [box]; декоративная. */
+@Composable
+internal fun TaskSprite(art: PixelArt, id: String, box: Dp) {
+    val sprite = art.sprite(id) ?: return
+    val cell = box / maxOf(sprite.width, sprite.height)
+    Box(modifier = Modifier.size(box), contentAlignment = Alignment.Center) {
+        Sprite(art, id, cell = cell)
+    }
+}
+
+/** ТЕСТ: подсказка мелким шрифтом под вариантами: «Сравни цену с планом». */
+@Composable
+private fun TaskHint(text: String?) {
+    if (text != null) {
+        SupportingText("Подсказка: $text", modifier = Modifier.padding(top = 10.dp))
     }
 }
 
@@ -195,17 +279,17 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
     val left = task.amount - (needs + wants + savings)
 
     Column {
-        TaskAmount("Нужное", needs, task.amount) { needs = it }
-        TaskAmount("Развлечения", wants, task.amount) { wants = it }
-        TaskAmount("Копилка", savings, task.amount) { savings = it }
+        // ТЕСТ: «+» останавливается, когда монеты кончились: раздать больше,
+        // чем есть, нельзя — и сообщения о переборе не нужно.
+        TaskAmount(planLabel(PlanCategory.NEEDS), needs, needs + left) { needs = it }
+        TaskAmount(planLabel(PlanCategory.WANTS), wants, wants + left) { wants = it }
+        TaskAmount(planLabel(PlanCategory.SAVINGS), savings, savings + left) { savings = it }
 
         SupportingText(
             text = if (left == 0) {
                 "Все монеты распределены."
-            } else if (left > 0) {
-                "Осталось распределить ${Explanations.coinsAccusative(left)}."
             } else {
-                "Ты раздал больше, чем есть, на ${Explanations.coinsAccusative(-left)}."
+                "Осталось распределить ${Explanations.coinsAccusative(left)}."
             },
             modifier = Modifier.padding(vertical = 12.dp),
         )
@@ -215,6 +299,7 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
             enabled = left == 0,
             onClick = { onSubmit(TaskAnswer.Allocation(needs, wants, savings)) },
         )
+        if (left > 0) TaskHint(task.hint)
     }
 }
 
@@ -241,61 +326,42 @@ private fun TaskAmount(label: String, value: Int, max: Int, onChange: (Int) -> U
     }
 }
 
-/** Отметка подходящих элементов списка. */
+/**
+ * ТЕСТ: выбор крупными карточками с картинками вместо галочек. Если верный
+ * ответ один — выбирается одна карточка; иначе карточки отмечаются.
+ */
 @Composable
 private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
     val picked = rememberSaveable { mutableStateListOf<String>() }
+    val single = task.correct.size == 1
+    val art = rememberPixelArt()
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val colors = FinnyTheme.colors
-        val shape = MaterialTheme.shapes.small
         task.options.forEach { option ->
             val checked = option.id in picked
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = maxOf(MinTouchTarget, ControlHeight))
-                    .clip(shape)
-                    .background(if (checked) colors.selectedContainer else colors.surface)
-                    .border(
-                        width = if (checked) 2.dp else 1.5.dp,
-                        color = if (checked) colors.primary else colors.outline,
-                        shape = shape,
-                    )
-                    // Нажатие принимает вся строка, а не только квадратик:
-                    // попасть по нему пальцем на телефоне трудно, а подпись
-                    // рядом выглядит частью того же переключателя.
-                    .toggleable(
-                        value = checked,
-                        role = Role.Checkbox,
-                        onValueChange = {
-                            if (checked) picked.remove(option.id) else picked.add(option.id)
-                        },
-                    )
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Обработчик снят: нажатие обрабатывает строка целиком,
-                // иначе программа чтения с экрана объявит два элемента.
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = null,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = colors.primary,
-                        uncheckedColor = colors.primary,
-                    ),
-                )
-                Text(
-                    text = if (option.price != null) {
-                        "${option.title} — ${Explanations.coins(option.price!!)}"
+            OptionCard(
+                art = art,
+                title = if (option.price != null) {
+                    "${option.title} — ${Explanations.coins(option.price!!)}"
+                } else {
+                    option.title
+                },
+                note = option.note,
+                icon = option.icon,
+                selected = checked,
+                onClick = {
+                    if (single) {
+                        picked.clear()
+                        picked.add(option.id)
+                    } else if (checked) {
+                        picked.remove(option.id)
                     } else {
-                        option.title
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
+                        picked.add(option.id)
+                    }
+                },
+            )
         }
+        TaskHint(task.hint)
 
         PrimaryButton(
             text = "Ответить",
@@ -304,6 +370,25 @@ private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
             modifier = Modifier.padding(top = 12.dp),
         )
     }
+}
+
+/** ТЕСТ: крупная карточка варианта: картинка, название, пометка. */
+@Composable
+private fun OptionCard(
+    art: PixelArt,
+    title: String,
+    note: String?,
+    icon: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    SelectButton(
+        text = title,
+        supporting = note,
+        selected = selected,
+        onClick = onClick,
+        leading = icon?.let { { TaskSprite(art, it, 48.dp) } },
+    )
 }
 
 /**
@@ -321,7 +406,39 @@ private fun NumberForm(task: NumberTask, onSubmit: (TaskAnswer) -> Unit) {
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.small
 
+    val clock = task.clock
+    // ТЕСТ: если на циферблате есть варианты — ответ выбирается на часах.
+    if (clock != null && clock.choices.isNotEmpty()) {
+        var chosen by rememberSaveable { mutableStateOf<Int?>(null) }
+        Column {
+            Text("Выбери на часах:", style = MaterialTheme.typography.titleMedium)
+            ClockFace(
+                spec = clock,
+                selected = chosen,
+                onSelect = { chosen = it },
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp),
+            )
+            TaskHint(task.hint)
+            PrimaryButton(
+                text = "Ответить",
+                enabled = chosen != null,
+                onClick = { chosen?.let { onSubmit(TaskAnswer.Number(it)) } },
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        return
+    }
+
     Column {
+        if (clock != null) {
+            ClockFace(
+                spec = clock,
+                selected = null,
+                onSelect = {},
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 12.dp),
+            )
+        }
+        task.coins?.let { CoinsPicture(it) }
         Text("Ответ, ${task.unit}:", style = MaterialTheme.typography.titleMedium)
         // Набранное число стоит в рамке поля: видно, куда идёт ввод.
         Text(
@@ -366,14 +483,19 @@ private const val MAX_ANSWER_DIGITS = 3
 private fun ChoiceForm(task: ChoiceTask, onSubmit: (TaskAnswer) -> Unit) {
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
 
+    val art = rememberPixelArt()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         task.options.forEach { option ->
-            SelectButton(
-                text = option.title,
+            OptionCard(
+                art = art,
+                title = option.title,
+                note = option.note,
+                icon = option.icon,
                 selected = selected == option.id,
                 onClick = { selected = option.id },
             )
         }
+        TaskHint(task.hint)
 
         PrimaryButton(
             text = "Ответить",
@@ -406,6 +528,8 @@ private val AnsweredTaskSaver: Saver<AnsweredTask?, Any> = listSaver(
                 check.reward.name,
                 answered.credited.amount,
                 answered.isRepeat,
+                check.pet,
+                check.petIcon ?: "",
             )
         }
     },
@@ -419,6 +543,8 @@ private val AnsweredTaskSaver: Saver<AnsweredTask?, Any> = listSaver(
                     explanation = items[2] as String,
                     outcome = (items[3] as String).ifEmpty { null },
                     reward = IncomeSource.valueOf(items[4] as String),
+                    pet = items[7] as String,
+                    petIcon = (items[8] as String).ifEmpty { null },
                 ),
                 credited = Coins(items[5] as Int),
                 isRepeat = items[6] as Boolean,
@@ -432,4 +558,125 @@ private fun PlanCategory.title(): String = when (this) {
     PlanCategory.NEEDS -> "Нужное"
     PlanCategory.WANTS -> "Развлечения"
     PlanCategory.SAVINGS -> "Копилка"
+}
+
+/** Подпись направления плана в задании: как в плане дня. */
+private fun planLabel(category: PlanCategory): String = when (category) {
+    PlanCategory.NEEDS -> BudgetCategory.NEEDS.displayName
+    PlanCategory.WANTS -> BudgetCategory.WANTS.displayName
+    PlanCategory.SAVINGS -> BudgetCategory.SAVINGS.displayName
+}
+
+/**
+ * ТЕСТ: циферблат. Стрелка показывает «сейчас» ([ClockSpec.from]); отрезок
+ * до [ClockSpec.to] — сколько ждать. Если заданы варианты ответа, эти часы
+ * нажимаются (круги 48 dp), остальные — нет.
+ */
+@Composable
+private fun ClockFace(spec: ClockSpec, selected: Int?, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val colors = FinnyTheme.colors
+    val until = selected ?: spec.to.takeIf { spec.choices.isEmpty() }
+    val size = 248.dp
+    Box(
+        modifier = modifier
+            .size(size)
+            .semantics(mergeDescendants = spec.choices.isEmpty()) {
+                if (spec.choices.isEmpty()) {
+                    contentDescription = "Часы: сейчас ${spec.from}:00" + (until?.let { ", отмечено до $it:00" } ?: "")
+                }
+            },
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val r = this.size.minDimension / 2f
+            val c = Offset(r, r)
+            drawCircle(colors.surface, r - 4.dp.toPx(), c)
+            drawCircle(colors.outline, r - 4.dp.toPx(), c, style = Stroke(3.dp.toPx()))
+            if (until != null) {
+                val start = spec.from % 12 * 30f - 90f
+                val sweep = ((until - spec.from + 12) % 12) * 30f
+                drawArc(
+                    color = colors.coin.copy(alpha = 0.55f),
+                    startAngle = start,
+                    sweepAngle = sweep,
+                    useCenter = true,
+                    topLeft = Offset(c.x - r * 0.62f, c.y - r * 0.62f),
+                    size = Size(r * 1.24f, r * 1.24f),
+                )
+            }
+            fun hand(hour: Float, length: Float, width: Float, color: Color) {
+                val a = Math.toRadians((hour % 12 * 30f - 90f).toDouble())
+                drawLine(
+                    color,
+                    c,
+                    Offset(c.x + (cos(a) * r * length).toFloat(), c.y + (sin(a) * r * length).toFloat()),
+                    strokeWidth = width,
+                    cap = StrokeCap.Round,
+                )
+            }
+            hand(spec.from.toFloat(), 0.5f, 6.dp.toPx(), colors.onSurface)
+            hand(0f, 0.72f, 3.dp.toPx(), colors.onSurface)
+            drawCircle(colors.onSurface, 5.dp.toPx(), c)
+        }
+        for (h in 1..12) {
+            val a = Math.toRadians((h * 30f - 90f).toDouble())
+            val dist = size / 2 - 28.dp
+            val clickable = h in spec.choices
+            val isSelected = h == selected
+            Box(
+                modifier = Modifier
+                    .offset(
+                        x = size / 2 - 24.dp + dist * cos(a).toFloat(),
+                        y = size / 2 - 24.dp + dist * sin(a).toFloat(),
+                    )
+                    .size(48.dp)
+                    .then(
+                        if (clickable) {
+                            Modifier
+                                .clip(CircleShape)
+                                .background(if (isSelected) colors.selectedContainer else colors.surface)
+                                .border(if (isSelected) 3.dp else 2.dp, colors.primary, CircleShape)
+                                .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(h) })
+                                .semantics { contentDescription = "$h:00" }
+                        } else {
+                            Modifier.clearAndSetSemantics { }
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "$h",
+                    style = if (clickable) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium,
+                    color = if (clickable) colors.onSurface else colors.onSurfaceMuted,
+                    fontWeight = if (clickable) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+/** ТЕСТ: монеты рисунком: сколько стоит покупка и сколько дали. */
+@Composable
+private fun CoinsPicture(spec: CoinsSpec) {
+    val art = rememberPixelArt()
+    Column(
+        modifier = Modifier
+            .padding(bottom = 12.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Цена — ${Explanations.coins(spec.price)}. Ты дал ${Explanations.coins(spec.paid)}."
+            },
+    ) {
+        CoinsRow(art, "Цена", spec.price)
+        CoinsRow(art, "Ты дал", spec.paid)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CoinsRow(art: PixelArt, label: String, count: Int) {
+    Column(modifier = Modifier.padding(vertical = 4.dp).clearAndSetSemantics { }) {
+        Text(text = "$label:", style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            repeat(count) { TaskSprite(art, "coin_0", 24.dp) }
+        }
+    }
 }

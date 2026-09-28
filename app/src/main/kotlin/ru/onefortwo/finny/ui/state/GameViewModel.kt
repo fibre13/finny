@@ -20,6 +20,7 @@ import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskAnswer
 import ru.onefortwo.finny.content.TaskCheck
 import ru.onefortwo.finny.content.TaskContent
+import ru.onefortwo.finny.content.TaskTopic
 import ru.onefortwo.finny.content.check
 import ru.onefortwo.finny.content.toDomain
 import ru.onefortwo.finny.data.GameRepository
@@ -543,7 +544,15 @@ class GameViewModel(
         val taskId = task.id
         val check = task.check(answer)
         val current = _state.value
-        val repeat = taskId in current.completedTaskIds
+        // ТЕСТ: круг заданий. Когда решены все задания уровня, следующий
+        // ответ начинает новый круг: звёзды на списке — заново.
+        val levelIds = content.tasks(current.difficulty)
+            .filter { it.topic != TaskTopic.RECOVERY }
+            .map { it.id }
+            .toSet()
+        val roundDone = levelIds.isNotEmpty() && current.completedTaskIds.containsAll(levelIds)
+        val solvedBefore = if (roundDone && taskId in levelIds) current.completedTaskIds - levelIds else current.completedTaskIds
+        val repeat = taskId in solvedBefore
         // ТЕСТ: монеты — за первые TaskPay.PER_DAY заданий дня, считая и
         // повторы; «Помоги Финни» — путь восстановления, оплачивается всегда.
         val counted = check.reward != IncomeSource.RECOVERY_TASK
@@ -560,7 +569,7 @@ class GameViewModel(
         _state.update {
             it.copy(
                 game = game,
-                completedTaskIds = it.completedTaskIds + taskId,
+                completedTaskIds = solvedBefore + taskId,
                 paidTasksPeriod = if (paid) it.game.period.number else it.paidTasksPeriod,
                 paidTasksCount = if (paid) it.paidTasksToday + 1 else it.paidTasksCount,
                 message = Explanations.income(
