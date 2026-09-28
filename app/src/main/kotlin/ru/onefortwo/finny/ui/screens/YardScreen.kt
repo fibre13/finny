@@ -13,6 +13,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
@@ -1216,6 +1218,7 @@ private fun FinishDayButton(
  * края экрана; хвостик всегда над серединой предмета. Слегка покачивается,
  * если движения включены. TalkBack зачитывает новый шаг сам.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GuideBubble(
     colors: YardColors,
@@ -1236,6 +1239,9 @@ private fun GuideBubble(
         step.reminder != null -> "Напоминание: ${step.text}"
         else -> "Подсказка: ${step.text}"
     }
+    // У напоминания действия — отдельными кнопками: нажатие мимо них ничего
+    // не делает, и «Не сейчас» не срабатывает случайно.
+    val reminder = step.reminder
     Layout(
         modifier = Modifier.fillMaxSize(),
         content = {
@@ -1244,7 +1250,7 @@ private fun GuideBubble(
                     .graphicsLayer { translationY = lift.dp.toPx() }
                     .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
                     .then(
-                        if (onClick != null) {
+                        if (onClick != null && reminder == null) {
                             Modifier.clickable(role = Role.Button, onClick = onClick)
                         } else {
                             Modifier
@@ -1264,18 +1270,40 @@ private fun GuideBubble(
                     )
                 }
                 Text(text = step.text, style = MaterialTheme.typography.titleSmall)
-                if (onDismiss != null) {
-                    Text(
-                        text = "Не сейчас",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = FinnyTheme.colors.onSurfaceMuted,
-                        modifier = Modifier
-                            .align(Alignment.End)
-                            .heightIn(min = MinTouchTarget)
-                            .clickable(role = Role.Button, onClick = onDismiss)
-                            .wrapContentHeight(Alignment.CenterVertically)
-                            .padding(horizontal = 8.dp),
-                    )
+                if (reminder != null) {
+                    FlowRow(
+                        modifier = Modifier.padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val action = reminder.action
+                        if (action != null && onClick != null) {
+                            Text(
+                                text = action,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.card,
+                                modifier = Modifier
+                                    .heightIn(min = MinTouchTarget)
+                                    .pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
+                                    .clickable(role = Role.Button, onClick = onClick)
+                                    .wrapContentHeight(Alignment.CenterVertically)
+                                    .padding(horizontal = 12.dp),
+                            )
+                        }
+                        if (onDismiss != null) {
+                            Text(
+                                text = "Не сейчас",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.outline,
+                                modifier = Modifier
+                                    .heightIn(min = MinTouchTarget)
+                                    .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+                                    .clickable(role = Role.Button, onClick = onDismiss)
+                                    .wrapContentHeight(Alignment.CenterVertically)
+                                    .padding(horizontal = 12.dp),
+                            )
+                        }
+                    }
                 }
             }
             Box(
@@ -1301,7 +1329,9 @@ private fun GuideBubble(
         },
     ) { measurables, constraints ->
         val margin = 8.dp.roundToPx()
-        val maxWidth = minOf(constraints.maxWidth - 2 * margin, 220.dp.roundToPx()).coerceAtLeast(0)
+        // У напоминания две кнопки — облачко шире, чтобы они встали в ряд.
+        val widest = if (reminder != null) 300.dp else 220.dp
+        val maxWidth = minOf(constraints.maxWidth - 2 * margin, widest.roundToPx()).coerceAtLeast(0)
         val panel = measurables[0].measure(Constraints(maxWidth = maxWidth))
         val tail = measurables[1].measure(Constraints())
         val overlap = max(1f, floor(YARD_CELL.toPx())).roundToInt() * 2

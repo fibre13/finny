@@ -1160,6 +1160,7 @@ class ScreenRenderTest {
         }
 
         compose.onNodeWithText(Reminder.WORD.text, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("В словарик", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Не сейчас", useUnmergedTree = true).performClick()
         assertEquals(Reminder.WORD, dismissed)
     }

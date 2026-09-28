@@ -24,11 +24,17 @@ enum class GuideTarget { PLAN, SHOP, TASKS, SAVINGS, GLOSSARY, FINISH }
  * (ТЗ 3.5). Системных уведомлений нет — только на дворе, когда ребёнок
  * сам открыл приложение.
  */
-enum class Reminder(val id: String, val target: GuideTarget, val text: String) {
-    NEEDS("needs", GuideTarget.SHOP, "Я проголодался. Купишь нужное в лавке?"),
-    TASK("task", GuideTarget.TASKS, "Стало скучно. Разгадаешь загадку?"),
-    WORD("word", GuideTarget.GLOSSARY, "Есть новое слово. Загляни в словарик!"),
-    FINISH("finish", GuideTarget.FINISH, "Все дела готовы. Можно заканчивать день!"),
+enum class Reminder(
+    val id: String,
+    val target: GuideTarget,
+    val text: String,
+    /** Кнопка действия в облачке; у конца дня её нет — день закрывает кнопка внизу. */
+    val action: String?,
+) {
+    NEEDS("needs", GuideTarget.SHOP, "Я проголодался. Купишь нужное в лавке?", "В лавку"),
+    TASK("task", GuideTarget.TASKS, "Стало скучно. Разгадаешь загадку?", "К заданию"),
+    WORD("word", GuideTarget.GLOSSARY, "Есть новое слово. Загляни в словарик!", "В словарик"),
+    FINISH("finish", GuideTarget.FINISH, "Все дела готовы. Можно заканчивать день!", null),
 }
 
 /**
