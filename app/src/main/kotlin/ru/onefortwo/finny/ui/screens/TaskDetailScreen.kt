@@ -105,7 +105,7 @@ fun TaskDetailScreen(
     nextTask: TaskContent? = null,
     onNextTask: () -> Unit = {},
     @Suppress("UNUSED_PARAMETER") balance: Coins? = null,
-    /** ТЕСТ: питомец ребёнка для реакции на ответ; `true` — радуется. */
+    /** Питомец ребёнка для реакции на ответ; `true` — радуется. */
     petFigure: (@Composable (happy: Boolean) -> Unit)? = null,
 ) {
     var result by rememberSaveable(stateSaver = AnsweredTaskSaver) {
@@ -118,7 +118,7 @@ fun TaskDetailScreen(
         onBack = onBack,
     ) {
         Column {
-            // ТЕСТ: игровое событие над условием — зачем решать задание.
+            // Игровое событие над условием — зачем решать задание.
             task.context?.let {
                 SectionCard(tone = CardTone.Coin) {
                     Text(text = it, style = MaterialTheme.typography.titleMedium)
@@ -176,7 +176,7 @@ private fun ResultCard(
     val colors = remember(art) { YardColors(art) }
     Column {
         SectionCard(
-            // ТЕСТ: мягче — «Почти получилось!», а не «Почти».
+            // Мягче — «Почти получилось!», а не «Почти».
             title = if (check.isCorrect) "Верно!" else "Почти получилось!",
             tone = if (check.isCorrect) CardTone.Success else CardTone.Warning,
             icon = { TaskResultIcon(correct = check.isCorrect) },
@@ -203,7 +203,7 @@ private fun ResultCard(
             }
         }
 
-        // ТЕСТ: питомец отвечает облачком — радуется или поддерживает.
+        // Питомец отвечает облачком — радуется или поддерживает.
         if (petFigure != null) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -239,7 +239,7 @@ private fun ResultCard(
     }
 }
 
-/** ТЕСТ: карточка следующего задания с короткой кнопкой «Начать →». */
+/** Карточка следующего задания с короткой кнопкой «Начать →». */
 @Composable
 private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) {
     SectionCard(eyebrow = "Следующее задание", bottomSpacing = 0.dp) {
@@ -260,7 +260,7 @@ private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) 
     }
 }
 
-/** ТЕСТ: картинка из `art/pixel`, вписанная в квадрат [box]; декоративная. */
+/** Картинка из `art/pixel`, вписанная в квадрат [box]; декоративная. */
 @Composable
 internal fun TaskSprite(art: PixelArt, id: String, box: Dp) {
     val sprite = art.sprite(id) ?: return
@@ -270,7 +270,7 @@ internal fun TaskSprite(art: PixelArt, id: String, box: Dp) {
     }
 }
 
-/** ТЕСТ: подсказка мелким шрифтом под вариантами: «Сравни цену с планом». */
+/** Подсказка мелким шрифтом под вариантами: «Сравни цену с планом». */
 @Composable
 private fun TaskHint(text: String?) {
     if (text != null) {
@@ -288,7 +288,7 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
     val left = task.amount - (needs + wants + savings)
 
     Column {
-        // ТЕСТ: «+» останавливается, когда монеты кончились: раздать больше,
+        // «+» останавливается, когда монеты кончились: раздать больше,
         // чем есть, нельзя — и сообщения о переборе не нужно.
         TaskAmount(planLabel(PlanCategory.NEEDS), needs, needs + left) { needs = it }
         TaskAmount(planLabel(PlanCategory.WANTS), wants, wants + left) { wants = it }
@@ -336,7 +336,7 @@ private fun TaskAmount(label: String, value: Int, max: Int, onChange: (Int) -> U
 }
 
 /**
- * ТЕСТ: выбор крупными карточками с картинками вместо галочек. Если верный
+ * Выбор крупными карточками с картинками вместо галочек. Если верный
  * ответ один — выбирается одна карточка; иначе карточки отмечаются.
  */
 @Composable
@@ -381,7 +381,7 @@ private fun PickForm(task: PickTask, onSubmit: (TaskAnswer) -> Unit) {
     }
 }
 
-/** ТЕСТ: крупная карточка варианта: картинка, название, пометка. */
+/** Крупная карточка варианта: картинка, название, пометка. */
 @Composable
 private fun OptionCard(
     art: PixelArt,
@@ -416,7 +416,7 @@ private fun NumberForm(task: NumberTask, onSubmit: (TaskAnswer) -> Unit) {
     val shape = MaterialTheme.shapes.small
 
     val clock = task.clock
-    // ТЕСТ: если на циферблате есть варианты — ответ выбирается на часах.
+    // Если на циферблате есть варианты — ответ выбирается на часах.
     if (clock != null && clock.choices.isNotEmpty()) {
         var chosen by rememberSaveable { mutableStateOf<Int?>(null) }
         Column {
@@ -577,7 +577,7 @@ private fun planLabel(category: PlanCategory): String = when (category) {
 }
 
 /**
- * ТЕСТ: циферблат. Стрелка показывает «сейчас» ([ClockSpec.from]); отрезок
+ * Циферблат. Стрелка показывает «сейчас» ([ClockSpec.from]); отрезок
  * до [ClockSpec.to] — сколько ждать. Если заданы варианты ответа, эти часы
  * нажимаются (круги 48 dp), остальные — нет.
  */
@@ -663,7 +663,7 @@ private fun ClockFace(spec: ClockSpec, selected: Int?, onSelect: (Int) -> Unit, 
     }
 }
 
-/** ТЕСТ: монеты рисунком: сколько стоит покупка и сколько дали. */
+/** Монеты рисунком: сколько стоит покупка и сколько дали. */
 @Composable
 private fun CoinsPicture(spec: CoinsSpec) {
     val art = rememberPixelArt()

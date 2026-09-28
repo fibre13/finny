@@ -165,7 +165,7 @@ fun PeriodResultScreen(
                 }
             }
 
-            // ТЕСТ: в обычном режиме карманные придут завтра, при первом входе.
+            // В обычном режиме карманные придут завтра, при первом входе.
             if (outcome.nextPeriodIncome == null && nextDayTomorrow) {
                 SectionCard(title = "Новый день", tone = CardTone.Coin) {
                     Text(

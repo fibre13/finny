@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** ТЕСТ: питомец носит несколько украшений сразу. */
+/** Питомец носит несколько украшений сразу. */
 class AccessoriesTest {
 
     private val parts = ContentParser.parsePetParts(File("src/main/assets/pet_parts.json").readText())

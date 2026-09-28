@@ -137,7 +137,7 @@ private val PLACEHOLDER = Regex("""\{(\w+)(?::([а-яё]+))?\}""")
 internal fun String.fill(values: Map<String, Int>): String =
     PLACEHOLDER.replace(this) { match ->
         val name = match.groupValues[1]
-        // ТЕСТ: «{name}» — имя питомца, его подставляет named().
+        // «{name}» — имя питомца, его подставляет named().
         if (name == "name") return@replace match.value
         val number = values[name] ?: error("В тексте есть «$name», а значения нет")
         val noun = match.groupValues[2]
@@ -180,7 +180,7 @@ fun TaskContent.withNumbers(random: Random): TaskContent {
 }
 
 /**
- * ТЕСТ: имя питомца вместо «{name}» во всех текстах задания. Имя стоит
+ * Имя питомца вместо «{name}» во всех текстах задания. Имя стоит
  * только в именительном падеже: придуманное имя не склоняется надёжно.
  */
 fun TaskContent.named(petName: String): TaskContent = mapTexts { it.replace("{name}", petName) }

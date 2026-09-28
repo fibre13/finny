@@ -170,7 +170,7 @@ fun composePet(
         ?: mouthFor(joy)
     place("${speciesId}_eyes_$eyes", "eyes")
     place("${speciesId}_mouth_$mouth", "mouth")
-    // ТЕСТ: несколько украшений сразу; шапочка — поверх, на макушке.
+    // Несколько украшений сразу; шапочка — поверх, на макушке.
     val worn = Accessories.list(accessoryId)
     if ("scarf" in worn) place("scarf_${speciesId}_${stageId(shownStage)}", "scarf")
     if ("bow" in worn) place("bow_$speciesId", "bow")

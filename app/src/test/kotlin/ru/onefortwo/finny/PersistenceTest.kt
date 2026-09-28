@@ -198,7 +198,7 @@ class PersistenceTest {
             first.buy("food")
             first.buy("ball")
             first.finishPeriod()
-            // ТЕСТ: карманные на новый день приходят в новые сутки.
+            // Карманные на новый день приходят в новые сутки.
             clock = java.time.LocalDate.parse(clock).plusDays(1).toString()
             first.startNewDayIfDue()
         }

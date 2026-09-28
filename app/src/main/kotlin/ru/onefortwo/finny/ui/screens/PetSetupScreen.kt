@@ -161,7 +161,7 @@ fun PetSetupScreen(
         )
     }
 
-    // ТЕСТ: финал знакомства — питомец выпрыгивает на лугу.
+    // Финал знакомства — питомец выпрыгивает на лугу.
     if (step == 4) {
         ReadyStep(
             name = name.trim(),
@@ -217,7 +217,7 @@ fun PetSetupScreen(
                     figure = figure,
                     onSpecies = { speciesId = it },
                     onColor = { colorId = it },
-                    // ТЕСТ: украшения надеваются и снимаются по одному.
+                    // Украшения надеваются и снимаются по одному.
                     onAccessory = { accessoryId = Accessories.toggle(accessoryId, it, parts.accessories.map { a -> a.id }) },
                     onNext = { step = 3 },
                 )
@@ -244,7 +244,7 @@ fun PetSetupScreen(
                             rejectName()
                         } else {
                             name = typed
-                            // ТЕСТ: сверх предела — короткое пояснение, лишнее не вводится.
+                            // Сверх предела — короткое пояснение, лишнее не вводится.
                             nameError = when {
                                 it.length > NAME_MAX_LENGTH -> "Слишком длинное имя"
                                 typed.isNotEmpty() -> null
@@ -313,7 +313,7 @@ private fun AppearanceStep(
         )
     }
 
-    // ТЕСТ: без заголовков групп и без подписей цветов — только кружки;
+    // Без заголовков групп и без подписей цветов — только кружки;
     // названия цветов по-прежнему озвучивает TalkBack.
     OptionRow(
         count = parts.colors.size,
@@ -331,7 +331,7 @@ private fun AppearanceStep(
         )
     }
 
-    // ТЕСТ: четыре варианта — сеткой по два: в одну строку слова рвались.
+    // Четыре варианта — сеткой по два: в одну строку слова рвались.
     OptionRow(
         count = parts.accessories.size,
         large = true,

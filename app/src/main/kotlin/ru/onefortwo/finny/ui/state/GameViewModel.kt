@@ -110,7 +110,7 @@ class GameViewModel(
     }
 
     /**
-     * ТЕСТ: реплика питомца в облачке на дворе. Приветствие готовится
+     * Реплика питомца в облачке на дворе. Приветствие готовится
      * при каждом возвращении в приложение и показывается один раз.
      */
     private val _speech = MutableStateFlow<String?>(null)
@@ -296,7 +296,7 @@ class GameViewModel(
     }
 
     /**
-     * ТЕСТ: новые календарные сутки — начинается новый игровой день.
+     * Новые календарные сутки — начинается новый игровой день.
      * Если прошлый день закрыт в обычном режиме, карманные на новый день
      * были отложены; они приходят сейчас, при первом входе в новые сутки.
      * Не в полночь: работа в фоне не нужна, а пропуск дня ничем не грозит.
@@ -316,7 +316,7 @@ class GameViewModel(
         )
     }
 
-    /** ТЕСТ: питомец спит — разделы дня откроются завтра. */
+    /** Питомец спит — разделы дня откроются завтра. */
     fun sleepingHint() {
         _state.update {
             it.copy(
@@ -544,7 +544,7 @@ class GameViewModel(
         val taskId = task.id
         val check = task.check(answer)
         val current = _state.value
-        // ТЕСТ: круг заданий. Когда решены все задания уровня, следующий
+        // Круг заданий. Когда решены все задания уровня, следующий
         // ответ начинает новый круг: звёзды на списке — заново.
         val levelIds = content.tasks(current.difficulty)
             .filter { it.topic != TaskTopic.RECOVERY }
@@ -553,7 +553,7 @@ class GameViewModel(
         val roundDone = levelIds.isNotEmpty() && current.completedTaskIds.containsAll(levelIds)
         val solvedBefore = if (roundDone && taskId in levelIds) current.completedTaskIds - levelIds else current.completedTaskIds
         val repeat = taskId in solvedBefore
-        // ТЕСТ: монеты — за первые TaskPay.PER_DAY заданий дня, считая и
+        // Монеты — за первые TaskPay.PER_DAY заданий дня, считая и
         // повторы; «Помоги Финни» — путь восстановления, оплачивается всегда.
         val counted = check.reward != IncomeSource.RECOVERY_TASK
         val overLimit = counted && current.paidTasksToday >= TaskPay.PER_DAY
@@ -587,7 +587,7 @@ class GameViewModel(
     // --- Игровой период --------------------------------------------------
 
     fun finishPeriod() {
-        // ТЕСТ: в обычном режиме карманные на новый день приходят завтра,
+        // В обычном режиме карманные на новый день приходят завтра,
         // при первом входе; в демонстрационном — сразу (ТЗ 2.5.13).
         when (val result = _state.value.game.finishPeriod(payIncome = _state.value.isDemo)) {
             is PeriodCompletion.Success -> {
@@ -630,7 +630,7 @@ class GameViewModel(
      * при этом запись в базу происходит не чаще раза в минуту.
      */
     fun onSessionStart() {
-        // ТЕСТ: поворот экрана — не новый вход: приветствие только после
+        // Поворот экрана — не новый вход: приветствие только после
         // паузы дольше минуты или при первом открытии.
         if (stoppedAt == 0L || clock() - stoppedAt > GREET_AFTER_MS) greetPending = true
         startNewDayIfDue()

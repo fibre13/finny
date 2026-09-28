@@ -229,7 +229,7 @@ class ScreenRenderTest {
         listOf("Котёнок", "Щенок", "Крольчонок").forEach {
             compose.onNodeWithContentDescription(it).performScrollTo().assertIsDisplayed()
         }
-        // ТЕСТ: цвета — кружками без подписей, но TalkBack их называет.
+        // Цвета — кружками без подписей, но TalkBack их называет.
         compose.onNodeWithText("Окрас").assertDoesNotExist()
         compose.onNodeWithText("Серый").assertDoesNotExist()
         compose.onNodeWithContentDescription("Серый", substring = true).performScrollTo().assertIsDisplayed()
@@ -740,7 +740,7 @@ class ScreenRenderTest {
             }
         }
 
-        // ТЕСТ: звёзды — решённые в этом круге из заданий уровня.
+        // Звёзды — решённые в этом круге из заданий уровня.
         compose.onNodeWithContentDescription("Звёзды: 1 из ${queue.size}").assertIsDisplayed()
         // Каждое задание — один раз, без «Уже решал» и длинных пояснений.
         compose.onAllNodesWithText(queue[0].title).assertCountEquals(1)
@@ -1193,7 +1193,7 @@ class ScreenRenderTest {
      * сцена во всю ширину экрана, но не выше 480 × 100 / 180 dp.
      */
     private fun checkYardLayout(widthDp: Int, heightDp: Int) {
-        // ТЕСТ: на планшете в портрете луг увеличен в k раз.
+        // На планшете в портрете луг увеличен в k раз.
         val k = ru.onefortwo.finny.ui.screens.yardScaleFor(widthDp.dp, heightDp.dp)
         val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
         compose.setContent {
@@ -1265,7 +1265,7 @@ class ScreenRenderTest {
                 )
             }
         }
-        // ТЕСТ: кнопка закреплена внизу, вне прокрутки двора.
+        // Кнопка закреплена внизу, вне прокрутки двора.
         compose.onNodeWithText("Закончить день").assertIsDisplayed()
         val bottom = compose.onNodeWithText("Закончить день").fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("кнопка ниже экрана: $bottom", bottom <= 640 * compose.density.density + 1)

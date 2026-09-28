@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Тестовая сборка ставится рядом с основной (суффикс .debug) и отличается названием. -->
-<resources>
-    <string name="app_name">Финни · тест копилки</string>
-</resources>

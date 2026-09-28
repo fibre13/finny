@@ -462,7 +462,7 @@ class GameViewModelTest {
         assertEquals(0, state.game.savings.saved.amount)
     }
 
-    /** ТЕСТ: новые сутки — карманные приходят при первом входе. */
+    /** Новые сутки — карманные приходят при первом входе. */
     private fun nextMorning(model: GameViewModel) {
         day = day.plusDays(1)
         model.startNewDayIfDue()

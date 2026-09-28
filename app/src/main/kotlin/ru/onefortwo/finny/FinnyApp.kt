@@ -161,7 +161,7 @@ fun FinnyApp(viewModel: GameViewModel) {
             .fillMaxSize()
             .background(FinnyTheme.colors.appBackground),
     ) {
-        // ТЕСТ: навигационных панелей нет — разделы открываются со двора.
+        // Навигационных панелей нет — разделы открываются со двора.
         Column(modifier = Modifier.weight(1f)) {
             val bottomBar = false
             Box(
@@ -208,7 +208,7 @@ private fun AppNavHost(
         startDestination = if (state.hasProfile) Routes.MAIN else Routes.ONBOARDING,
     ) {
         composable(Routes.ONBOARDING) {
-            // ТЕСТ: знакомство начинается с подарка.
+            // Знакомство начинается с подарка.
             GiftScreen(onOpen = { navController.navigate(Routes.PET_SETUP) })
         }
 
@@ -261,7 +261,7 @@ private fun AppNavHost(
                 viewModel.greetIfPending()
             }
 
-            // ТЕСТ: главная — двор питомца; разделы открываются предметами.
+            // Главная — двор питомца; разделы открываются предметами.
             YardScreen(
                 state = state,
                 parts = content.petParts(),
@@ -541,7 +541,7 @@ private fun DemoWatermark() {
 }
 
 /**
- * ТЕСТ: питомец ребёнка в ответе на задание: радуется при верном ответе,
+ * Питомец ребёнка в ответе на задание: радуется при верном ответе,
  * спокоен при ошибке — без грусти и упрёка.
  */
 @Composable

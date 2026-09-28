@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import ru.onefortwo.finny.ui.state.PetSpeech
 
-/** ТЕСТ (ветка test/kopilka-a): приветствие питомца по времени и давности. */
+/** Приветствие питомца по времени и давности. */
 class PetSpeechTest {
 
     @Test

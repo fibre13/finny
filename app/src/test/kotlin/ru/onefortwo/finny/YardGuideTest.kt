@@ -27,7 +27,7 @@ import ru.onefortwo.finny.ui.state.GuideTarget
 import ru.onefortwo.finny.ui.state.YardGuide
 
 /**
- * ТЕСТ (ветка test/kopilka-a): одна цель на экране, день = календарные
+ * Одна цель на экране, день = календарные
  * сутки, монеты за первые два задания дня.
  */
 class YardGuideTest {

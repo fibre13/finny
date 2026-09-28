@@ -4,7 +4,7 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /*
- * ТЕСТ (ветка test/kopilka-a): реплики питомца в облачке. Только позитив:
+ * Реплики питомца в облачке. Только позитив:
  * без давления на жалость и без упрёков за отсутствие (ТЗ 3.5).
  */
 object PetSpeech {

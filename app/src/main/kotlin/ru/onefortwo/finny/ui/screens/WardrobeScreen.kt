@@ -101,7 +101,7 @@ fun WardrobeScreen(
                     title = option.title,
                     selected = Accessories.isOn(accessoryId, option.id),
                     enabled = available,
-                    // ТЕСТ: украшения надеваются вместе — нажатие надевает или снимает.
+                    // Украшения надеваются вместе — нажатие надевает или снимает.
                     onClick = { accessoryId = Accessories.toggle(accessoryId, option.id, parts.accessories.map { it.id }) },
                     selectedSuffix = "надето",
                     status = if (available) "есть" else "не куплено",

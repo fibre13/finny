@@ -52,7 +52,7 @@ import ru.onefortwo.finny.ui.common.rememberPulse
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /*
- * ТЕСТ (ветка test/kopilka-a): знакомство начинается с подарка. У ребёнка
+ * Знакомство начинается с подарка. У ребёнка
  * день рождения, в коробке с бантом — будущий питомец. Карточка правил
  * называет цель игры и три решения (ТЗ 2.5.1): нужное, приятное, копилка.
  * Вернуться к правилам можно кнопкой «?» на дворе — там экран «Как играть».
@@ -201,7 +201,7 @@ fun GiftScreen(onOpen: () -> Unit) {
                     Sprite(art, "yard_balloon_blue", Modifier.align(Alignment.TopStart).offset(x = 44.dp, y = 8.dp), cell = 3.dp)
                     Sprite(art, "yard_balloon_yellow", Modifier.align(Alignment.TopEnd).offset(x = (-44).dp, y = 16.dp), cell = 3.dp)
                     Sprite(art, "yard_balloon_green", Modifier.align(Alignment.TopEnd).offset(x = (-6).dp, y = 56.dp), cell = 3.dp)
-                    // ТЕСТ: торт со свечами — это день рождения.
+                    // Торт со свечами — это день рождения.
                     Sprite(art, "item_cake", Modifier.align(Alignment.BottomStart).offset(x = 18.dp, y = (-6).dp), cell = 3.dp)
                     Sprite(
                         art, "yard_gift",

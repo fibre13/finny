@@ -79,7 +79,7 @@ fun ShopScreen(
      * последнее действие, поэтому покупки дня видны здесь.
      */
     todayPurchases: List<PurchaseRecord> = emptyList(),
-    /** ТЕСТ: план дня утверждён; иначе мягко напоминается о нём. */
+    /** План дня утверждён; иначе мягко напоминается о нём. */
     planConfirmed: Boolean = true,
     message: FeedbackMessage?,
     onDismissMessage: () -> Unit,

@@ -25,8 +25,8 @@ android {
         applicationId = "ru.onefortwo.finny"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.6.7"
+        versionCode = 16
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -45,8 +45,6 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            // ТЕСТ: метка тестовой сборки в сведениях о приложении.
-            versionNameSuffix = "-двор"
         }
         release {
             // Обфускация отключена: ТЗ 7.2 требует полный исходный код без обфускации.

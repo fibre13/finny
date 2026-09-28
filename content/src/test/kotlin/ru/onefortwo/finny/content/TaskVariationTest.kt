@@ -172,7 +172,7 @@ class TaskVariationTest {
                     "Задание ${task.id}: сумма ${task.amount} меньше обязательного $required",
                     task.amount > required,
                 )
-                // ТЕСТ: слагаемые (корм и вода) — в событии, сумма — в объяснении.
+                // Слагаемые (корм и вода) — в событии, сумма — в объяснении.
                 assertTrue(
                     "Задание ${task.id}: обязательное $required не названо в объяснении",
                     task.explanationCorrect.contains(required.toString()),
@@ -227,7 +227,7 @@ class TaskVariationTest {
                 val ball = task.options.first { it.id == "ball" }.price!!
 
                 assertTrue("Задание $id: корм $food, мячик $ball", food < ball)
-                // ТЕСТ: сумму ребёнок не считает — цены названы в условии.
+                // Сумму ребёнок не считает — цены названы в условии.
                 assertTrue(
                     "Задание $id: в условии нет цен $food и $ball",
                     task.prompt.contains(food.toString()) && task.prompt.contains(ball.toString()),
