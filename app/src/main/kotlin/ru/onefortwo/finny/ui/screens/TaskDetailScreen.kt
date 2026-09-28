@@ -60,6 +60,8 @@ import ru.onefortwo.finny.ui.common.TaskResultIcon
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.Explanations
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -207,7 +209,12 @@ private fun ResultCard(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                SpeechBubble(colors = colors, text = check.pet)
+                // Облачко опущено к голове: над ней в рамке питомца пустые ряды.
+                SpeechBubble(
+                    colors = colors,
+                    text = check.pet,
+                    modifier = Modifier.widthIn(max = 280.dp).offset(y = 28.dp).zIndex(1f),
+                )
                 Row(verticalAlignment = Alignment.Bottom) {
                     petFigure(check.isCorrect)
                     check.petIcon?.let { icon ->
@@ -236,17 +243,19 @@ private fun ResultCard(
 @Composable
 private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) {
     SectionCard(eyebrow = "Следующее задание", bottomSpacing = 0.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            task.icon?.let {
-                TaskSprite(art, it, 40.dp)
-                Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                task.icon?.let {
+                    TaskSprite(art, it, 40.dp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = task.title, style = MaterialTheme.typography.titleMedium)
+                    SupportingText(task.topic.displayName)
+                }
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = task.title, style = MaterialTheme.typography.titleMedium)
-                SupportingText(task.topic.displayName)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            PrimaryButton(text = "Начать →", onClick = onStart, modifier = Modifier.width(132.dp))
+            // Кнопка под названием: рядом с ним она сжимала текст.
+            PrimaryButton(text = "Начать →", onClick = onStart, modifier = Modifier.padding(top = 12.dp))
         }
     }
 }

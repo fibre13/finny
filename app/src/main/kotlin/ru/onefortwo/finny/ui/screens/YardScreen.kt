@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.screens
 
+import ru.onefortwo.finny.content.Accessories
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.LinearEasing
@@ -801,7 +802,6 @@ private fun Pet(
     val game = state.game
     val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
     val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
-    val accessory = parts.accessories.firstOrNull { it.id == profile.appearance.accessoryId }
     var hopRound by remember { mutableLongStateOf(0L) }
     // Во время перебежки питомец прыгает; иначе — реакция из очереди.
     val shown = if (hopping) PetReaction(PetReactions.PLAY, id = -1 - hopRound) else reaction
@@ -814,7 +814,7 @@ private fun Pet(
             speciesId = profile.appearance.speciesId,
             speciesTitle = species?.title ?: "Питомец",
             accessoryId = profile.appearance.accessoryId,
-            accessoryTitle = accessory?.title ?: "без украшения",
+            accessoryTitle = Accessories.title(parts, profile.appearance.accessoryId),
             colorHex = color?.hex ?: "#CCCCCC",
             stage = game.stage,
             care = game.pet.care.level,

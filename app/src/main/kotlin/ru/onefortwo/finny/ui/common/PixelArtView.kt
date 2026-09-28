@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.common
 
+import ru.onefortwo.finny.content.Accessories
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
@@ -169,10 +170,11 @@ fun composePet(
         ?: mouthFor(joy)
     place("${speciesId}_eyes_$eyes", "eyes")
     place("${speciesId}_mouth_$mouth", "mouth")
-    when (accessoryId) {
-        "bow" -> place("bow_$speciesId", "bow")
-        "scarf" -> place("scarf_${speciesId}_${stageId(shownStage)}", "scarf")
-    }
+    // ТЕСТ: несколько украшений сразу; шапочка — поверх, на макушке.
+    val worn = Accessories.list(accessoryId)
+    if ("scarf" in worn) place("scarf_${speciesId}_${stageId(shownStage)}", "scarf")
+    if ("bow" in worn) place("bow_$speciesId", "bow")
+    if ("hat" in worn) place("hat", "hat")
 
     if (spec != null) {
         val plain: (Int) -> Int = { art.colors[it] }

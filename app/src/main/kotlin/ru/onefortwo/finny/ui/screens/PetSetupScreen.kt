@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.PetAppearance
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
+import ru.onefortwo.finny.content.Accessories
 import ru.onefortwo.finny.content.NameFilter
 import ru.onefortwo.finny.ui.state.PetSpeech
 import ru.onefortwo.finny.content.PetPartsContent
@@ -75,7 +76,7 @@ import ru.onefortwo.finny.ui.common.petCaption
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /** Предел длины игрового имени. */
-private const val NAME_MAX_LENGTH = 12
+private const val NAME_MAX_LENGTH = 15
 
 /** Пауза в наборе имени, после которой проверяются короткие слова. */
 private const val NAME_PAUSE_MS = 1000L
@@ -132,7 +133,7 @@ fun PetSetupScreen(
 
     val species = parts.species.first { it.id == speciesId }
     val color = parts.colors.first { it.id == colorId }
-    val accessory = parts.accessories.first { it.id == accessoryId }
+    val accessoryTitle = Accessories.title(parts, accessoryId)
 
     // Системный жест «назад» на шагах 3 и 4 возвращает на шаг раньше.
     BackHandler(enabled = step > 2) { step -= 1 }
@@ -150,8 +151,8 @@ fun PetSetupScreen(
             petName = name.ifBlank { "Пока без имени" },
             speciesId = species.id,
             speciesTitle = species.title,
-            accessoryId = accessory.id,
-            accessoryTitle = accessory.title,
+            accessoryId = accessoryId,
+            accessoryTitle = accessoryTitle,
             colorHex = color.hex,
             stage = GrowthStage.BABY,
             size = size,
@@ -169,8 +170,8 @@ fun PetSetupScreen(
                     petName = name.trim(),
                     speciesId = species.id,
                     speciesTitle = species.title,
-                    accessoryId = accessory.id,
-                    accessoryTitle = accessory.title,
+                    accessoryId = accessoryId,
+                    accessoryTitle = accessoryTitle,
                     colorHex = color.hex,
                     stage = GrowthStage.BABY,
                     care = StatLevel.HIGH,
@@ -216,7 +217,8 @@ fun PetSetupScreen(
                     figure = figure,
                     onSpecies = { speciesId = it },
                     onColor = { colorId = it },
-                    onAccessory = { accessoryId = it },
+                    // ТЕСТ: украшения надеваются и снимаются по одному.
+                    onAccessory = { accessoryId = Accessories.toggle(accessoryId, it, parts.accessories.map { a -> a.id }) },
                     onNext = { step = 3 },
                 )
 
@@ -225,7 +227,7 @@ fun PetSetupScreen(
                         PreviewRow(
                             figure = { figure(64.dp) },
                             name = name.trim(),
-                            caption = "${species.title} · ${color.title.lowercase()} · ${accessory.title.lowercase()}",
+                            caption = "${species.title} · ${color.title.lowercase()} · $accessoryTitle",
                             large = false,
                             onEdit = { step = 2 },
                         )
@@ -242,7 +244,12 @@ fun PetSetupScreen(
                             rejectName()
                         } else {
                             name = typed
-                            if (typed.isNotEmpty()) nameError = null
+                            // ТЕСТ: сверх предела — короткое пояснение, лишнее не вводится.
+                            nameError = when {
+                                it.length > NAME_MAX_LENGTH -> "Слишком длинное имя"
+                                typed.isNotEmpty() -> null
+                                else -> nameError
+                            }
                         }
                     },
                     onNext = { if (nameFilter.isAllowed(name)) step = 4 else rejectName() },
@@ -306,7 +313,8 @@ private fun AppearanceStep(
         )
     }
 
-    GroupTitle("Окрас")
+    // ТЕСТ: без заголовков групп и без подписей цветов — только кружки;
+    // названия цветов по-прежнему озвучивает TalkBack.
     OptionRow(
         count = parts.colors.size,
         large = large,
@@ -317,24 +325,22 @@ private fun AppearanceStep(
             title = option.title,
             selected = option.id == colorId,
             onClick = { onColor(option.id) },
-            swatch = { ColorSwatch(parseColor(option.hex), size = 24.dp) },
+            swatch = { ColorSwatch(parseColor(option.hex), size = 32.dp) },
+            showTitle = false,
             modifier = modifier.heightIn(min = 64.dp),
         )
     }
 
-    GroupTitle("Украшение")
+    // ТЕСТ: четыре варианта — сеткой по два: в одну строку слова рвались.
     OptionRow(
         count = parts.accessories.size,
-        large = large,
-        minItemWidth = 140.dp,
-        // «Без украшения» — самая длинная подпись; плитка шире, чтобы
-        // слово «украшения» не разрывалось.
-        weights = parts.accessories.map { if (it.id == "none") 1.35f else 1f },
+        large = true,
+        minItemWidth = 150.dp,
     ) { index, modifier ->
         val option = parts.accessories[index]
         CheckOption(
             title = option.title,
-            selected = option.id == accessoryId,
+            selected = Accessories.isOn(accessoryId, option.id),
             onClick = { onAccessory(option.id) },
             modifier = modifier.heightIn(min = 64.dp),
         )

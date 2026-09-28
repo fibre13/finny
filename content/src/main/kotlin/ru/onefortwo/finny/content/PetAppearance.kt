@@ -50,3 +50,36 @@ data class PetAppearance(
     val colorId: String,
     val accessoryId: String,
 )
+
+/**
+ * ТЕСТ: набор украшений. Питомец носит несколько сразу — бантик, шарфик,
+ * шапочку; набор хранится в том же поле кодов через запятую («bow,hat»),
+ * поэтому менять базу не нужно. «none» — без украшений.
+ */
+object Accessories {
+    const val NONE = "none"
+
+    /** Коды надетых украшений по порядку каталога. */
+    fun list(key: String): List<String> =
+        key.split(',').map { it.trim() }.filter { it.isNotEmpty() && it != NONE }.distinct()
+
+    /** Ключ набора для хранения. */
+    fun key(ids: Collection<String>): String =
+        ids.filter { it.isNotEmpty() && it != NONE }.distinct().joinToString(",").ifEmpty { NONE }
+
+    /** Нажали на украшение: надето — снять, нет — надеть; «без украшения» снимает всё. */
+    fun toggle(key: String, id: String, order: List<String> = emptyList()): String {
+        if (id == NONE) return NONE
+        val now = list(key)
+        val next = if (id in now) now - id else now + id
+        return key(if (order.isEmpty()) next else next.sortedBy { order.indexOf(it) })
+    }
+
+    /** Надето ли украшение [id]; «без украшения» — когда не надето ничего. */
+    fun isOn(key: String, id: String): Boolean = if (id == NONE) list(key).isEmpty() else id in list(key)
+
+    /** Названия для подписи и TalkBack: «бантик и шапочка»; без украшений — «без украшения». */
+    fun title(parts: PetPartsContent, key: String): String =
+        list(key).mapNotNull { id -> parts.accessories.firstOrNull { it.id == id }?.title?.lowercase() }
+            .let { if (it.isEmpty()) "без украшения" else it.joinToString(" и ") }
+}

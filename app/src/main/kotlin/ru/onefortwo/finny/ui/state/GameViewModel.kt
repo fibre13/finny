@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.onefortwo.finny.content.Accessories
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.ItemCategory
 import ru.onefortwo.finny.content.PetAppearance
@@ -276,9 +277,7 @@ class GameViewModel(
             timeLimitEnabled = keepUsage?.timeLimitEnabled ?: true,
             // Украшение, выбранное при создании питомца, доступно в гардеробе
             // без покупки: иначе его нельзя было бы вернуть, сняв однажды.
-            ownedAccessories = setOfNotNull(
-                appearance.accessoryId.takeIf { it != PetAppearanceDefaults.NONE },
-            ),
+            ownedAccessories = Accessories.list(appearance.accessoryId).toSet(),
             arrival = FeedbackMessage(
                 text = "Тебе дали ${Explanations.coins(IncomeSource.START_BUDGET.amount)}.",
                 nextStep = "На них ты будешь заботиться о питомце: кормить, радовать и копить на мечту.",

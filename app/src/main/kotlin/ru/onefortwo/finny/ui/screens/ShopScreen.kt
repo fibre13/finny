@@ -332,6 +332,7 @@ private fun glyphOf(itemId: String): LineGlyph = when (itemId) {
     "tent" -> LineGlyph.TENT
     "stickers" -> LineGlyph.STICKERS
     "scarf" -> LineGlyph.CLOTHES
+    "hat" -> LineGlyph.CLOTHES
     else -> LineGlyph.SHOP
 }
 

@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.screens
 
+import ru.onefortwo.finny.content.Accessories
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -124,13 +125,12 @@ fun SavingsScreen(
         if (profile != null && parts != null) {
             val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
             val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
-            val accessory = parts.accessories.firstOrNull { it.id == profile.appearance.accessoryId }
             PetFigure(
                 petName = profile.petName,
                 speciesId = profile.appearance.speciesId,
                 speciesTitle = species?.title ?: "Питомец",
                 accessoryId = profile.appearance.accessoryId,
-                accessoryTitle = accessory?.title ?: "без украшения",
+                accessoryTitle = Accessories.title(parts, profile.appearance.accessoryId),
                 colorHex = color?.hex ?: "#CCCCCC",
                 stage = game.stage,
                 care = game.pet.care.level,

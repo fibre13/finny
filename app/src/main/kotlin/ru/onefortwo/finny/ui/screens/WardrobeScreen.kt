@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.screens
 
+import ru.onefortwo.finny.content.Accessories
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +56,6 @@ fun WardrobeScreen(
 
     val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
     val color = parts.colors.firstOrNull { it.id == colorId }
-    val accessory = parts.accessories.firstOrNull { it.id == accessoryId }
     val locked = parts.accessories.filterNot { state.isAccessoryAvailable(it.id) }
 
     ScreenScaffold(
@@ -71,7 +71,7 @@ fun WardrobeScreen(
                     speciesId = profile.appearance.speciesId,
                     speciesTitle = species?.title ?: "Питомец",
                     accessoryId = accessoryId,
-                    accessoryTitle = accessory?.title ?: "без украшения",
+                    accessoryTitle = Accessories.title(parts, accessoryId),
                     colorHex = color?.hex ?: "#CCCCCC",
                     stage = state.game.stage,
                     care = state.game.pet.care.level,
@@ -99,9 +99,10 @@ fun WardrobeScreen(
                 val available = state.isAccessoryAvailable(option.id)
                 OptionTile(
                     title = option.title,
-                    selected = option.id == accessoryId,
+                    selected = Accessories.isOn(accessoryId, option.id),
                     enabled = available,
-                    onClick = { accessoryId = option.id },
+                    // ТЕСТ: украшения надеваются вместе — нажатие надевает или снимает.
+                    onClick = { accessoryId = Accessories.toggle(accessoryId, option.id, parts.accessories.map { it.id }) },
                     selectedSuffix = "надето",
                     status = if (available) "есть" else "не куплено",
                     modifier = Modifier.weight(1f),

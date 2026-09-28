@@ -1,5 +1,6 @@
 package ru.onefortwo.finny.ui.state
 
+import ru.onefortwo.finny.content.Accessories
 import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.data.SavedGame
 import ru.onefortwo.finny.economy.GameState
@@ -127,7 +128,7 @@ data class AppState(
 
     /** Доступно ли украшение для гардероба: без украшения — всегда. */
     fun isAccessoryAvailable(accessoryId: String): Boolean =
-        accessoryId == PetAppearanceDefaults.NONE || accessoryId in ownedAccessories
+        Accessories.list(accessoryId).all { it in ownedAccessories }
 
     /** Сколько новых заданий уже оплачено сегодня. */
     val paidTasksToday: Int get() = if (paidTasksPeriod == game.period.number) paidTasksCount else 0

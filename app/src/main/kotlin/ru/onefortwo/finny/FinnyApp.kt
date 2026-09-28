@@ -1,5 +1,6 @@
 package ru.onefortwo.finny
 
+import ru.onefortwo.finny.content.Accessories
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -548,13 +549,12 @@ private fun TaskPet(state: AppState, parts: PetPartsContent, happy: Boolean) {
     val profile = state.profile ?: return
     val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
     val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
-    val accessory = parts.accessories.firstOrNull { it.id == profile.appearance.accessoryId }
     PetFigure(
         petName = profile.petName,
         speciesId = profile.appearance.speciesId,
         speciesTitle = species?.title ?: "Питомец",
         accessoryId = profile.appearance.accessoryId,
-        accessoryTitle = accessory?.title ?: "без украшения",
+        accessoryTitle = Accessories.title(parts, profile.appearance.accessoryId),
         colorHex = color?.hex ?: "#CCCCCC",
         stage = state.game.stage,
         care = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,

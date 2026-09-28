@@ -229,9 +229,10 @@ class ScreenRenderTest {
         listOf("Котёнок", "Щенок", "Крольчонок").forEach {
             compose.onNodeWithContentDescription(it).performScrollTo().assertIsDisplayed()
         }
-        compose.onNodeWithText("Окрас").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Серый").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Украшение").performScrollTo().assertIsDisplayed()
+        // ТЕСТ: цвета — кружками без подписей, но TalkBack их называет.
+        compose.onNodeWithText("Окрас").assertDoesNotExist()
+        compose.onNodeWithText("Серый").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Серый", substring = true).performScrollTo().assertIsDisplayed()
     }
 
     @Test
