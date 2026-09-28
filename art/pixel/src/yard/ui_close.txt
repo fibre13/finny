@@ -1,0 +1,12 @@
+# 10 10
+# pivot 0 0
+KK......KK
+KKK....KKK
+.KKK..KKK.
+..KKKKKK..
+...KKKK...
+...KKKK...
+..KKKKKK..
+.KKK..KKK.
+KKK....KKK
+KK......KK

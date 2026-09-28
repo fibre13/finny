@@ -646,6 +646,6 @@ private fun GoalOption(goal: GoalContent, saved: Coins, onChoose: (String) -> Un
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        ChevronIcon(color = colors.onSurface)
+        ChevronIcon()
     }
 }

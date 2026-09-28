@@ -45,8 +45,7 @@ import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.IconTile
 import ru.onefortwo.finny.ui.common.LabeledValue
-import ru.onefortwo.finny.ui.common.LineGlyph
-import ru.onefortwo.finny.ui.common.LineIcon
+import ru.onefortwo.finny.ui.common.PixelIcon
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SecondaryButton
@@ -244,7 +243,7 @@ private fun ShopItemRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconTile(size = 44.dp) {
-            LineIcon(glyph = glyphOf(item.id), color = colors.attention)
+            PixelIcon(spriteOf(item.id), cell = 2.dp)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -321,20 +320,12 @@ private fun PriceButton(
     }
 }
 
-/** Значок товара; для товара вне списка — корзина раздела покупок. */
-private fun glyphOf(itemId: String): LineGlyph = when (itemId) {
-    "food" -> LineGlyph.NEEDS
-    "water" -> LineGlyph.WATER
-    "vitamins" -> LineGlyph.VITAMINS
-    "brush" -> LineGlyph.GROOMING
-    "ball" -> LineGlyph.BALL
-    "bow" -> LineGlyph.BOW
-    "tent" -> LineGlyph.TENT
-    "stickers" -> LineGlyph.STICKERS
-    "scarf" -> LineGlyph.CLOTHES
-    "hat" -> LineGlyph.CLOTHES
-    else -> LineGlyph.SHOP
-}
+/**
+ * Значок товара — пиксельный спрайт 16 × 16 `item_<id>` (art/pixel,
+ * tools/make_icons.py). Для товара без спрайта плитка остаётся пустой:
+ * название написано рядом.
+ */
+private fun spriteOf(itemId: String): String = "item_$itemId"
 
 /** Подтверждение покупки: последнее слово за пользователем. */
 @Composable

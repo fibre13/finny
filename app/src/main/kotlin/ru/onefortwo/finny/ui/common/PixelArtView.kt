@@ -4,6 +4,7 @@ import ru.onefortwo.finny.content.Accessories
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -13,8 +14,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.PixelArt
 import ru.onefortwo.finny.content.PixelPoint
@@ -365,6 +369,22 @@ private object PixelArtStore {
 fun rememberPixelArt(): PixelArt {
     val context = LocalContext.current
     return remember { PixelArtStore.get(context) }
+}
+
+/**
+ * Пиксельный значок интерфейса: спрайт [id] с клеткой [cell] без замены
+ * цветов. Не озвучивается: смысл несёт подпись рядом или описание кнопки
+ * (ТЗ 3.6).
+ */
+@Composable
+fun PixelIcon(id: String, modifier: Modifier = Modifier, cell: Dp = 2.dp) {
+    val art = rememberPixelArt()
+    val sprite = art.sprite(id) ?: return
+    val image = remember(art, id) { composeGoal(art, id)?.let { pixelImage(it, sprite.width) } } ?: return
+    PixelImage(
+        image = image,
+        modifier = modifier.size(cell * sprite.width, cell * sprite.height).clearAndSetSemantics { },
+    )
 }
 
 /** Переводит собранный массив в изображение для вывода. */

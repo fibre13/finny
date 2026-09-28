@@ -68,7 +68,6 @@ import ru.onefortwo.finny.ui.screens.GiftScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
-import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
 import ru.onefortwo.finny.ui.screens.PeriodResultScreen
 import ru.onefortwo.finny.ui.screens.PetSetupScreen
@@ -236,83 +235,6 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `главный экран показывает баланс, показатели и задание одновременно`() {
-        val state = AppState(profile = profile, game = GameState.newProfile())
-
-        compose.setContent {
-            FinnyTheme {
-                MainScreen(
-                    state = state,
-                    parts = content.petParts(),
-                    activeTask = content.tasks().first(),
-                    goalTitle = null,
-                    onDismissMessage = {},
-                    onOpenPlan = {},
-                    onOpenShop = {},
-                    onOpenSavings = {},
-                    onOpenGlossary = {},
-                    onOpenHelp = {},
-                    onOpenAdult = {},
-                    onFinishPeriod = {},
-                    today = "2026-09-15",
-                )
-            }
-        }
-
-        compose.onNodeWithText("Финни").assertIsDisplayed()
-        compose.onNodeWithText("Можно потратить").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("В копилке").performScrollTo().assertIsDisplayed()
-        // Стартовое значение 60 — средний уровень. На экране он показан
-        // числом делений панели в сцене (не только цветом), словами — в
-        // описании сцены для программы чтения с экрана (ТЗ 3.6).
-        compose.onNodeWithContentDescription("Забота: В порядке, 60 из 100", substring = true)
-            .performScrollTo()
-            .assertIsDisplayed()
-        compose.onNodeWithContentDescription("Радость: Спокойный, 60 из 100", substring = true)
-            .assertIsDisplayed()
-    }
-
-    @Test
-    fun `у неактивной кнопки завершения дня всегда есть причина текстом`() {
-        // Прожитый день выключает кнопку. Объяснение есть в блоке «На сегодня
-        // день закончен», но он остаётся вверху экрана: рядом с самой кнопкой
-        // причина обязана быть текстом, а не только приглушённым цветом
-        // (ТЗ 3.6).
-        val state = AppState(
-            profile = profile,
-            game = GameState.newProfile(),
-            lastFinishedDate = "2026-09-15",
-        )
-
-        compose.setContent {
-            FinnyTheme {
-                MainScreen(
-                    state = state,
-                    parts = content.petParts(),
-                    activeTask = content.tasks().first(),
-                    goalTitle = null,
-                    onDismissMessage = {},
-                    onOpenPlan = {},
-                    onOpenShop = {},
-                    onOpenSavings = {},
-                    onOpenGlossary = {},
-                    onOpenHelp = {},
-                    onOpenAdult = {},
-                    onFinishPeriod = {},
-                    today = "2026-09-15",
-                )
-            }
-        }
-
-        compose.onNodeWithText("Закончить день").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText(
-            "Закончить день можно завтра.",
-        )
-            .performScrollTo()
-            .assertIsDisplayed()
-    }
-
-    @Test
     fun `без цели план предлагает её выбрать и объясняет, почему кнопка неактивна`() {
         // Без цели откладывать некуда: об этом сказано на карточке копилки
         // заранее, с переходом к выбору цели, а не после отказа.
@@ -376,43 +298,6 @@ class ScreenRenderTest {
 
         compose.onAllNodesWithText("20 монет").assertCountEquals(0)
         compose.onNodeWithText("Больше, чем есть", substring = true).assertDoesNotExist()
-    }
-
-    @Test
-    fun `после утверждения плана блок прожитого дня не предлагает составить план`() {
-        // Прожитый день и уже утверждённый план на следующий: предлагать
-        // составить план второй раз нельзя — повторно он не составляется.
-        val goal = content.goals().first { it.id == "scooter" }.toDomain()
-        val first = GameState.newProfile().chooseGoal(goal)
-            .confirmPlan(BudgetPlan(Coins(20), Coins(10), Coins(5))) as PlanConfirmation.Success
-        val nextDay = (first.state.finishPeriod() as PeriodCompletion.Success).state
-        val planned = nextDay.confirmPlan(BudgetPlan(Coins(10), Coins(5), Coins(0)))
-            as PlanConfirmation.Success
-        val state = AppState(profile = profile, game = planned.state, lastFinishedDate = "2026-09-15")
-
-        compose.setContent {
-            FinnyTheme {
-                MainScreen(
-                    state = state,
-                    parts = content.petParts(),
-                    activeTask = content.tasks().first(),
-                    goalTitle = null,
-                    onDismissMessage = {},
-                    onOpenPlan = {},
-                    onOpenShop = {},
-                    onOpenSavings = {},
-                    onOpenGlossary = {},
-                    onOpenHelp = {},
-                    onOpenAdult = {},
-                    onFinishPeriod = {},
-                    today = "2026-09-15",
-                )
-            }
-        }
-
-        compose.onNodeWithText("Закончить день можно завтра.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Сначала составь план.").assertDoesNotExist()
-        compose.onNodeWithText("можно составить план", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -803,104 +688,6 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `главный экран открывает следующее задание сразу`() {
-        val next = TaskQueue.ordered(simpleTasks).first()
-        val opened = mutableListOf<String>()
-        compose.setContent {
-            FinnyTheme {
-                MainScreen(
-                    state = AppState(profile = profile, game = GameState.newProfile()),
-                    parts = content.petParts(),
-                    activeTask = next,
-                    goalTitle = null,
-                    onDismissMessage = {},
-                    onOpenPlan = {},
-                    onOpenShop = {},
-                    onOpenSavings = {},
-                    onOpenGlossary = {},
-                    onOpenHelp = {},
-                    onOpenAdult = {},
-                    onFinishPeriod = {},
-                    today = "2026-09-15",
-                    onOpenTask = { opened += it },
-                )
-            }
-        }
-
-        compose.onNodeWithText("СЛЕДУЮЩЕЕ ЗАДАНИЕ").performScrollTo().assertIsDisplayed()
-        // Карточка задания нажимается целиком.
-        compose.onNodeWithText(next.title).performScrollTo().performClick()
-        assertEquals(listOf(next.id), opened)
-    }
-
-    @Test
-    fun `когда новых нет, главный экран предлагает повтор и так и говорит`() {
-        val queue = TaskQueue.ordered(simpleTasks)
-        val state = AppState(
-            profile = profile,
-            game = GameState.newProfile(),
-            completedTaskIds = queue.map { it.id }.toSet(),
-        )
-        compose.setContent {
-            FinnyTheme {
-                MainScreen(
-                    state = state,
-                    parts = content.petParts(),
-                    activeTask = queue.first(),
-                    goalTitle = null,
-                    onDismissMessage = {},
-                    onOpenPlan = {},
-                    onOpenShop = {},
-                    onOpenSavings = {},
-                    onOpenGlossary = {},
-                    onOpenHelp = {},
-                    onOpenAdult = {},
-                    onFinishPeriod = {},
-                    today = "2026-09-15",
-                )
-            }
-        }
-
-        compose.onNodeWithText("ПОВТОР · ПОЛОВИНА МОНЕТ").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText(queue.first().title).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("СЛЕДУЮЩЕЕ ЗАДАНИЕ").assertDoesNotExist()
-    }
-
-    @Test
-    @Config(qualifiers = "w360dp-h640dp")
-    fun `главный экран помещается на телефоне 360 на 640 без прокрутки`() {
-        // Под нижней панелью вкладок (80 dp) и строкой состояния (24 dp)
-        // главному экрану MI 5 остаётся 536 dp.
-        compose.setContent {
-            FinnyTheme {
-                Box(modifier = Modifier.height(536.dp)) {
-                    MainScreen(
-                        state = AppState(profile = profile, game = GameState.newProfile()),
-                        parts = content.petParts(),
-                        activeTask = content.task("cart_fit_easy"),
-                        goalTitle = null,
-                        onDismissMessage = {},
-                        onOpenPlan = {},
-                        onOpenShop = {},
-                        onOpenSavings = {},
-                        onOpenGlossary = {},
-                        onOpenHelp = {},
-                        onOpenAdult = {},
-                        onFinishPeriod = {},
-                        today = "2026-09-15",
-                    )
-                }
-            }
-        }
-
-        val bottom = compose.onNodeWithText("Закончить день").fetchSemanticsNode().boundsInRoot.bottom
-        val limit = with(compose.density) { 536.dp.toPx() }
-        assertTrue("Кнопка «Закончить день» ниже края экрана: $bottom > $limit", bottom <= limit)
-        compose.onNodeWithText("Можно потратить").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Забота: В порядке", substring = true).assertIsDisplayed()
-    }
-
-    @Test
     fun `покупки дня перечислены на экране покупок`() {
         val food = content.shopItems().first()
         compose.setContent {
@@ -1269,6 +1056,23 @@ class ScreenRenderTest {
             }
         }
         compose.onNodeWithText("Осталось 4 минуты на сегодня.").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `у неактивной кнопки конца дня на дворе есть причина текстом`() {
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Сначала составь план.").assertIsDisplayed()
     }
 
     @Test

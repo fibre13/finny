@@ -462,36 +462,6 @@ private fun ScreenHeader(
     }
 }
 
-/**
- * Кнопка-значок в шапке: тот же квадрат, что у кнопки «Назад», со
- * значком в стиле значков разделов. Подписи на экране нет, поэтому
- * описание для программы чтения с экрана обязательно.
- */
-@Composable
-fun HeaderIconButton(
-    glyph: LineGlyph,
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = FinnyTheme.colors
-    val shape = MaterialTheme.shapes.small
-
-    Box(
-        modifier = modifier
-            .size(maxOf(MinTouchTarget, 48.dp))
-            .softShadow(shape, lift = false)
-            .clip(shape)
-            .background(colors.surface)
-            .border(1.5.dp, colors.outline, shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        LineIcon(glyph, colors.attention, size = 22.dp)
-    }
-}
-
 /** Кнопка возврата: стрелка в квадрате со скруглением, подписана «Назад». */
 @Composable
 private fun BackButton(onClick: () -> Unit) {
@@ -510,7 +480,7 @@ private fun BackButton(onClick: () -> Unit) {
             .semantics { contentDescription = "Назад" },
         contentAlignment = Alignment.Center,
     ) {
-        ArrowBackIcon(color = colors.onSurface)
+        ArrowBackIcon()
     }
 }
 
@@ -1204,7 +1174,7 @@ fun FeedbackCard(
                 .semantics { contentDescription = "Закрыть сообщение" },
             contentAlignment = Alignment.Center,
         ) {
-            LineIcon(glyph = LineGlyph.CLOSE, color = colors.onSurface, size = 20.dp)
+            PixelIcon("ui_close", cell = 2.dp)
         }
     }
 }

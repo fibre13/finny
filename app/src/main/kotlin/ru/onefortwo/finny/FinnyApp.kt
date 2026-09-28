@@ -3,13 +3,8 @@ package ru.onefortwo.finny
 import ru.onefortwo.finny.content.Accessories
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,8 +18,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -32,7 +25,6 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
@@ -46,14 +38,11 @@ import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.PetReaction
 import ru.onefortwo.finny.ui.state.PetReactions
 import androidx.compose.foundation.layout.width
-import ru.onefortwo.finny.ui.common.FinnyNavigationBar
 import ru.onefortwo.finny.ui.common.LocalMotionEnabled
-import ru.onefortwo.finny.ui.common.FinnyNavigationRail
 import ru.onefortwo.finny.ui.common.NavSection
 import ru.onefortwo.finny.ui.screens.AdultScreen
 import ru.onefortwo.finny.ui.screens.GlossaryScreen
 import ru.onefortwo.finny.ui.screens.HistoryScreen
-import ru.onefortwo.finny.ui.screens.MainScreen
 import ru.onefortwo.finny.ui.screens.YardScreen
 import ru.onefortwo.finny.ui.screens.GiftScreen
 import ru.onefortwo.finny.ui.screens.OnboardingScreen
@@ -98,15 +87,6 @@ private fun NavSection.route(): String = when (this) {
     NavSection.PROGRESS -> Routes.HISTORY
 }
 
-/** Вкладка, к которой относится маршрут, либо `null` для вложенного экрана. */
-private fun tabOf(route: String?): NavSection? = when (route) {
-    Routes.MAIN -> NavSection.HOME
-    Routes.TASKS -> NavSection.TASKS
-    Routes.WARDROBE -> NavSection.PET
-    Routes.HISTORY -> NavSection.PROGRESS
-    else -> null
-}
-
 /**
  * Переход на вкладку. Стек не растёт от переключения вкладок: под любой
  * вкладкой лежит только главный экран, и системная кнопка «Назад» ведёт
@@ -119,9 +99,6 @@ private fun NavController.openTab(section: NavSection) {
         restoreState = true
     }
 }
-
-/** Ширина, начиная с которой навигация переходит в боковую колонку. */
-private const val EXPANDED_WIDTH_DP = 840
 
 /**
  * Навигация приложения. Последовательность экранов повторяет сквозной
@@ -150,42 +127,16 @@ fun FinnyApp(viewModel: GameViewModel) {
         return
     }
 
-    val backStack by navController.currentBackStackEntryAsState()
-    val tab = tabOf(backStack?.destination?.route)
-    val windowWidthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp().value }
-    val expanded = windowWidthDp >= EXPANDED_WIDTH_DP
-    val onSelectTab: (NavSection) -> Unit = { navController.openTab(it) }
-
-    Row(
+    // Навигационных панелей нет — разделы открываются со двора.
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(FinnyTheme.colors.appBackground),
     ) {
-        // Навигационных панелей нет — разделы открываются со двора.
-        Column(modifier = Modifier.weight(1f)) {
-            val bottomBar = false
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    // Отступ от системной панели внизу уже взяла панель
-                    // навигации: экраны не должны прибавлять его ещё раз.
-                    .then(
-                        if (bottomBar) {
-                            Modifier.consumeWindowInsets(WindowInsets.navigationBars)
-                        } else {
-                            Modifier
-                        },
-                    ),
-            ) {
-                CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
-                    AppNavHost(navController = navController, viewModel = viewModel)
-                }
-                if (state.isDemo || state.demoPending) DemoWatermark()
-            }
-            if (bottomBar && tab != null) {
-                FinnyNavigationBar(selected = tab, onSelect = onSelectTab)
-            }
+        CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
+            AppNavHost(navController = navController, viewModel = viewModel)
         }
+        if (state.isDemo || state.demoPending) DemoWatermark()
     }
 }
 

@@ -1,8 +1,10 @@
 package ru.onefortwo.finny.ui.common
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -20,7 +22,8 @@ import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
  * Пиктограммы уровней показателя, результата задания и монеты.
- * Направления плана и служебные знаки — линейные значки [LineIcon].
+ * Направления плана и служебные знаки — пиксельные значки [PixelIcon]
+ * в стиле двора.
  *
  * Все построены на сетке 24 × 24 из простой геометрии: линии, окружности,
  * дуги. Толщина обводки задана в dp и переводится в единицы сетки при
@@ -81,9 +84,9 @@ fun StatLevelIcon(level: StatLevel, modifier: Modifier = Modifier, size: Dp = Pi
 }
 
 /**
- * Направление плана бюджета: миска с паром для нужного, звезда для
- * желаемого, копилка-свинка для накоплений. Линейные значки того же
- * набора, что в меню разделов и на вкладках.
+ * Направление плана бюджета: миска корма для нужного, мячик для
+ * желаемого, монета для копилки — те же пиксельные значки, что в правилах
+ * на экране подарка.
  */
 @Composable
 fun BudgetDirectionIcon(
@@ -91,16 +94,15 @@ fun BudgetDirectionIcon(
     modifier: Modifier = Modifier,
     size: Dp = 24.dp,
 ) {
-    LineIcon(
-        glyph = when (category) {
-            BudgetCategory.NEEDS -> LineGlyph.NEEDS
-            BudgetCategory.WANTS -> LineGlyph.WANTS
-            BudgetCategory.SAVINGS -> LineGlyph.SAVINGS
-        },
-        color = FinnyTheme.colors.attention,
-        modifier = modifier,
-        size = size,
-    )
+    val id = when (category) {
+        BudgetCategory.NEEDS -> "icon_care"
+        BudgetCategory.WANTS -> "yard_ball"
+        BudgetCategory.SAVINGS -> "coin_0"
+    }
+    // Значки 7 × 7 клеток: клетка — восьмая часть размера, с полем по краям.
+    Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
+        PixelIcon(id, cell = size / 8)
+    }
 }
 
 /** Итог задания: галочка при верном решении, знак внимания при ошибке. */
@@ -173,8 +175,8 @@ private fun arc(cx: Float, cy: Float, halfWidth: Float, rise: Float): Path = Pat
 
 /** Стрелка «назад». Описание задаёт кнопка, сама стрелка не озвучивается. */
 @Composable
-fun ArrowBackIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
-    LineIcon(LineGlyph.BACK, color, modifier, size)
+fun ArrowBackIcon(modifier: Modifier = Modifier) {
+    PixelIcon("yard_icon_back", modifier, cell = 2.dp)
 }
 
 /** Галочка: отметка выбранного варианта. */
@@ -195,25 +197,11 @@ fun CheckIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
     }
 }
 
-/** Шеврон «открыть» в конце нажимаемой карточки. */
+/** Стрелка «открыть» в конце нажимаемой карточки: 8 × 10 клеток. */
 @Composable
-fun ChevronIcon(color: Color, modifier: Modifier = Modifier, size: Dp = 20.dp) {
-    LineIcon(LineGlyph.CHEVRON, color, modifier, size)
+fun ChevronIcon(modifier: Modifier = Modifier, size: Dp = 20.dp) {
+    PixelIcon("ui_chevron", modifier, cell = size / 10)
 }
 
-/** Вкладки нижней навигации. */
-enum class NavSection(val glyph: LineGlyph) {
-    HOME(LineGlyph.HOME),
-    TASKS(LineGlyph.TASKS),
-    PET(LineGlyph.PET),
-    PROGRESS(LineGlyph.PROGRESS),
-}
-
-/**
- * Пиктограмма вкладки. Подпись вкладки видна всегда, рисунок её не
- * заменяет (ТЗ 3.6).
- */
-@Composable
-fun NavIcon(section: NavSection, color: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
-    LineIcon(section.glyph, color, modifier, size)
-}
+/** Разделы, между которыми переключается приложение. */
+enum class NavSection { HOME, TASKS, PET, PROGRESS }

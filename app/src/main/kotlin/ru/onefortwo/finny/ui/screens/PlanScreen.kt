@@ -44,8 +44,7 @@ import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.ChevronIcon
 import ru.onefortwo.finny.ui.common.CoinStepper
 import ru.onefortwo.finny.ui.common.LabeledValue
-import ru.onefortwo.finny.ui.common.LineGlyph
-import ru.onefortwo.finny.ui.common.LineIcon
+import ru.onefortwo.finny.ui.common.PixelIcon
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
@@ -258,7 +257,7 @@ private fun PlanEditor(
         ) {
             if (hasGoal) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    LineIcon(LineGlyph.GOAL, color = colors.onSurfaceMuted, size = 18.dp)
+                    PixelIcon("ui_flag", cell = 1.5.dp)
                     Spacer(modifier = Modifier.width(6.dp))
                     SupportingText(
                         if (goalTitle != null) "На «$goalTitle»" else "Сразу уйдут в копилку на цель.",
@@ -360,7 +359,7 @@ private fun ChooseGoalButton(onClick: () -> Unit) {
             style = MaterialTheme.typography.labelLarge,
             color = colors.attentionText,
         )
-        ChevronIcon(color = colors.attentionText, size = 18.dp)
+        ChevronIcon(size = 18.dp)
     }
 }
 
