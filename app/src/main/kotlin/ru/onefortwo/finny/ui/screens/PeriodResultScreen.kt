@@ -177,7 +177,7 @@ fun PeriodResultScreen(
 
             if (outcome.isSetback) {
                 SecondaryButton(
-                    text = "Выполнить задание «Помоги $petName»",
+                    text = "Выполнить задание «Помоги своему питомцу»",
                     onClick = onOpenRecoveryTask,
                     modifier = Modifier.padding(bottom = 10.dp),
                 )

@@ -32,6 +32,10 @@ enum class TaskTopic(val displayName: String) {
     @SerialName("time")
     TIME("Время"),
 
+    /** Финансовая безопасность: пароли, личные данные, уловки обманщиков. */
+    @SerialName("safety")
+    SAFETY("Безопасность"),
+
     @SerialName("recovery")
     RECOVERY("Помощь питомцу"),
 }

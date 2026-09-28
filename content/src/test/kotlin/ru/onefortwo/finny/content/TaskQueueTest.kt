@@ -26,7 +26,11 @@ class TaskQueueTest {
             listOf(TaskTopic.BUDGET_PLANNING, TaskTopic.SAVINGS, TaskTopic.PAYMENTS),
             topics.take(3),
         )
-        assertEquals(topics.take(3), topics.drop(3).take(3))
+        // Затем круг проходит остальные темы уровня в порядке объявления
+        // и начинается снова с планирования.
+        val cycle = TaskTopic.entries.filter { it != TaskTopic.RECOVERY && it in topics }
+        assertEquals(cycle, topics.take(cycle.size))
+        assertEquals(TaskTopic.BUDGET_PLANNING, topics[cycle.size])
     }
 
     @Test

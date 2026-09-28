@@ -554,7 +554,7 @@ class GameViewModel(
         val solvedBefore = if (roundDone && taskId in levelIds) current.completedTaskIds - levelIds else current.completedTaskIds
         val repeat = taskId in solvedBefore
         // Монеты — за первые TaskPay.PER_DAY заданий дня, считая и
-        // повторы; «Помоги Финни» — путь восстановления, оплачивается всегда.
+        // повторы; «Помоги своему питомцу» — путь восстановления, оплачивается всегда.
         val counted = check.reward != IncomeSource.RECOVERY_TASK
         val overLimit = counted && current.paidTasksToday >= TaskPay.PER_DAY
         val reward = when {

@@ -194,5 +194,6 @@ private fun defaultIcon(topic: TaskTopic): String = when (topic) {
     TaskTopic.SAVINGS -> "yard_savings"
     TaskTopic.PAYMENTS -> "yard_shop"
     TaskTopic.TIME -> "item_clock"
+    TaskTopic.SAFETY -> "yard_icon_adult"
     TaskTopic.RECOVERY -> "icon_care"
 }
