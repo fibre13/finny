@@ -359,8 +359,9 @@ class GameViewModel(
         val period = state.game.period.number
         val season = Season.seasonOf(period)
         if (season == state.extras.season) {
+            // Внутри сезона монет не приходит — поэтому не окно «Пришли монеты», а сообщение.
             return state.copy(
-                arrival = if (state.isDemo) null else FeedbackMessage(
+                message = if (state.isDemo) state.message else FeedbackMessage(
                     text = "Новый день! День ${Season.dayOf(period)} из $SEASON_DAYS в сезоне.",
                     nextStep = "${state.profile?.petName ?: "Питомец"} проснулся. Посмотрим, что сегодня случится.",
                 ),
@@ -449,7 +450,7 @@ class GameViewModel(
         _state.update {
             it.copy(
                 message = FeedbackMessage(
-                    text = "$petName спит. Новый день начнётся завтра — тогда придут и монеты.",
+                    text = "$petName спит. Новый день начнётся завтра.",
                     nextStep = "Пока можно заглянуть в словарик или в гардероб.",
                 ),
             )

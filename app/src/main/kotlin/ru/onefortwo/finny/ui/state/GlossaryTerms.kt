@@ -34,7 +34,7 @@ object GlossaryTerms {
                 add("Цель")
                 add("Копилка")
             }
-            if (period.isPlanConfirmed || dayLived) {
+            if (state.extras.planned || period.isPlanConfirmed || dayLived) {
                 add("Бюджет")
                 add("План")
             }

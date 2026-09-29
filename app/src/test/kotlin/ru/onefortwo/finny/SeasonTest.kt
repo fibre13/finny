@@ -28,6 +28,7 @@ import ru.onefortwo.finny.ui.state.GameViewModel
 import ru.onefortwo.finny.ui.state.Growth
 import ru.onefortwo.finny.ui.state.Season
 import ru.onefortwo.finny.ui.state.SeasonExtras
+import ru.onefortwo.finny.ui.state.toAppState
 
 /**
  * Сезон из трёх дней, банки, события дня, сюрпризы за задания,
@@ -260,7 +261,8 @@ class SeasonTest {
         assertEquals(GrowthStage.BABY, Growth.stageFor(2, 8))
         assertEquals(GrowthStage.BABY, Growth.stageFor(1, 20))
         assertEquals(GrowthStage.TEEN, Growth.stageFor(2, 9))
-        assertEquals(GrowthStage.ADULT, Growth.stageFor(4, 18))
+        assertEquals(GrowthStage.TEEN, Growth.stageFor(3, 17))
+        assertEquals(GrowthStage.ADULT, Growth.stageFor(3, 18))
     }
 
     @Test
@@ -284,6 +286,29 @@ class SeasonTest {
         assertEquals("Не потрачено на желаемое: 15 монет, из них 15 монет ушли на нужное.", notes.wants)
         assertEquals("Из копилки на нужное взято 7 монет.", notes.savings)
         assertEquals(Season.BorrowNotes(null, null, null), Season.borrowNotes(SeasonExtras(plannedNeeds = 20, spentNeeds = 10)))
+    }
+
+    @Test
+    fun `профиль без состояния сезона продолжает текущий сезон и не получает праздник роста`() {
+        val saved = ru.onefortwo.finny.data.SavedGame(
+            petName = "Финни",
+            speciesId = "cat",
+            colorId = "ginger",
+            accessoryId = "none",
+            isDemo = false,
+            game = ru.onefortwo.finny.economy.GameState(
+                balance = ru.onefortwo.finny.economy.Coins(6),
+                growthPoints = GrowthStage.TEEN.requiredPoints,
+                period = ru.onefortwo.finny.economy.PeriodState(number = 5),
+            ),
+            completedTaskIds = emptySet(),
+            extras = "",
+        )
+        val state = saved.toAppState()
+        assertEquals(2, state.extras.season)
+        assertEquals(GrowthStage.TEEN, state.extras.growthShown)
+        assertFalse(state.extras.planned)
+        assertEquals(6, state.game.balance.amount)
     }
 
     @Test

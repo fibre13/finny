@@ -511,7 +511,7 @@ fun GrowthCelebrationScreen(state: AppState, parts: PetPartsContent, onDone: () 
                     Sprite(art, "yard_balloon_blue", cell = 3.dp)
                 }
                 val bubble = when (scene) {
-                    0 -> "Ура! Ты накопил на целых две мечты!"
+                    0 -> if (stage == GrowthStage.ADULT) "Ура! Ты накопил на все три мечты!" else "Ура! Ты накопил на целых две мечты!"
                     1 -> "Смотри, как я вырос!"
                     else -> null
                 }

@@ -213,7 +213,12 @@ fun SavedGame.toAppState(): AppState = AppState(
     remindersPeriod = remindersPeriod,
     // Профиль из версии без сезонов: стадия, выросшая по прежним шагам роста,
     // уже отпразднована — праздник роста за мечты для неё не показывается.
-    extras = if (extras.isBlank()) SeasonExtras(growthShown = game.stage) else SeasonExtras.decode(extras),
+    extras = if (extras.isBlank()) {
+        // Сезон — по текущему игровому дню: иначе следующий день начал бы новый сезон посреди текущего.
+        SeasonExtras(season = Season.seasonOf(game.period.number), growthShown = game.stage)
+    } else {
+        SeasonExtras.decode(extras)
+    },
 )
 
 /** Переводит состояние приложения в сохраняемый вид; null, если профиля нет. */
