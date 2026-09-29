@@ -323,9 +323,26 @@ class GameViewModel(
         _state.update { it.copy(arrival = null) }
     }
 
-    /** Словарик открыт: новые слова прочитаны, отметка «Новое» снимается. */
+    /**
+     * Словарик открыт: встреченные слова прочитаны, а заход запомнен —
+     * облачко над словариком до следующего игрового дня не показывается.
+     */
     fun markTermsRead() {
-        _state.update { if (it.newTerms.isEmpty()) it else it.copy(newTerms = emptySet()) }
+        _state.update {
+            val day = it.game.period.number
+            if (it.newTerms.isEmpty() && it.extras.wordVisit == day) {
+                it
+            } else {
+                it.copy(newTerms = emptySet(), extras = it.extras.copy(wordVisit = day))
+            }
+        }
+    }
+
+    /** Карточка словарика [term] открыта и прочитана: она уходит из сетки в список. */
+    fun openTerm(term: String) {
+        _state.update {
+            if (term in it.extras.wordsOpened) it else it.copy(extras = it.extras.copy(wordsOpened = it.extras.wordsOpened + term))
+        }
     }
 
     /** «Не сейчас»: напоминание не показывается до конца игрового дня. */

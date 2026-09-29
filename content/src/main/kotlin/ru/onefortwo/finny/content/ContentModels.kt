@@ -119,7 +119,11 @@ data class GlossaryEntry(
     /** Термин показывается только на уровне «Посложнее». */
     @SerialName("hard_only")
     val hardOnly: Boolean = false,
-    /** Термин ведёт на экран: `plan` — план, `fact` — план и факт. */
+    /**
+     * Раздел игры, куда ведёт термин: `budget`, `plan`, `fact` — план,
+     * `shop` — покупки, `savings` — копилка, `goal` — выбор цели,
+     * `main` — двор, `task:<id>` — задание.
+     */
     val link: String? = null,
 )
 

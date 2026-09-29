@@ -317,6 +317,10 @@ fun YardScreen(
     onDismissSurprise: () -> Unit = {},
     onMissedShown: () -> Unit = {},
     onPlay: () -> Unit = {},
+    /** Облачко над словариком без кнопок (см. [GlossaryTerms.hint]); `null` — не показывать. */
+    glossaryHint: String? = null,
+    /** Сколько карточек словарика можно открыть сейчас; 0 — счётчик скрыт. */
+    glossaryNew: Int = 0,
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -539,8 +543,10 @@ fun YardScreen(
                     YardObject(
                         art, colors, "yard_glossary", "Словарик",
                         description = "Словарик: финансовые слова",
+                        state = if (glossaryNew > 0) "можно открыть карточек: $glossaryNew" else null,
                         onPlaced = { places["glossary"] = it.center; bounds[GuideTarget.GLOSSARY] = it },
                         onClick = { runTo(places["glossary"], onOpenGlossary) },
+                        overlay = { if (glossaryNew > 0) CountBadge(colors, glossaryNew, Modifier.align(Alignment.TopEnd)) },
                     )
                 }
                 ChestRow(
@@ -677,6 +683,20 @@ fun YardScreen(
                     GuideTarget.FINISH -> null
                 },
                 onDismiss = guide.reminder?.takeIf { it != Reminder.TASK && it != Reminder.FINISH }?.let { reminder -> { onDismissReminder(reminder) } },
+            )
+        }
+
+        // Облачко над словариком — без кнопок, только приглашение. Не над
+        // соседним планом с его подсказкой: два облачка в ряд налезли бы друг на друга.
+        val book = bounds[GuideTarget.GLOSSARY]
+        if (glossaryHint != null && book != null && book.overlaps(viewport) && !busy && speech == null &&
+            !dayFinished && guide?.target != GuideTarget.PLAN
+        ) {
+            GuideBubble(
+                colors = colors,
+                step = GuideStep(0, GuideTarget.GLOSSARY, glossaryHint),
+                target = book.translate(-yardOrigin),
+                onClick = { runTo(places["glossary"], onOpenGlossary) },
             )
         }
 
@@ -1024,6 +1044,21 @@ private fun Badge(colors: YardColors, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text("!", style = MaterialTheme.typography.labelLarge, color = colors.card)
+    }
+}
+
+/** Счётчик карточек словарика, которые можно открыть: жёлтая плашка с числом. */
+@Composable
+private fun CountBadge(colors: YardColors, count: Int, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .offset(x = 8.dp, y = (-8).dp)
+            .size(22.dp)
+            .pixelPanel(colors.coin, colors.coin, colors.coin, colors.outline)
+            .clearAndSetSemantics { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("$count", style = MaterialTheme.typography.labelLarge, color = colors.outline)
     }
 }
 

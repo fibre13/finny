@@ -250,7 +250,8 @@ class PersistenceTest {
         // Новый профиль начинает первый сезон с нуля: план, банки, задания — прежние не переходят.
         val restored = viewModel().state.value
         assertTrue(restored.achievedGoalIds.isEmpty())
-        assertEquals(SeasonExtras(season = 1, seasonStart = TODAY), restored.extras)
+        // Первый игровой день уже засчитан словарику: открыта одна карточка.
+        assertEquals(SeasonExtras(season = 1, seasonStart = TODAY, wordDay = 1, wordDays = 1), restored.extras)
         assertEquals(50, restored.game.balance.amount)
         assertEquals(0, restored.game.savings.saved.amount)
     }
@@ -429,7 +430,7 @@ class PersistenceTest {
         assertTrue(state.game.history.isEmpty())
         assertTrue(state.completedTaskIds.isEmpty())
         // Сезон — с первого дня: план не составлен, банки пусты, сюрпризы закрыты.
-        val fresh = SeasonExtras(season = 1, seasonStart = TODAY)
+        val fresh = SeasonExtras(season = 1, seasonStart = TODAY, wordDay = 1, wordDays = 1)
         assertEquals(fresh, state.extras)
         // И в базе — то же начальное состояние сезона.
         assertEquals(fresh, SeasonExtras.decode(repository.load()!!.extras))

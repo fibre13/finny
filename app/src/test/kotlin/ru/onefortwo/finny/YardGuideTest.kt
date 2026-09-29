@@ -23,6 +23,7 @@ import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.ui.state.DateProvider
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.GlossaryTerms
 import ru.onefortwo.finny.ui.state.GuideTarget
 import ru.onefortwo.finny.ui.state.Reminder
 import ru.onefortwo.finny.ui.state.YardGuide
@@ -122,8 +123,7 @@ class YardGuideTest {
         assertEquals(0, model.guide()?.number)
 
         model.solve("save_rate")
-        assertEquals(GuideTarget.GLOSSARY, model.guide()?.target)
-        model.markTermsRead()
+        // О словарике зовёт своё облачко без кнопок — не напоминание по порядку дня.
         assertEquals(Reminder.PLAN_FIX, model.guide()?.reminder)
         model.dismissReminder(Reminder.PLAN_FIX)
         assertEquals(GuideTarget.FINISH, model.guide()?.target)
@@ -191,11 +191,6 @@ class YardGuideTest {
         assertEquals(GuideTarget.TASKS, model.guide()?.target)
         model.solve("save_rate")
 
-        // Слова первого дня встречены, а словарик ещё не открывали.
-        assertEquals(Reminder.WORD, model.guide()?.reminder)
-        assertEquals(GuideTarget.GLOSSARY, model.guide()?.target)
-        model.markTermsRead()
-
         // Раз в сезон после дел дня — вопрос о поправке плана.
         assertEquals(Reminder.PLAN_FIX, model.guide()?.reminder)
         assertEquals(GuideTarget.PLAN, model.guide()?.target)
@@ -212,9 +207,7 @@ class YardGuideTest {
         assertEquals(Reminder.TASK, model.guide()?.reminder)
 
         model.dismissReminder(Reminder.TASK)
-        assertEquals("следующее дело по порядку", Reminder.WORD, model.guide()?.reminder)
-        model.dismissReminder(Reminder.WORD)
-        assertEquals(Reminder.PLAN_FIX, model.guide()?.reminder)
+        assertEquals("следующее дело по порядку", Reminder.PLAN_FIX, model.guide()?.reminder)
         model.dismissReminder(Reminder.PLAN_FIX)
         assertEquals(Reminder.FINISH, model.guide()?.reminder)
 
@@ -226,8 +219,6 @@ class YardGuideTest {
         assertEquals(3, model.state.value.seasonDay)
         assertEquals(Reminder.TASK, model.guide()?.reminder)
         model.dismissReminder(Reminder.TASK)
-        assertEquals(Reminder.WORD, model.guide()?.reminder)
-        model.dismissReminder(Reminder.WORD)
         assertEquals(Reminder.FINISH, model.guide()?.reminder)
     }
 
@@ -238,7 +229,7 @@ class YardGuideTest {
         val timeUp = model.state.value.copy(usageDate = today, usageMinutes = 20)
 
         assertTrue(timeUp.isTimeUp(today))
-        assertEquals(Reminder.WORD, YardGuide.reminder(timeUp, today))
+        assertEquals(Reminder.PLAN_FIX, YardGuide.reminder(timeUp, today))
         // Взрослый снял ограничение — напоминание о задании возвращается.
         assertEquals(Reminder.TASK, YardGuide.reminder(timeUp.copy(timeLimitEnabled = false), today))
     }
@@ -271,6 +262,41 @@ class YardGuideTest {
         model.finishPeriod()
         assertTrue("Факт" in model.state.value.newTerms)
         assertFalse("Цель" in model.state.value.newTerms)
+    }
+
+    @Test
+    fun `карточка словарика открывается одна за игровой день, пропуск дней новых не добавляет`() {
+        val terms = content.glossary().map { it.term }
+        val model = plannedModel()
+        assertEquals("в первый день — одна карточка", listOf(terms[0]), GlossaryTerms.available(model.state.value, terms))
+
+        model.declineDay()
+        model.finishPeriod()
+        // Ребёнок не приходил три календарных дня — засчитывается только следующий день игры.
+        repeat(3) { nextDay() }
+        model.startNewDayIfDue()
+        assertEquals(terms.take(2), GlossaryTerms.available(model.state.value, terms))
+        assertEquals(2, GlossaryTerms.closed(model.state.value, terms).size)
+
+        // Открытая карточка уходит из закрытых; неоткрытая не сгорает.
+        model.openTerm(terms[0])
+        assertEquals(listOf(terms[1]), GlossaryTerms.closed(model.state.value, terms))
+        assertEquals(listOf(terms[0]), model.state.value.extras.wordsOpened)
+    }
+
+    @Test
+    fun `облачко над словариком — после мечты, плана и двух событий и не в день захода`() {
+        val terms = content.glossary().map { it.term }
+        val model = plannedModel()
+        assertNull("события дня ещё не решены", GlossaryTerms.hint(model.state.value, terms))
+
+        model.declineDay()
+        assertEquals(GlossaryTerms.HINT_NEW, GlossaryTerms.hint(model.state.value, terms))
+        assertEquals("Есть новое слово! Загляни в словарик.", GlossaryTerms.HINT_NEW)
+
+        // Заглянул в словарик — облачко не появляется до следующего игрового дня.
+        model.markTermsRead()
+        assertNull(GlossaryTerms.hint(model.state.value, terms))
     }
 
     @Test

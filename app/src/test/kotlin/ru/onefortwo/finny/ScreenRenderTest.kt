@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.economy.PurchaseRecord
 import org.junit.Assert.assertEquals
+import ru.onefortwo.finny.ui.state.GlossaryTerms
 import ru.onefortwo.finny.ui.state.GuideStep
 import ru.onefortwo.finny.ui.state.Reminder
 import org.junit.Assert.assertFalse
@@ -1272,9 +1273,10 @@ class ScreenRenderTest {
     private val simpleTasks get() = content.tasks(Difficulty.SIMPLE)
 
     @Test
-    fun `словарик показывает термины с объяснениями`() {
+    fun `словарик показывает открытые термины с объяснениями`() {
+        val entries = content.glossary()
         compose.setContent {
-            FinnyTheme { GlossaryScreen(entries = content.glossary(), onBack = {}) }
+            FinnyTheme { GlossaryScreen(entries = entries, onBack = {}, opened = entries.map { it.term }.toSet()) }
         }
 
         compose.onNodeWithText("Бюджет").assertIsDisplayed()
@@ -1282,12 +1284,35 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `новое слово в словарике отмечено словом «Новое»`() {
+    fun `карточка словарика открывается окном и после закрытия уходит в список`() {
+        val entries = content.glossary()
+        var opened by androidx.compose.runtime.mutableStateOf(emptySet<String>())
         compose.setContent {
-            FinnyTheme { GlossaryScreen(entries = content.glossary(), onBack = {}, newTerms = setOf("Бюджет")) }
+            FinnyTheme {
+                GlossaryScreen(
+                    entries = entries,
+                    onBack = {},
+                    available = setOf(entries[0].term),
+                    opened = opened,
+                    onOpenTerm = { opened = opened + it },
+                )
+            }
         }
 
-        compose.onAllNodesWithText("НОВОЕ").assertCountEquals(1)
+        // До нажатия термин не показан: одна карточка со знаком вопроса, остальные — под замком.
+        val openable = androidx.compose.ui.test.hasContentDescription("Закрытая карточка, можно открыть")
+        compose.onAllNodesWithText(entries[0].term).assertCountEquals(0)
+        compose.onAllNodes(openable).assertCountEquals(1)
+        compose.onNode(openable).performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+
+        compose.onNodeWithText(entries[0].explanation).assertIsDisplayed()
+        compose.onNodeWithText("Открыть план бюджета →").assertIsDisplayed()
+        compose.onNodeWithText("Понятно").performClick()
+        assertEquals(setOf(entries[0].term), opened)
+        compose.onNodeWithText(entries[0].term).performScrollTo().assertIsDisplayed()
+        compose.onAllNodes(openable).assertCountEquals(0)
     }
 
     @Test
@@ -1302,15 +1327,41 @@ class ScreenRenderTest {
                     onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
                     onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
                     onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
-                    guide = GuideStep(0, Reminder.WORD.target, Reminder.WORD.text, Reminder.WORD),
+                    guide = GuideStep(0, Reminder.PLAN_FIX.target, Reminder.PLAN_FIX.text, Reminder.PLAN_FIX),
                     onDismissReminder = { dismissed = it },
                 )
             }
         }
 
-        compose.onNodeWithText(Reminder.WORD.text, useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithText("В словарик", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText(Reminder.PLAN_FIX.text, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("В план", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Не сейчас", useUnmergedTree = true).performClick()
-        assertEquals(Reminder.WORD, dismissed)
+        assertEquals(Reminder.PLAN_FIX, dismissed)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `облачко над словариком без кнопок ведёт в словарик`() {
+        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        var opened = false
+        compose.setContent {
+            FinnyTheme {
+                YardScreen(
+                    state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                    onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                    onOpenGlossary = { opened = true }, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                    onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = {},
+                    glossaryHint = GlossaryTerms.HINT_NEW,
+                    glossaryNew = 2,
+                )
+            }
+        }
+
+        compose.onNodeWithText("Есть новое слово! Загляни в словарик.", useUnmergedTree = true).assertIsDisplayed()
+        compose.onAllNodesWithText("Не сейчас", useUnmergedTree = true).assertCountEquals(0)
+        compose.onNodeWithText("Есть новое слово! Загляни в словарик.", useUnmergedTree = true).performClick()
+        compose.mainClock.advanceTimeBy(2000)
+        compose.waitForIdle()
+        assertTrue(opened)
     }
 }

@@ -3,12 +3,17 @@ package ru.onefortwo.finny
 import android.graphics.Color
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.onefortwo.finny.ui.common.TouchMarks
 import ru.onefortwo.finny.ui.state.GameViewModel
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
@@ -36,11 +41,17 @@ class MainActivity : ComponentActivity() {
         if (resources.configuration.smallestScreenWidthDp < TABLET_MIN_WIDTH_DP) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
+        // Отметки касаний для видеозаписи: только в отладочной сборке и при
+        // включённом системном параметре «Показывать нажатия».
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val touchMarks = debuggable && Settings.System.getInt(contentResolver, "show_touches", 0) == 1
         setContent {
             val model: GameViewModel = viewModel(factory = GameViewModel.Factory(this))
 
             FinnyTheme {
-                FinnyApp(viewModel = model)
+                TouchMarks(enabled = touchMarks, modifier = Modifier.fillMaxSize()) {
+                    FinnyApp(viewModel = model)
+                }
             }
         }
     }

@@ -2,12 +2,14 @@
   {
     "term": "Бюджет",
     "explanation": "Твои монеты на сезон. Ты решаешь, сколько потратить и сколько отложить.",
-    "icon": "item_wallet"
+    "icon": "item_wallet",
+    "link": "budget"
   },
   {
     "term": "Нужное и желаемое",
     "explanation": "Нужное — чтобы питомец был сыт, здоров и ухожен. Желаемое — чтобы ему было весело: игрушки и развлечения. Сначала покупаем нужное!",
-    "icon": "item_apple"
+    "icon": "item_apple",
+    "link": "shop"
   },
   {
     "term": "План",
@@ -24,12 +26,14 @@
   {
     "term": "Копилка",
     "explanation": "Монеты, которые ты отложил на мечту. Копилка растёт, и мечта становится ближе!",
-    "icon": "item_piggy"
+    "icon": "item_piggy",
+    "link": "savings"
   },
   {
     "term": "Накопления",
     "explanation": "Все монеты в копилке. Чем больше откладываешь, тем быстрее накопишь на мечту.",
-    "icon": "item_moneybag"
+    "icon": "item_moneybag",
+    "link": "savings"
   },
   {
     "term": "Подушка безопасности",
@@ -39,22 +43,26 @@
   {
     "term": "Цель",
     "explanation": "Твоя мечта! Например, самокат. Смотри, сколько монет осталось накопить.",
-    "icon": "item_target"
+    "icon": "item_target",
+    "link": "goal"
   },
   {
     "term": "Доход",
     "explanation": "Монеты, которые ты получаешь. В начале каждого сезона тебе дают монеты на питомца.",
-    "icon": "item_arrow_up"
+    "icon": "item_arrow_up",
+    "link": "main"
   },
   {
     "term": "Расход",
     "explanation": "Монеты, которые ты тратишь на любые свои покупки. Расход уменьшает бюджет, поэтому его планируют заранее.",
-    "icon": "item_arrow_down"
+    "icon": "item_arrow_down",
+    "link": "shop"
   },
   {
     "term": "Сдача",
     "explanation": "Монеты, которые тебе вернут, если ты дал больше. Сдачу всегда пересчитывай!",
-    "icon": "item_change"
+    "icon": "item_change",
+    "link": "task:change_count"
   },
   {
     "term": "Скидка",

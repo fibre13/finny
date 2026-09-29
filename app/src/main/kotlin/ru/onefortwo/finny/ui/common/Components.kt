@@ -1286,28 +1286,31 @@ fun FinnyDialog(
     val shape = MaterialTheme.shapes.extraLarge
 
     Dialog(onDismissRequest = onDismiss) {
-        // Цвет текста задаётся явно: диалог вызывается вне каркаса экрана.
-        CompositionLocalProvider(
-            LocalContentColor provides colors.onSurface,
-            LocalMutedColor provides colors.onSurfaceMuted,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shape)
-                    .background(colors.surface)
-                    .padding(24.dp),
+        // Отметки касаний для видеозаписи: окно диалога — отдельное окно.
+        TouchMarks(enabled = LocalTouchMarks.current, modifier = Modifier) {
+            // Цвет текста задаётся явно: диалог вызывается вне каркаса экрана.
+            CompositionLocalProvider(
+                LocalContentColor provides colors.onSurface,
+                LocalMutedColor provides colors.onSurfaceMuted,
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                Column(
                     modifier = Modifier
-                        .padding(bottom = 12.dp)
-                        .semantics { heading() },
-                )
-                content()
-                Spacer(modifier = Modifier.size(20.dp))
-                actions()
+                        .fillMaxWidth()
+                        .clip(shape)
+                        .background(colors.surface)
+                        .padding(24.dp),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier
+                            .padding(bottom = 12.dp)
+                            .semantics { heading() },
+                    )
+                    content()
+                    Spacer(modifier = Modifier.size(20.dp))
+                    actions()
+                }
             }
         }
     }

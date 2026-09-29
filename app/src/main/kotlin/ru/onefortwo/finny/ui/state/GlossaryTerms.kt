@@ -1,19 +1,23 @@
 package ru.onefortwo.finny.ui.state
 
 /*
- * Слово за действием. Слово словарика считается встреченным, когда ребёнок
+ * Словарик — игра с карточками. Каждый прожитый игровой день открывает
+ * одну карточку по порядку словаря: за сезон из трёх дней — три слова.
+ * Пропущенные календарные дни карточки не сжигают и новых не добавляют:
+ * засчитываются только дни, в которые ребёнок играл. Открытая карточка
+ * уходит из сетки в список под ней.
+ *
+ * Над словариком на дворе появляется облачко — не раньше, чем выбрана
+ * мечта, разложены монеты и решены два события дня: словарик не главное
+ * в игре и не перебивает другие дела. Облачко не показывается в день,
+ * когда ребёнок уже заходил в словарик.
+ *
+ * Слово за действием. Слово словаря считается встреченным, когда ребёнок
  * впервые столкнулся с ним в игре: выбрал цель — «Цель» и «Копилка», утвердил
  * план — «Бюджет» и «План», купил — «Нужное и желаемое» и «Расход».
- * Встреченное слово до прочтения отмечено в словарике «Новое», и двор
- * напоминает о нём (см. [Reminder.WORD]).
  *
- * Словарик при этом открыт целиком: все слова читаются с первого дня, это
- * справочный раздел (ТЗ 2.5.11). Отметка «Новое» только подсказывает, какое
- * слово связано с тем, что ребёнок сейчас сделал.
- *
- * Встреченность выводится из состояния игры, а не отмечается в каждом
- * действии: правило одно на всё приложение, и новое действие не забудет
- * отметить слово.
+ * Встреченность и счёт дней выводятся из состояния игры, а не отмечаются
+ * в каждом действии: правило одно на всё приложение.
  */
 object GlossaryTerms {
     /** Задания, в которых встречается слово «Сдача». */
@@ -53,13 +57,54 @@ object GlossaryTerms {
     }
 
     /**
-     * Состояние с отмеченными новыми словами или то же состояние, если
-     * новых встреч нет. Слово отмечается «Новое» только при первой встрече:
-     * прочитанное слово второй раз новым не становится.
+     * Состояние с отмеченными новыми словами и засчитанным игровым днём или
+     * то же состояние, если отмечать нечего. Слово отмечается встреченным
+     * только при первой встрече.
      */
     fun note(state: AppState): AppState {
+        var result = state
         val found = encountered(state) - state.knownTerms
-        if (found.isEmpty()) return state
-        return state.copy(knownTerms = state.knownTerms + found, newTerms = state.newTerms + found)
+        if (found.isNotEmpty()) {
+            result = result.copy(knownTerms = state.knownTerms + found, newTerms = state.newTerms + found)
+        }
+        val day = state.game.period.number
+        val x = result.extras
+        if (state.profile != null && x.wordDay != day) {
+            result = result.copy(extras = x.copy(wordDay = day, wordDays = x.wordDays + 1))
+        }
+        return result
+    }
+
+    /** Облачко над словариком, когда есть карточка, которую можно открыть. */
+    const val HINT_NEW = "Есть новое слово! Загляни в словарик."
+
+    /** Облачко над словариком, когда новых карточек нет, а словарик давно не открывали. */
+    const val HINT_RECALL = "Загляни в словарик — вспомни, что ты уже знаешь"
+
+    /** Сколько карточек можно открыть всего: по одной за игровой день, не меньше одной. */
+    fun availableCount(state: AppState): Int = maxOf(1, state.extras.wordDays)
+
+    /** Термины [terms], карточки которых уже можно открыть, — по порядку словаря. */
+    fun available(state: AppState, terms: List<String>): List<String> = terms.take(availableCount(state))
+
+    /** Доступные, но ещё не открытые карточки. */
+    fun closed(state: AppState, terms: List<String>): List<String> =
+        available(state, terms).filter { it !in state.extras.wordsOpened }
+
+    /**
+     * Текст облачка над словариком или `null`. Облачко — только после
+     * мечты, плана сезона и двух решённых событий дня и не в день, когда
+     * ребёнок уже заходил в словарик. Новое слово важнее; без новых слов
+     * облачко напоминает о словарике раз в два игровых дня без захода.
+     */
+    fun hint(state: AppState, terms: List<String>): String? {
+        val x = state.extras
+        val day = state.game.period.number
+        if (state.profile == null || state.game.savings.goal == null || !x.planned) return null
+        if (x.eventsDay != day || x.answered < minOf(2, x.dayEvents.size)) return null
+        if (x.wordVisit == day) return null
+        if (closed(state, terms).isNotEmpty()) return HINT_NEW
+        val since = day - x.wordVisit
+        return if (x.wordVisit > 0 && since >= 2 && since % 2 == 0) HINT_RECALL else null
     }
 }

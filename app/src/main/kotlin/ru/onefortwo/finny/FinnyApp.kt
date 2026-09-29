@@ -28,6 +28,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlin.random.Random
 import ru.onefortwo.finny.content.TaskQueue
+import ru.onefortwo.finny.content.ContentRepository
+import ru.onefortwo.finny.content.GlossaryEntry
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.content.named
@@ -55,6 +57,7 @@ import ru.onefortwo.finny.ui.screens.TaskDetailScreen
 import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.screens.WardrobeScreen
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.GlossaryTerms
 import ru.onefortwo.finny.ui.state.YardGuide
 import ru.onefortwo.finny.ui.state.Growth
 import ru.onefortwo.finny.economy.GrowthStage
@@ -237,6 +240,8 @@ private fun AppNavHost(
                 parts = content.petParts(),
                 activeTask = activeTask,
                 guide = YardGuide.step(state, today),
+                glossaryHint = GlossaryTerms.hint(state, glossaryEntries(content, state).map { it.term }),
+                glossaryNew = GlossaryTerms.closed(state, glossaryEntries(content, state).map { it.term }).size,
                 onSleepingTap = viewModel::sleepingHint,
                 onArrivalShown = viewModel::dismissArrival,
                 onOpenTask = activeTask?.let { task -> { navController.navigate("${Routes.TASK}/${task.id}") } },
@@ -562,21 +567,25 @@ private fun AppNavHost(
         }
 
         composable(Routes.GLOSSARY) {
-            // Отметка «Новое» запоминается на время показа экрана, а в игре
-            // слова сразу становятся прочитанными: напоминание о словах
-            // уходит, как только словарик открыт.
-            val fresh = rememberSaveable { ArrayList(state.newTerms) }
+            // Заход в словарик запоминается: облачко над ним на дворе
+            // не показывается до следующего игрового дня.
             LaunchedEffect(Unit) { viewModel.markTermsRead() }
+            val entries = glossaryEntries(content, state)
             GlossaryScreen(
-                entries = content.glossary()
-                    .filter { !it.hardOnly || state.difficulty == Difficulty.HARDER }
-                    .map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
+                entries = entries.map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
+                available = GlossaryTerms.available(state, entries.map { it.term }).toSet(),
+                opened = state.extras.wordsOpened.toSet(),
+                onOpenTerm = viewModel::openTerm,
+                // Словарик остаётся в стеке: «Назад» из раздела возвращает к нему.
                 onOpenLink = { link ->
-                    when (link) {
-                        "plan", "fact" -> navController.navigate(Routes.PLAN)
+                    when {
+                        link == "budget" || link == "plan" || link == "fact" -> navController.navigate(Routes.PLAN)
+                        link == "shop" -> navController.navigate(Routes.SHOP)
+                        link == "savings" || link == "goal" -> navController.navigate(Routes.SAVINGS)
+                        link == "main" -> navController.popBackStack(Routes.MAIN, inclusive = false)
+                        link.startsWith("task:") -> navController.navigate("${Routes.TASK}/${link.removePrefix("task:")}")
                     }
                 },
-                newTerms = fresh.toSet(),
                 onBack = { navController.popBackStack() },
             )
         }
@@ -683,3 +692,7 @@ private fun LoadingScreen() {
         Text("Питомец Финни", style = MaterialTheme.typography.headlineMedium)
     }
 }
+
+/** Слова словарика для уровня сложности профиля — по порядку словаря. */
+private fun glossaryEntries(content: ContentRepository, state: AppState): List<GlossaryEntry> =
+    content.glossary().filter { !it.hardOnly || state.difficulty == Difficulty.HARDER }

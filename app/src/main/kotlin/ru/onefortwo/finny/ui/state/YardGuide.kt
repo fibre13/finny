@@ -19,7 +19,8 @@ enum class GuideTarget { PLAN, SHOP, TASKS, SAVINGS, GLOSSARY, FINISH }
 
 /**
  * Напоминание двора со второго дня. Порядок — порядок игрового дня:
- * нужное, задание, новое слово, конец дня. Каждое откладывается кнопкой
+ * нужное, задание, конец дня. О словарике зовёт своё облачко без кнопок
+ * (см. [GlossaryTerms.hint]). Каждое откладывается кнопкой
  * «Не сейчас» до конца игрового дня: напоминание зовёт, но не давит
  * (ТЗ 3.5). Системных уведомлений нет — только на дворе, когда ребёнок
  * сам открыл приложение.
@@ -35,7 +36,6 @@ enum class Reminder(
     /** Есть монеты вне банков — подарок или снятое из копилки. */
     FREE("free", GuideTarget.PLAN, "Есть свободные монеты. Разложи их в плане!", "В план"),
     TASK("task", GuideTarget.TASKS, "Реши задание — и в лавке появится что-то новое!", null),
-    WORD("word", GuideTarget.GLOSSARY, "Я услышал новое слово! Загляни в словарик!", "В словарик"),
     /** Раз в сезон после дел дня. */
     PLAN_FIX("plan_fix", GuideTarget.PLAN, "Хочешь скорректировать план?", "В план"),
     FINISH("finish", GuideTarget.FINISH, "Все дела сделаны! Поиграй со мной или уложи спать", null),
@@ -92,7 +92,6 @@ object YardGuide {
                 Reminder.NEEDS -> false
                 Reminder.FREE -> state.freeCoins > 0
                 Reminder.TASK -> (x.tasksDay != state.game.period.number || x.tasksToday == 0) && !state.isTimeUp(today)
-                Reminder.WORD -> state.newTerms.isNotEmpty()
                 Reminder.PLAN_FIX -> !x.correctionAsked && state.dayEventsDone
                 Reminder.FINISH -> state.dayEventsDone
             }
