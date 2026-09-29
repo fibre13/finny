@@ -31,6 +31,7 @@ import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.motionAllowed
 import ru.onefortwo.finny.ui.state.SEASON_DAYS
+import ru.onefortwo.finny.ui.state.Season
 import ru.onefortwo.finny.ui.state.SeasonExtras
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -122,8 +123,9 @@ fun PlanScreen(
                     bottomSpacing = 0.dp,
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        PlanFactRow(BudgetCategory.NEEDS, extras.plannedNeeds, extras.spentNeeds, palette.needs)
-                        PlanFactRow(BudgetCategory.WANTS, extras.plannedWants, extras.spentWants, palette.wants)
+                        val (needsNote, wantsNote) = Season.borrowNotes(extras)
+                        PlanFactRow(BudgetCategory.NEEDS, extras.plannedNeeds, extras.spentNeeds, palette.needs, needsNote)
+                        PlanFactRow(BudgetCategory.WANTS, extras.plannedWants, extras.spentWants, palette.wants, wantsNote)
                         PlanFactRow(BudgetCategory.SAVINGS, extras.plannedSavings, extras.deposited, palette.savings)
                     }
                 }
@@ -402,6 +404,8 @@ internal fun PlanFactRow(
     planned: Int,
     actual: Int,
     color: Color,
+    /** ТЕСТ 3: пояснение вместо стандартного вывода — например, куда ушли монеты банка. */
+    note: String? = null,
 ) {
     val title = category.displayName
 
@@ -426,7 +430,7 @@ internal fun PlanFactRow(
             height = 8.dp,
         )
         SupportingText(
-            when {
+            note ?: when {
                 // Для копилки «больше плана» — хорошо: отложено больше.
                 category == BudgetCategory.SAVINGS && actual > planned ->
                     "Отложено больше плана на ${Explanations.coinsAccusative(actual - planned)}. Отлично!"

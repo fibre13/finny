@@ -593,6 +593,7 @@ class GameViewModel(
         wantsJar = (x.wantsJar - payment.fromWants).coerceAtLeast(0),
         spentNeeds = x.spentNeeds + if (category == ItemCategory.NEEDS) payment.price else 0,
         spentWants = x.spentWants + if (category == ItemCategory.WANTS) payment.price else 0,
+        wantsToNeeds = x.wantsToNeeds + if (category == ItemCategory.NEEDS) payment.fromWants else 0,
     )
 
     /** «Взять из копилки» подтверждено: покупка или событие завершаются. */
@@ -821,7 +822,7 @@ class GameViewModel(
                 game = it.game.chooseGoal(goal.toDomain()),
                 message = FeedbackMessage(
                     text = "Цель выбрана: ${goal.title} за ${Explanations.coins(goal.price)}.",
-                    nextStep = "Откладывай понемногу каждый день — так цель станет ближе.",
+                    nextStep = "Откладывай в копилку, когда составляешь план, — так мечта станет ближе.",
                 ),
             )
         }

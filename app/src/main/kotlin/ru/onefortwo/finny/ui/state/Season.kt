@@ -52,6 +52,8 @@ data class SeasonExtras(
     val spentNeeds: Int = 0,
     val spentWants: Int = 0,
     val deposited: Int = 0,
+    /** Сколько монет из банка «Хочу» ушло на нужное, когда в «Нужном» не хватило. */
+    val wantsToNeeds: Int = 0,
 
     /** События дня [eventsDay]; решено первых [answered]. */
     val eventsDay: Int = 0,
@@ -111,6 +113,19 @@ data class Payment(
 }
 
 object Season {
+
+    /** Пояснения к строкам «Нужное» и «Хочу», если «Хочу» доплачивал за нужное. */
+    fun borrowNotes(x: SeasonExtras): Pair<String?, String?> {
+        val borrowed = x.wantsToNeeds
+        if (borrowed <= 0) return null to null
+        val over = x.spentNeeds - x.plannedNeeds
+        val needs = if (over > 0) "Потрачено больше плана на ${Explanations.coinsAccusative(over)} — " +
+            "из банка «Хочу» взято ${Explanations.coins(borrowed)}." else null
+        val unspent = (x.plannedWants - x.spentWants).coerceAtLeast(0)
+        val wants = "Не потрачено на желаемое: ${Explanations.coins(unspent)}, из них " +
+            "${Explanations.coins(borrowed)} ушли на нужное."
+        return needs to wants
+    }
 
     /** Номер сезона игрового дня [period]. */
     fun seasonOf(period: Int): Int = (period - 1) / SEASON_DAYS + 1

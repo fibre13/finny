@@ -381,8 +381,9 @@ fun SeasonResultScreen(
                 bottomSpacing = 0.dp,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    PlanFactRow(BudgetCategory.NEEDS, x.plannedNeeds, x.spentNeeds, palette.needs)
-                    PlanFactRow(BudgetCategory.WANTS, x.plannedWants, x.spentWants, palette.wants)
+                    val (needsNote, wantsNote) = Season.borrowNotes(x)
+                    PlanFactRow(BudgetCategory.NEEDS, x.plannedNeeds, x.spentNeeds, palette.needs, needsNote)
+                    PlanFactRow(BudgetCategory.WANTS, x.plannedWants, x.spentWants, palette.wants, wantsNote)
                     PlanFactRow(BudgetCategory.SAVINGS, x.plannedSavings, x.deposited, palette.savings)
                 }
             }
@@ -393,7 +394,7 @@ fun SeasonResultScreen(
                 Column {
                     LabeledValue("Осталось монет всего", Explanations.coins(state.game.balance))
                     LabeledValue("Накоплено за сезон", Explanations.coins(x.deposited))
-                    LabeledValue("Запланировано, но не потрачено", Explanations.coins(leftover))
+                    LabeledValue("Осталось в банках", Explanations.coins(leftover))
                 }
             }
 

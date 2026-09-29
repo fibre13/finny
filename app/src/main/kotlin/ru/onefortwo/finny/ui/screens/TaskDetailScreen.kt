@@ -56,7 +56,6 @@ import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.SelectButton
 import ru.onefortwo.finny.ui.common.SupportingText
-import ru.onefortwo.finny.ui.common.TaskResultIcon
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.Explanations
@@ -128,10 +127,11 @@ fun TaskDetailScreen(
                 }
             }
             SectionCard(tone = CardTone.Sage) {
+                // ТЕСТ 3: после ответа условие мельче — итог и питомец помещаются на экран.
                 Text(
                     text = task.prompt,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = if (result == null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (result == null) FontWeight.Bold else FontWeight.Normal,
                 )
             }
 
@@ -182,7 +182,7 @@ private fun ResultCard(
             // Мягче — «Почти получилось!», а не «Почти».
             title = if (check.isCorrect) "Верно!" else "Почти получилось!",
             tone = if (check.isCorrect) CardTone.Success else CardTone.Warning,
-            icon = { TaskResultIcon(correct = check.isCorrect) },
+            // ТЕСТ 3: без значка — итог назван словом, экран короче.
         ) {
             Column {
                 if (check.outcome != null) {
@@ -196,7 +196,7 @@ private fun ResultCard(
                 Text(
                     // ТЕСТ 3: монет за задания нет — они приближают сюрприз в лавке.
                     text = if (answered.credited.amount == 0) {
-                        "Засчитано! Каждые три задания открывают сюрприз в лавке."
+                        "Засчитано — сюрприз в лавке ближе!"
                     } else {
                         Explanations.reward(
                             source = check.reward,

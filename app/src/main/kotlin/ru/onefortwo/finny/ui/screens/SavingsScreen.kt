@@ -192,23 +192,20 @@ fun SavingsScreen(
                             modifier = Modifier.padding(bottom = 10.dp),
                         )
                         LabeledValue("Стоимость", Explanations.coins(goal.price))
-                        // ТЕСТ 3: пополнение — в плане, всё в одном месте.
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                LabeledValue("Уже накоплено", Explanations.coins(game.savings.saved))
-                            }
-                            Text(
-                                text = "Изменить",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = FinnyTheme.colors.onPrimary,
-                                textDecoration = TextDecoration.Underline,
-                                modifier = Modifier
-                                    .heightIn(min = 48.dp)
-                                    .clickable(role = Role.Button, onClick = onOpenPlan)
-                                    .wrapContentHeight(Alignment.CenterVertically)
-                                    .padding(start = 12.dp),
-                            )
-                        }
+                        LabeledValue("Уже накоплено", Explanations.coins(game.savings.saved))
+                        // ТЕСТ 3: пополнение — в плане, всё в одном месте. Ссылка —
+                        // отдельной строкой под суммой: в одной строке сумма переносилась.
+                        Text(
+                            text = "Изменить →",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = FinnyTheme.colors.onPrimary,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .heightIn(min = 48.dp)
+                                .clickable(role = Role.Button, onClick = onOpenPlan)
+                                .wrapContentHeight(Alignment.CenterVertically),
+                        )
                         LabeledValue("Осталось накопить", Explanations.coins(game.savings.remaining))
                         SupportingText(
                             text = Explanations.forecast(game.goalForecast()),

@@ -4,6 +4,7 @@ import ru.onefortwo.finny.content.EventContent
 import ru.onefortwo.finny.content.ShopItemContent
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.ui.state.Season
+import ru.onefortwo.finny.ui.state.SEASON_DAYS
 import androidx.compose.foundation.layout.wrapContentHeight
 import ru.onefortwo.finny.content.Accessories
 import androidx.compose.animation.core.Animatable
@@ -798,7 +799,8 @@ private fun Header(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     // Режим «демо» назван водяным знаком и для TalkBack; в строке — только сезон и день.
-                    text = "Сезон ${Season.seasonOf(day)} · день ${Season.dayOf(day)}",
+                    // Сезон назван в «Моём прогрессе» и для TalkBack; в шапке — день сезона.
+                    text = "День ${Season.dayOf(day)} из $SEASON_DAYS",
                     style = MaterialTheme.typography.labelMedium,
                     color = FinnyTheme.colors.onSurfaceMuted,
                 )

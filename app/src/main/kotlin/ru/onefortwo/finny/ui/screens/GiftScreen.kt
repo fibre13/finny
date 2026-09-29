@@ -236,7 +236,8 @@ fun GiftScreen(onOpen: () -> Unit) {
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
                     )
                     Text(
-                        text = "Каждый день у тебя будут монеты на его содержание. Трать с умом:",
+                        // ТЕСТ 3: монеты приходят в начале сезона, на три дня.
+                        text = "В начале каждого сезона у тебя будут монеты на его содержание. Трать с умом:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = FinnyTheme.colors.onSurfaceMuted,
                     )
