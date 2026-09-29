@@ -407,18 +407,18 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
     val art = rememberPixelArt()
     val colors = remember(art) { YardColors(art) }
     val motion = motionAllowed()
-    // Покачивание лапки: плавно влево-вправо, неторопливо — полторы секунды на взмах.
-    val tilt = if (motion) {
+    // Лапка машет: два кадра наклона, неторопливо.
+    val frame = if (motion) {
         val wave = rememberInfiniteTransition(label = "wave")
         val value by wave.animateFloat(
-            initialValue = -1f,
+            initialValue = 0f,
             targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(750, easing = LinearEasing), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart),
             label = "paw",
         )
-        value * 18f
+        if (value < 0.5f) 0 else 1
     } else {
-        0f
+        0
     }
     val fur = parts.colors.firstOrNull { it.id == state.profile?.appearance?.colorId }?.hex
         ?.let { runCatching { Color(it.toColorInt()) }.getOrNull() }
@@ -427,19 +427,10 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
         title = "На сегодня всё!",
         onDismiss = onClose,
         content = {
-            // Лапка того же окраса поднята у левого плеча (хвост у питомцев справа) и качается.
+            // Поднятая лапка окраса питомца — у плеча со стороны без хвоста; размер — по стадии роста.
             Box {
                 ProfilePet(state, parts, 140.dp)
-                WavingPaw(
-                    fur = fur,
-                    outline = colors.outline,
-                    modifier = Modifier
-                        .offset(x = 18.dp, y = 52.dp)
-                        .graphicsLayer {
-                            rotationZ = -12f + tilt
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
-                        },
-                )
+                WavingPaw(art, state, fur, frame, Modifier.size(140.dp))
             }
             SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = 56.dp)
             Text(
@@ -452,37 +443,41 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
     )
 }
 
-/** Поднятая лапка: пальчики, подушечки и лапа окраса питомца; клетка 4 dp, как у фигуры. */
-private val PAW = listOf(
-    ".K.K.K.",
-    "KFKFKFK",
-    "KFFFFFK",
-    "KFpFpFK",
-    "KFFpFFK",
-    "KFFFFFK",
-    ".KFFfK.",
-    ".KFFfK.",
-    ".KFFfK.",
-    ".KFFfK.",
-    ".KFFfK.",
-)
-
+/**
+ * Поднятая лапка «пока-пока» поверх фигуры питомца того же размера. Спрайт
+ * `paw_wave_0/1`: основа перекрашивается в окрас питомца, подушечки и
+ * контур — из палитры. Низ лапки ставится у левого плеча: точка шеи из якорей
+ * фигуры (`scarf`) минус половина ширины туловища. Подросток и взрослый
+ * крупнее малыша — лапка у них тоже крупнее.
+ */
 @Composable
-private fun WavingPaw(fur: Color, outline: Color, modifier: Modifier = Modifier) {
-    val shade = Color(fur.red * 0.8f, fur.green * 0.8f, fur.blue * 0.8f, 1f)
-    val pad = Color(0xFFE88BB0)
-    Canvas(modifier = modifier.size(28.dp, 44.dp).clearAndSetSemantics { }) {
-        val c = size.width / PAW[0].length
-        PAW.forEachIndexed { y, row ->
-            row.forEachIndexed { x, ch ->
-                val color = when (ch) {
-                    'K' -> outline
-                    'F' -> fur
-                    'f' -> shade
-                    'p' -> pad
-                    else -> null
-                } ?: return@forEachIndexed
-                drawRect(color, Offset(x * c, y * c), Size(c + 0.5f, c + 0.5f))
+private fun WavingPaw(art: ru.onefortwo.finny.content.PixelArt, state: AppState, fur: Color, frame: Int, modifier: Modifier) {
+    val sprite = art.sprite("paw_wave_$frame") ?: return
+    val species = state.profile?.appearance?.speciesId ?: return
+    val stage = state.game.stage
+    val neck = art.anchors["${species}_${stage.name.lowercase()}"]?.getOrNull(0)?.get("scarf") ?: return
+    val scale = when (stage) {
+        GrowthStage.BABY -> 1f
+        GrowthStage.TEEN -> 1.2f
+        GrowthStage.ADULT -> 1.35f
+    }
+    val furChar = art.indexOf('b')
+    Canvas(modifier = modifier.clearAndSetSemantics { }) {
+        val cell = size.width / art.petSize
+        val px = cell * scale
+        // Основание лапки — у левого плеча, чуть ниже шеи.
+        val baseX = (neck.x - 11 * scale) * cell
+        val baseY = (neck.y + 3) * cell
+        for (y in 0 until sprite.height) {
+            for (x in 0 until sprite.width) {
+                val index = sprite.pixels[y * sprite.width + x]
+                if (index < 0) continue
+                val color = if (index == furChar) fur else Color(art.colors[index])
+                drawRect(
+                    color,
+                    Offset(baseX + (x - sprite.pivotX) * px, baseY + (y - sprite.pivotY) * px),
+                    Size(px + 0.5f, px + 0.5f),
+                )
             }
         }
     }
