@@ -70,25 +70,105 @@ class SeasonTest {
     }
 
     @Test
-    fun `в дне три события — обязательное, затратное и спокойное, затратные не подряд`() {
+    fun `в сезоне девять событий, затратные не подряд ни в дне, ни на стыке дней`() {
         val events = content.events()
-        for (period in 1..9) {
-            val ids = Season.pickDay(events, period, emptyList(), null, emptySet(), emptySet())
-            assertEquals(3, ids.size)
-            val picked = ids.map { id -> events.first { it.id == id } }
-            val mandatory = picked.filter { it.mandatory }
-            assertEquals(1, mandatory.size)
-            assertEquals(if (Season.dayOf(period) == 2) "thirst" else "hunger", mandatory.single().group)
-            assertEquals(1, picked.count { !it.cost })
-            assertFalse("Затратные подряд: $ids", picked[0].cost && picked[1].cost || picked[1].cost && picked[2].cost)
-            assertEquals(ids, Season.pickDay(events, period, emptyList(), null, emptySet(), emptySet()))
+        val items = content.shopItems()
+        for (species in listOf("cat", "dog", "rabbit")) {
+            for (season in 1..4) {
+                val used = mutableListOf<String>()
+                val all = mutableListOf<ru.onefortwo.finny.content.EventContent>()
+                for (day in 1..3) {
+                    val period = Season.firstPeriodOf(season) + day - 1
+                    val ids = Season.pickDay(events, period, used, null, emptySet(), emptySet(), species, emptySet(), items, SeasonExtras(), 10)
+                    assertEquals(ids.toString(), 3, ids.size)
+                    assertEquals(ids, Season.pickDay(events, period, used, null, emptySet(), emptySet(), species, emptySet(), items, SeasonExtras(), 10))
+                    val picked = ids.map { id -> events.first { it.id == id } }
+                    val mandatory = picked.single { it.mandatory }
+                    assertEquals(if (day == 2) "thirst" else "hunger", mandatory.group)
+                    assertTrue("$species: ${mandatory.id}", mandatory.fits(species))
+                    // День 2 — одно затратное (жажда) между двумя незатратными, игра — последней.
+                    if (day == 2) {
+                        assertEquals(listOf(false, true, false), picked.map { it.cost })
+                        assertEquals(ru.onefortwo.finny.content.EventKind.INTERACTIVE, picked[2].kind)
+                    } else {
+                        assertEquals(listOf(true, false, true), picked.map { it.cost })
+                    }
+                    used += ids
+                    all += picked
+                }
+                val costly = all.map { it.cost }
+                assertFalse("Затратные подряд: ${all.map { it.id }}", costly.zipWithNext().any { (a, b) -> a && b })
+            }
         }
     }
 
     @Test
-    fun `после отказа от зонта бывает продолжение «промок»`() {
-        val ids = Season.pickDay(content.events(), 2, listOf("rain_no_tent"), "rain_no_tent", emptySet(), emptySet())
-        assertTrue(ids.toString(), "wet_after_rain" in ids)
+    fun `третий день — событие по времени года`() {
+        val events = content.events()
+        val items = content.shopItems()
+        // Зимой — холод, летом — жара.
+        val winter = Season.pickDay(events, 3, emptyList(), null, emptySet(), emptySet(), "cat", emptySet(), items, SeasonExtras(), 1)
+        assertTrue(winter.toString(), "cold_scarf" in winter)
+        val summer = Season.pickDay(events, 3, emptyList(), null, emptySet(), emptySet(), "cat", emptySet(), items, SeasonExtras(), 7)
+        assertTrue(summer.toString(), "heat_panama" in summer)
+    }
+
+    @Test
+    fun `после отказа от зонта сразу следом — «промок», оно бесплатное`() {
+        val next = Season.followUp(content.events(), "rain_no_tent", "cat")
+        assertEquals("wet_after_rain", next?.id)
+        assertFalse(next!!.cost)
+    }
+
+    @Test
+    fun `событие с товаром бывает, только когда товар уже в лавке, и не сразу`() {
+        val events = content.events()
+        val items = content.shopItems()
+        // Билета в кино в лавке нет — события «кино» не бывает ни в одном дне.
+        val none = (1..30).flatMap { period ->
+            Season.pickDay(events, period, emptyList(), null, emptySet(), emptySet(), "dog", emptySet(), items, SeasonExtras(), 10)
+        }
+        assertFalse("cinema" in none)
+        assertFalse("bone_wish" in none)
+        // Открыт за задания в день 4 — в дни 4 и 5 о нём ещё не просят, с дня 6 — можно.
+        val x = SeasonExtras(unlocked = listOf("ticket_cinema", "bone"), unlockedAt = mapOf("ticket_cinema" to 4, "bone" to 4))
+        assertFalse(Season.itemReady("bone", items, x, "dog", 5))
+        assertTrue(Season.itemReady("bone", items, x, "dog", 6))
+        // Косточка — только щенку.
+        assertFalse(Season.itemReady("bone", items, x, "cat", 6))
+        // Базовые товары лавки готовы сразу.
+        assertTrue(Season.itemReady("chocolate", items, SeasonExtras(), "cat", 1))
+    }
+
+    @Test
+    fun `«хочу мячик» — только пока мячика нет, «поиграть в мячик» — когда он есть`() {
+        val events = content.events()
+        val items = content.shopItems()
+        val without = (1..30).flatMap { period ->
+            Season.pickDay(events, period, emptyList(), null, emptySet(), emptySet(), "cat", emptySet(), items, SeasonExtras(), 10)
+        }
+        assertFalse("play_ball" in without)
+        val with = (1..30).flatMap { period ->
+            Season.pickDay(events, period, emptyList(), null, emptySet(), emptySet(), "cat", setOf("ball"), items, SeasonExtras(), 10)
+        }
+        assertFalse("ball_wish" in with)
+    }
+
+    @Test
+    fun `лавка по виду питомца — котёнку молоко, щенку вода и косточка за задания`() {
+        val items = content.shopItems()
+        val cat = Season.visibleItems(items, SeasonExtras(), "cat").map { it.id }
+        assertTrue("milk" in cat)
+        assertFalse("water" in cat)
+        val dog = Season.visibleItems(items, SeasonExtras(), "dog").map { it.id }
+        assertTrue("water" in dog)
+        assertFalse("milk" in dog)
+        assertFalse("bone" in dog)
+        // Три задания — сюрприз-одежда и еда по виду вместе.
+        val opened = Season.pendingSurprise(items, SeasonExtras(tasksSolved = 3), "dog").map { it.id }
+        assertEquals(listOf("pants", "bone"), opened)
+        val rabbit = Season.pendingSurprise(items, SeasonExtras(tasksSolved = 3), "rabbit").map { it.id }
+        assertEquals(listOf("pants", "carrot"), rabbit)
     }
 
     @Test
@@ -208,8 +288,15 @@ class SeasonTest {
         val model = model(demo = true)
         model.confirmPlan(5, 40, 5)
         var offered = false
-        repeat(12) {
+        repeat(60) {
             if (offered) return@repeat
+            // Новый сезон — новый план: почти всё — в «Хочу».
+            model.state.value.let { st ->
+                if (!st.extras.planned && !st.extras.seasonDone) {
+                    val available = st.freeCoins + st.extras.needsJar + st.extras.wantsJar
+                    model.confirmPlan(available / 5, available - available / 5, 0)
+                }
+            }
             val event = model.pendingEvent()
             if (event != null && event.cost && event.category == ItemCategory.WANTS) {
                 val saved = model.state.value.game.savings.saved.amount
@@ -250,6 +337,9 @@ class SeasonTest {
         assertEquals(balance, state.game.balance.amount)
         assertEquals(3, state.extras.tasksSolved)
         assertEquals("pants", state.extras.surprise)
+        // Котёнку вместе со штанишками открывается колбаска.
+        assertEquals(listOf("sausage"), state.extras.surpriseAlso)
+        assertEquals(state.game.period.number, state.extras.unlockedAt["sausage"])
         assertTrue(Season.visibleItems(content.shopItems(), state.extras).any { it.id == "pants" })
         assertFalse(Season.visibleItems(content.shopItems(), SeasonExtras()).any { it.id == "pants" })
         model.dismissSurprise()

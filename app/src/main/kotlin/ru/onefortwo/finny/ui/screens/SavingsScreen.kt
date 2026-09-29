@@ -110,6 +110,10 @@ fun SavingsScreen(
     afterClaim: Boolean = false,
     /** «Изменить» — пополнение копилки делается в плане. */
     onOpenPlan: () -> Unit = {},
+    /** Строка о росте при полученной мечте: «Осталось ещё 1 мечта…». */
+    growthLine: String? = null,
+    /** Совет при выборе цели: «это твоя вторая мечта!». */
+    goalTip: String? = null,
 ) {
     // Хранится сумма, а не объект предпросмотра: примитив переживает
     // поворот экрана, а сам предпросмотр пересчитывается из неё.
@@ -161,6 +165,7 @@ fun SavingsScreen(
                     afterClaim = afterClaim,
                     pet = pet,
                     onChoose = onChooseGoal,
+                    tip = goalTip,
                 )
             } else if (reached) {
                 GoalCelebration(
@@ -171,6 +176,7 @@ fun SavingsScreen(
                     petName = profile?.petName ?: "Финни",
                     pet = pet,
                     onClaim = onClaimGoal,
+                    growthLine = growthLine,
                 )
             } else {
                 SectionCard(
@@ -357,6 +363,7 @@ private fun GoalCelebration(
     petName: String,
     pet: PetSlot,
     onClaim: () -> Unit,
+    growthLine: String? = null,
 ) {
     val colors = FinnyTheme.colors
     val shape = RoundedCornerShape(24.dp)
@@ -410,6 +417,15 @@ private fun GoalCelebration(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 12.dp).semantics { heading() },
         )
+        if (growthLine != null) {
+            Text(
+                text = growthLine,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
         val line = goal?.celebrationFor(petName).orEmpty()
         if (line.isNotBlank()) {
             Text(
@@ -506,6 +522,7 @@ private fun GoalChooser(
     afterClaim: Boolean,
     pet: PetSlot,
     onChoose: (String) -> Unit,
+    tip: String? = null,
 ) {
     val colors = FinnyTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -549,7 +566,7 @@ private fun GoalChooser(
         }
         goals.forEach { GoalOption(goal = it, saved = saved, onChoose = onChoose) }
         Text(
-            text = "Совет: начни с маленькой мечты — её достичь быстрее.",
+            text = tip ?: "Совет: начни с маленькой мечты — её достичь быстрее.",
             style = MaterialTheme.typography.bodyMedium,
             color = colors.onSurfaceMuted,
             textAlign = TextAlign.Center,

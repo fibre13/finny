@@ -112,9 +112,12 @@ class ContentFilesTest {
         // Надеть украшение можно только после покупки, поэтому каждое
         // украшение, кроме варианта «без украшения», должно продаваться.
         assertTrue("Украшения в каталоге: $unlocks", unlocks.containsAll(setOf("bow", "scarf")))
-        shop.filter { it.unlocksAccessory != null }.forEach {
+        // Украшения — желаемое. Шарфик — тёплая вещь: в холод он нужен
+        // (событие «Стало холодно»), поэтому он — нужное.
+        shop.filter { it.unlocksAccessory != null && it.id != "scarf" }.forEach {
             assertEquals(ItemCategory.WANTS, it.category)
         }
+        assertEquals(ItemCategory.NEEDS, shop.first { it.id == "scarf" }.category)
     }
 
     @Test

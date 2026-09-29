@@ -4,6 +4,7 @@ import kotlin.random.Random
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import ru.onefortwo.finny.content.EventContent
+import ru.onefortwo.finny.content.EventKind
 import ru.onefortwo.finny.content.ItemCategory
 import ru.onefortwo.finny.content.ShopItemContent
 import ru.onefortwo.finny.economy.GrowthStage
@@ -16,8 +17,8 @@ import ru.onefortwo.finny.economy.GrowthStage
  * приходят всегда одни и те же 50 монет; ребёнок раскладывает их по трём
  * банкам — «Нужное», «Хочу», «Копим на мечту» — целиком, остаток не остаётся.
  * План сезона можно поправить в любой момент. В каждом дне три события:
- * обязательное (голод или жажда), затратное и незатратное; пока событие
- * не решено, день не закончить. Монет за задания нет, кроме «Помоги своему
+ * обязательное (голод или жажда), затратное и незатратное — два затратных
+ * подряд не идут; пока событие не решено, день не закончить. Монет за задания нет, кроме «Помоги своему
  * питомцу»: каждые три решённых задания открывают сюрприз в лавке.
  * Питомец растёт не по очкам, а за мечты и задания (см. [Growth]).
  */
@@ -30,6 +31,13 @@ const val EVENTS_PER_DAY = 3
 
 /** Через сколько календарных дней незавершённый сезон закрывается. */
 const val SEASON_EXPIRES_DAYS = 6
+
+/**
+ * Через сколько игровых дней после появления товара в лавке о нём может
+ * попросить событие: не в тот же день и не на следующий, чтобы связь
+ * «открыл за задания — понадобилось» не была прямолинейной.
+ */
+const val ITEM_EVENT_DELAY = 2
 
 /** Состояние сезона, хранится одной строкой JSON в профиле. */
 @Serializable
@@ -80,8 +88,14 @@ data class SeasonExtras(
     val rewarded: List<Int> = emptyList(),
     /** Открытые сюрпризами товары. */
     val unlocked: List<String> = emptyList(),
+    /** Игровой день, в который товар появился в лавке. */
+    val unlockedAt: Map<String, Int> = emptyMap(),
     /** Сюрприз, о котором ещё не сказали ребёнку. */
     val surprise: String? = null,
+    /** Товары, открытые вместе с сюрпризом: еда, билеты, аптечка. */
+    val surpriseAlso: List<String> = emptyList(),
+    /** Купленные товары — в лавке и в событиях: мячик, палатка, игрушка. */
+    val owned: List<String> = emptyList(),
 
     /** Стадия, праздник которой уже показан. */
     val growthShown: GrowthStage = GrowthStage.BABY,
@@ -176,11 +190,20 @@ object Season {
     }
 
     /**
-     * Три события дня [period]: обязательное, затратное, незатратное.
-     * Порядок меняется по дням: обязательное то первое, то последнее,
-     * затратные подряд внутри дня не идут. Выбор повторяется при
-     * тех же входных данных — одинаково в демо и в тестах.
+     * События дня [period]. В сезоне девять событий, по три в день, и два
+     * затратных не идут подряд ни внутри дня, ни на стыке дней:
+     *
+     * - день 1: затратное — эмоциональное — затратное (голод и событие с покупкой);
+     * - день 2: эмоциональное — жажда — игра с питомцем;
+     * - день 3: затратное — игра — затратное (голод и событие по времени года).
+     *
+     * Голод стоит то первым, то последним. Событие с товаром бывает, только
+     * когда товар уже есть в лавке ([itemReady]); просьбы о еде — по виду
+     * питомца. Выбор повторяется при тех же входных данных — одинаково в
+     * демо и в тестах. Продолжение отказа («промок») вставляется сразу после
+     * отказа — см. [followUp].
      */
+    @Suppress("UNUSED_PARAMETER")
     fun pickDay(
         events: List<EventContent>,
         period: Int,
@@ -188,32 +211,82 @@ object Season {
         refused: String?,
         scenery: Set<String>,
         achievedGoals: Set<String>,
+        species: String? = null,
+        owned: Set<String> = emptySet(),
+        items: List<ShopItemContent> = emptyList(),
+        x: SeasonExtras = SeasonExtras(),
+        month: Int = 9,
     ): List<String> {
         val season = seasonOf(period)
         val day = dayOf(period)
         val random = Random(season * 101 + day * 7)
-        fun allowed(e: EventContent): Boolean =
-            e.id !in used &&
+        fun fits(e: EventContent): Boolean =
+            e.fits(species) &&
+                e.follows == null &&
                 (e.requiresScenery == null || e.requiresScenery in scenery) &&
                 (e.requiresNoScenery == null || e.requiresNoScenery !in scenery) &&
-                (e.requiresGoal == null || e.requiresGoal in achievedGoals)
+                (e.requiresGoal == null || e.requiresGoal in achievedGoals) &&
+                (e.requiresOwned == null || e.requiresOwned in owned) &&
+                (e.requiresNotOwned == null || e.requiresNotOwned !in owned) &&
+                (e.item == null || items.isEmpty() || itemReady(e.item!!, items, x, species, period))
 
-        // Обязательное: голод в первый и третий день, жажда во второй.
-        val group = if (day == 2) "thirst" else "hunger"
-        val mandatory = events.filter { it.mandatory && it.group == group }
-            .let { list -> list.filter { it.id !in used }.ifEmpty { list } }
-            .randomOrNull(random)
+        // Из подходящих — ещё не бывших в сезоне; если таких нет, повтор лучше пустого места.
+        fun pick(pool: List<EventContent>, taken: List<EventContent?> = emptyList()): EventContent? {
+            val ok = pool.filter { fits(it) && it !in taken }
+            return (ok.filter { it.id !in used }.ifEmpty { ok }).randomOrNull(random)
+        }
 
-        // Затратное: сначала продолжение отказа («промок» после «зонта»).
-        val followUp = events.firstOrNull { it.follows != null && it.follows == refused && it.id !in used }
-        val costly = followUp ?: events
-            .filter { it.cost && !it.mandatory && it.follows == null && allowed(it) }
-            .randomOrNull(random)
+        val hunger = pick(events.filter { it.mandatory && it.group == "hunger" })
+        val thirst = pick(events.filter { it.mandatory && it.group == "thirst" })
+        val costly = events.filter { it.cost && !it.mandatory }
+        val calm = events.filter { !it.cost && it.kind != EventKind.INTERACTIVE }
+        val play = events.filter { !it.cost && it.kind == EventKind.INTERACTIVE }
 
-        val calm = events.filter { !it.cost && allowed(it) }.randomOrNull(random)
+        return when (day) {
+            1 -> {
+                val spend = pick(costly.filter { it.weather == null }) ?: pick(costly)
+                val middle = pick(calm) ?: pick(play)
+                if (random.nextBoolean()) listOf(hunger, middle, spend) else listOf(spend, middle, hunger)
+            }
 
-        val ordered = if (random.nextBoolean()) listOf(mandatory, calm, costly) else listOf(costly, calm, mandatory)
-        return ordered.mapNotNull { it?.id }
+            2 -> {
+                val first = pick(calm) ?: pick(play)
+                val last = pick(play, listOf(first)) ?: pick(calm, listOf(first))
+                listOf(first, thirst, last)
+            }
+
+            else -> {
+                val weather = seasonWeather(month)
+                val spend = pick(costly.filter { it.weather in weather }) ?: pick(costly)
+                val middle = pick(play) ?: pick(calm)
+                if (random.nextBoolean()) listOf(spend, middle, hunger) else listOf(hunger, middle, spend)
+            }
+        }.mapNotNull { it?.id }
+    }
+
+    /** Погода времени года для события третьего дня: зимой холод, весной и осенью дождь, летом жара. */
+    fun seasonWeather(month: Int): Set<String> = when (month) {
+        12, 1, 2 -> setOf("cold")
+        in 3..5 -> setOf("rain")
+        in 6..8 -> setOf("heat")
+        else -> setOf("rain", "cold")
+    }
+
+    /** Продолжение отказа от события [refusedId] — оно идёт сразу следом. */
+    fun followUp(events: List<EventContent>, refusedId: String, species: String?): EventContent? =
+        events.firstOrNull { it.follows == refusedId && it.fits(species) }
+
+    /**
+     * Товар [itemId] уже можно просить в событии: он есть в лавке для этого
+     * питомца с начала игры или открыт за задания не позже чем за
+     * [ITEM_EVENT_DELAY] игровых дня до [period].
+     */
+    fun itemReady(itemId: String, items: List<ShopItemContent>, x: SeasonExtras, species: String?, period: Int): Boolean {
+        val item = items.firstOrNull { it.id == itemId } ?: return false
+        if (!item.fits(species)) return false
+        if (item.unlockAfter == null) return true
+        if (itemId !in x.unlocked) return false
+        return period >= (x.unlockedAt[itemId] ?: 0) + ITEM_EVENT_DELAY
     }
 
     /** Формулировка события: у обязательных — своя в каждом сезоне и дне. */
@@ -222,18 +295,24 @@ object Season {
         return titles[(period - 1).mod(titles.size)]
     }
 
-    /** Товары лавки, которые видит ребёнок: обычные и открытые сюрпризами. */
-    fun visibleItems(items: List<ShopItemContent>, x: SeasonExtras): List<ShopItemContent> =
-        items.filter { it.unlockAfter == null || it.id in x.unlocked }
+    /** Товары лавки, которые видит ребёнок: для его питомца, обычные и открытые сюрпризами. */
+    fun visibleItems(items: List<ShopItemContent>, x: SeasonExtras, species: String? = null): List<ShopItemContent> =
+        items.filter { it.fits(species) && (it.unlockAfter == null || it.id in x.unlocked) }
 
-    /** Сюрприз, который пора открыть: наименьший достигнутый и не выданный порог. */
-    fun pendingSurprise(items: List<ShopItemContent>, x: SeasonExtras): ShopItemContent? =
-        items.filter { val n = it.unlockAfter; n != null && n <= x.tasksSolved && n !in x.rewarded }
-            .minByOrNull { it.unlockAfter!! }
+    /**
+     * Сюрприз, который пора открыть: товары наименьшего достигнутого порога,
+     * которых ещё нет в лавке. Первым идёт главный сюрприз — одежда, за ним
+     * то, что открывается вместе с ним: еда по виду питомца, билеты, аптечка.
+     */
+    fun pendingSurprise(items: List<ShopItemContent>, x: SeasonExtras, species: String? = null): List<ShopItemContent> {
+        val due = items.filter { val n = it.unlockAfter; n != null && n <= x.tasksSolved && it.id !in x.unlocked && it.fits(species) }
+        val first = due.minOfOrNull { it.unlockAfter!! } ?: return emptyList()
+        return due.filter { it.unlockAfter == first }
+    }
 
     /** Сколько заданий до следующего сюрприза; `null` — сюрпризы кончились. */
-    fun tasksToNextSurprise(items: List<ShopItemContent>, x: SeasonExtras): Int? =
-        items.mapNotNull { it.unlockAfter }.filter { it > x.tasksSolved }.minOrNull()?.let { it - x.tasksSolved }
+    fun tasksToNextSurprise(items: List<ShopItemContent>, x: SeasonExtras, species: String? = null): Int? =
+        items.filter { it.fits(species) }.mapNotNull { it.unlockAfter }.filter { it > x.tasksSolved }.minOrNull()?.let { it - x.tasksSolved }
 }
 
 /**
@@ -252,6 +331,35 @@ object Growth {
         dreams >= ADULT_DREAMS && tasks >= ADULT_TASKS -> GrowthStage.ADULT
         dreams >= TEEN_DREAMS && tasks >= TEEN_TASKS -> GrowthStage.TEEN
         else -> GrowthStage.BABY
+    }
+
+    /**
+     * Строка при получении мечты: сколько мечт ещё до роста. [achievedBefore] —
+     * сколько мечт было до этой; `null`, если питомец уже взрослый.
+     */
+    fun claimLine(stage: GrowthStage, achievedBefore: Int, tasks: Int, petName: String, goalTitle: String): String? {
+        val (needDreams, needTasks) = nextNeeds(stage) ?: return null
+        val dreamsLeft = needDreams - (achievedBefore + 1)
+        val tasksLeft = needTasks - tasks
+        return when {
+            dreamsLeft > 0 -> "Ты накопил на «$goalTitle»! Осталось ещё ${dreamsWord(dreamsLeft)}, чтобы $petName стал взрослее!"
+            tasksLeft > 0 -> "Ты накопил на «$goalTitle»! Реши ещё ${Explanations.tasks(tasksLeft)} — и $petName вырастет!"
+            else -> "Ты накопил на «$goalTitle»! Сейчас $petName вырастет!"
+        }
+    }
+
+    /** Совет при выборе цели: эта мечта — та, после которой питомец вырастет. */
+    fun goalTip(stage: GrowthStage, achieved: Int, petName: String): String? {
+        val (needDreams, _) = nextNeeds(stage) ?: return null
+        if (achieved != needDreams - 1 || achieved == 0) return null
+        val nth = if (needDreams == 2) "вторая" else "третья"
+        return "Совет: это твоя $nth мечта! Купи её — и $petName вырастет."
+    }
+
+    private fun dreamsWord(n: Int): String = when {
+        n % 10 == 1 && n % 100 != 11 -> "$n мечта"
+        n % 10 in 2..4 && n % 100 !in 12..14 -> "$n мечты"
+        else -> "$n мечт"
     }
 
     /** Что нужно для следующей стадии: мечты и задания; `null` — выше расти некуда. */

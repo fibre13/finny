@@ -106,6 +106,8 @@ fun TaskDetailScreen(
     @Suppress("UNUSED_PARAMETER") balance: Coins? = null,
     /** Питомец ребёнка для реакции на ответ; `true` — радуется. */
     petFigure: (@Composable (happy: Boolean) -> Unit)? = null,
+    /** Реплика питомца по его стадии. */
+    voice: (String) -> String = { it },
 ) {
     var result by rememberSaveable(stateSaver = AnsweredTaskSaver) {
         mutableStateOf<AnsweredTask?>(null)
@@ -150,6 +152,7 @@ fun TaskDetailScreen(
                     onNextTask = onNextTask,
                     onBack = onBack,
                     petFigure = petFigure,
+                    voice = voice,
                 )
             }
         }
@@ -173,6 +176,7 @@ private fun ResultCard(
     onNextTask: () -> Unit,
     onBack: () -> Unit,
     petFigure: (@Composable (happy: Boolean) -> Unit)?,
+    voice: (String) -> String = { it },
 ) {
     val check = answered.check
     val art = rememberPixelArt()
@@ -226,7 +230,7 @@ private fun ResultCard(
                 }
                 SpeechBubble(
                     colors = colors,
-                    text = check.pet,
+                    text = voice(check.pet),
                     modifier = Modifier.weight(1f).padding(start = 8.dp, bottom = 48.dp),
                 )
             }

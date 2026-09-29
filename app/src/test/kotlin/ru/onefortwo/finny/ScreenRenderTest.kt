@@ -891,7 +891,7 @@ class ScreenRenderTest {
 
         // Без движений раздел открывается сразу, без перебежки питомца.
         compose.onNodeWithContentDescription("Покупки: лавка для питомца").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("План на день").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("План сезона").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Словарик: финансовые слова").performScrollTo().performClick()
         compose.onNode(hasContentDescriptionPrefix("Задания. На доске:")).performScrollTo().performClick()
         compose.onNode(hasContentDescriptionPrefix("Копилка:")).performScrollTo().performClick()
@@ -904,7 +904,7 @@ class ScreenRenderTest {
             opened,
         )
         // План не составлен — отметка передана словами.
-        compose.onNodeWithContentDescription("План на день").assert(
+        compose.onNodeWithContentDescription("План сезона").assert(
             androidx.compose.ui.test.SemanticsMatcher.expectValue(
                 androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "не составлен",
             ),
@@ -1027,7 +1027,7 @@ class ScreenRenderTest {
         val objects = mapOf(
             "лавка" to bounds(hasContentDescriptionPrefix("Покупки:")),
             "доска заданий" to bounds(hasContentDescriptionPrefix("Задания.")),
-            "доска плана" to bounds(hasContentDescriptionPrefix("План на день")),
+            "доска плана" to bounds(hasContentDescriptionPrefix("План сезона")),
             "книга" to bounds(hasContentDescriptionPrefix("Словарик:")),
             "питомец" to bounds(hasContentDescriptionPrefix("Финни")),
             "сундучок" to bounds(hasContentDescriptionPrefix("Копилка:")),
@@ -1057,10 +1057,14 @@ class ScreenRenderTest {
 
     @Test
     @Config(qualifiers = "w360dp-h800dp")
-    fun `двор предупреждает, что экранное время заканчивается`() {
+    fun `экранное время на дворе — сообщением с крестиком, а не отдельной строкой`() {
         val state = AppState(
             isLoaded = true, profile = profile, game = GameState.newProfile(),
             usageDate = "2026-09-26", usageMinutes = 16,
+            message = ru.onefortwo.finny.ui.state.FeedbackMessage(
+                text = "Осталось 5 минут на сегодня.",
+                nextStep = "Не забудь доделать все дела, если какие-то остались.",
+            ),
         )
         compose.setContent {
             FinnyTheme {
@@ -1072,7 +1076,10 @@ class ScreenRenderTest {
                 )
             }
         }
-        compose.onNodeWithText("Осталось 4 минуты на сегодня.").assertIsDisplayed()
+        compose.onNodeWithText("Осталось 5 минут на сегодня.").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Закрыть сообщение").assertIsDisplayed()
+        // Постоянной строки с остатком минут на дворе нет.
+        compose.onNodeWithText("Осталось 4 минуты на сегодня.").assertDoesNotExist()
     }
 
     @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")

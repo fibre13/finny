@@ -178,7 +178,8 @@ fun composePet(
     val worn = Accessories.list(accessoryId)
     if ("scarf" in worn) place("scarf_${speciesId}_${stageId(shownStage)}", "scarf")
     if ("bow" in worn) place("bow_$speciesId", "bow")
-    if ("hat" in worn) place("hat", "hat")
+    // Подросток и взрослый ходят в школу — на них школьная кепка, если не надета шапочка.
+    if ("hat" in worn) place("hat", "hat") else if (shownStage != GrowthStage.BABY) place("cap", "hat")
 
     if (spec != null) {
         val plain: (Int) -> Int = { art.colors[it] }

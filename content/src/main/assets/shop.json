@@ -17,7 +17,24 @@
     "stat": "care",
     "stat_delta": 15,
     "effect": "{name} не будет хотеть пить",
-    "icon": "item_water"
+    "icon": "item_water",
+    "species": [
+      "dog",
+      "rabbit"
+    ]
+  },
+  {
+    "id": "milk",
+    "title": "Миска молока",
+    "category": "needs",
+    "price": 5,
+    "stat": "care",
+    "stat_delta": 15,
+    "effect": "{name} не будет хотеть пить",
+    "icon": "item_milk",
+    "species": [
+      "cat"
+    ]
   },
   {
     "id": "vitamins",
@@ -31,7 +48,7 @@
   },
   {
     "id": "brush",
-    "title": "Расчёска и уход",
+    "title": "Шампунь и расчёска",
     "category": "needs",
     "price": 7,
     "stat": "care",
@@ -85,9 +102,9 @@
   {
     "id": "scarf",
     "title": "Шарфик",
-    "category": "wants",
+    "category": "needs",
     "price": 9,
-    "stat": "joy",
+    "stat": "care",
     "stat_delta": 10,
     "effect": "{name} будет тёплым и нарядным",
     "unlocks_accessory": "scarf",
@@ -105,6 +122,36 @@
     "icon": "item_hat"
   },
   {
+    "id": "chocolate",
+    "title": "Шоколадка",
+    "category": "wants",
+    "price": 4,
+    "stat": "joy",
+    "stat_delta": 8,
+    "effect": "{name} полакомится шоколадкой",
+    "icon": "item_chocolate"
+  },
+  {
+    "id": "panama",
+    "title": "Панамка",
+    "category": "needs",
+    "price": 6,
+    "stat": "care",
+    "stat_delta": 10,
+    "effect": "{name} не перегреется на солнце",
+    "icon": "item_panama"
+  },
+  {
+    "id": "present",
+    "title": "Подарок другу",
+    "category": "wants",
+    "price": 10,
+    "stat": "joy",
+    "stat_delta": 12,
+    "effect": "{name} пойдёт на день рождения к другу",
+    "icon": "item_present"
+  },
+  {
     "id": "pants",
     "title": "Штанишки",
     "category": "wants",
@@ -114,6 +161,48 @@
     "effect": "{name} будет в новых штанишках",
     "unlock_after": 3,
     "icon": "item_pants"
+  },
+  {
+    "id": "bone",
+    "title": "Косточка",
+    "category": "wants",
+    "price": 5,
+    "stat": "joy",
+    "stat_delta": 8,
+    "effect": "{name} погрызёт косточку",
+    "icon": "item_bone",
+    "unlock_after": 3,
+    "species": [
+      "dog"
+    ]
+  },
+  {
+    "id": "sausage",
+    "title": "Колбаска",
+    "category": "wants",
+    "price": 5,
+    "stat": "joy",
+    "stat_delta": 8,
+    "effect": "{name} полакомится колбаской",
+    "icon": "item_sausage",
+    "unlock_after": 3,
+    "species": [
+      "cat"
+    ]
+  },
+  {
+    "id": "carrot",
+    "title": "Морковка",
+    "category": "needs",
+    "price": 4,
+    "stat": "care",
+    "stat_delta": 12,
+    "effect": "{name} погрызёт морковку",
+    "icon": "item_carrot",
+    "unlock_after": 3,
+    "species": [
+      "rabbit"
+    ]
   },
   {
     "id": "paints",
@@ -127,6 +216,17 @@
     "icon": "item_paints"
   },
   {
+    "id": "firstaid",
+    "title": "Аптечка",
+    "category": "needs",
+    "price": 7,
+    "stat": "care",
+    "stat_delta": 15,
+    "effect": "{name} будет здоров",
+    "icon": "item_firstaid",
+    "unlock_after": 6
+  },
+  {
     "id": "jacket",
     "title": "Куртка",
     "category": "wants",
@@ -136,6 +236,17 @@
     "effect": "{name} будет в тёплой куртке",
     "unlock_after": 9,
     "icon": "item_coat"
+  },
+  {
+    "id": "ticket_cinema",
+    "title": "Билет в кино",
+    "category": "wants",
+    "price": 8,
+    "stat": "joy",
+    "stat_delta": 12,
+    "effect": "{name} сходит в кино",
+    "icon": "item_ticket",
+    "unlock_after": 9
   },
   {
     "id": "football",
@@ -149,6 +260,48 @@
     "icon": "item_football"
   },
   {
+    "id": "meat",
+    "title": "Мясо",
+    "category": "needs",
+    "price": 9,
+    "stat": "care",
+    "stat_delta": 25,
+    "effect": "{name} будет сытым и сильным",
+    "icon": "item_meat",
+    "unlock_after": 12,
+    "species": [
+      "dog"
+    ]
+  },
+  {
+    "id": "fish",
+    "title": "Рыбка",
+    "category": "needs",
+    "price": 8,
+    "stat": "care",
+    "stat_delta": 22,
+    "effect": "{name} будет сытым",
+    "icon": "item_fish",
+    "unlock_after": 12,
+    "species": [
+      "cat"
+    ]
+  },
+  {
+    "id": "cabbage",
+    "title": "Капуста",
+    "category": "needs",
+    "price": 6,
+    "stat": "care",
+    "stat_delta": 18,
+    "effect": "{name} будет сытым",
+    "icon": "item_cabbage",
+    "unlock_after": 12,
+    "species": [
+      "rabbit"
+    ]
+  },
+  {
     "id": "glasses",
     "title": "Очки",
     "category": "wants",
@@ -160,13 +313,24 @@
     "icon": "item_glasses"
   },
   {
+    "id": "toy",
+    "title": "Мягкая игрушка",
+    "category": "wants",
+    "price": 6,
+    "stat": "joy",
+    "stat_delta": 10,
+    "effect": "{name} будет обнимать игрушку",
+    "icon": "item_toy",
+    "unlock_after": 15
+  },
+  {
     "id": "umbrella_toy",
     "title": "Зонтик",
-    "category": "wants",
+    "category": "needs",
     "price": 8,
-    "stat": "joy",
-    "stat_delta": 9,
-    "effect": "{name} будет гулять под зонтиком",
+    "stat": "care",
+    "stat_delta": 10,
+    "effect": "{name} не промокнет под дождём",
     "unlock_after": 18,
     "icon": "item_umbrella"
   },
@@ -180,5 +344,16 @@
     "effect": "{name} будет настоящим супергероем",
     "unlock_after": 21,
     "icon": "item_superhero"
+  },
+  {
+    "id": "ticket_theater",
+    "title": "Билет в театр",
+    "category": "wants",
+    "price": 10,
+    "stat": "joy",
+    "stat_delta": 14,
+    "effect": "{name} сходит в театр",
+    "icon": "item_theater",
+    "unlock_after": 21
   }
 ]

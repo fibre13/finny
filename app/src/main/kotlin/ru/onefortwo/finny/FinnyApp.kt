@@ -56,6 +56,8 @@ import ru.onefortwo.finny.ui.screens.TasksScreen
 import ru.onefortwo.finny.ui.screens.WardrobeScreen
 import ru.onefortwo.finny.ui.state.GameViewModel
 import ru.onefortwo.finny.ui.state.YardGuide
+import ru.onefortwo.finny.ui.state.Growth
+import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /** Маршруты навигации. */
@@ -216,7 +218,9 @@ private fun AppNavHost(
             // Итоги сезона и праздник роста открываются сами.
             LaunchedEffect(state.extras.seasonDone, state.game.stage, state.extras.growthShown) {
                 when {
-                    state.game.stage > state.extras.growthShown -> navController.navigate(Routes.GROWTH)
+                    // Праздник — только когда малыш становится подростком; взрослая стадия без праздника.
+                    state.game.stage > state.extras.growthShown ->
+                        if (state.extras.growthShown == GrowthStage.BABY) navController.navigate(Routes.GROWTH) else viewModel.growthCelebrated()
                     state.extras.seasonDone -> navController.navigate(Routes.SEASON_RESULT)
                 }
             }
@@ -238,6 +242,7 @@ private fun AppNavHost(
                 onConfirmSavings = viewModel::confirmSavingsAsk,
                 onCancelSavings = viewModel::cancelSavingsAsk,
                 surprise = state.extras.surprise?.let { id -> content.shopItems().firstOrNull { it.id == id } },
+                surpriseAlso = state.extras.surpriseAlso.mapNotNull { id -> content.shopItems().firstOrNull { it.id == id } },
                 onDismissSurprise = viewModel::dismissSurprise,
                 onMissedShown = viewModel::missedShown,
                 onPlay = viewModel::play,
@@ -290,7 +295,7 @@ private fun AppNavHost(
 
         composable(Routes.SHOP) {
             ShopScreen(
-                items = ru.onefortwo.finny.ui.state.Season.visibleItems(content.shopItems(), state.extras),
+                items = ru.onefortwo.finny.ui.state.Season.visibleItems(content.shopItems(), state.extras, state.profile?.appearance?.speciesId),
                 jars = if (state.extras.planned) state.extras.needsJar to state.extras.wantsJar else null,
                 petName = state.profile?.petName ?: "Финни",
                 pet = state.game.pet,
@@ -322,11 +327,17 @@ private fun AppNavHost(
                 // После неудачного дня задание помощи — сверху.
                 recoveryFirst = state.lastOutcome?.isSetback == true,
                 solved = state.extras.tasksSolved,
-                toSurprise = ru.onefortwo.finny.ui.state.Season.tasksToNextSurprise(content.shopItems(), state.extras),
+                toSurprise = ru.onefortwo.finny.ui.state.Season.tasksToNextSurprise(content.shopItems(), state.extras, state.profile?.appearance?.speciesId),
             )
             state.extras.surprise?.let { id ->
                 content.shopItems().firstOrNull { it.id == id }?.let { item ->
-                    ru.onefortwo.finny.ui.screens.SurpriseDialog(item, state.extras.tasksSolved, petName, viewModel::dismissSurprise)
+                    ru.onefortwo.finny.ui.screens.SurpriseDialog(
+                        item,
+                        state.extras.tasksSolved,
+                        petName,
+                        viewModel::dismissSurprise,
+                        also = state.extras.surpriseAlso.mapNotNull { id -> content.shopItems().firstOrNull { it.id == id } },
+                    )
                 }
             }
         }
@@ -368,6 +379,7 @@ private fun AppNavHost(
                     onBack = { navController.popBackStack() },
                     nextTask = nextTask?.named(petName),
                     petFigure = { happy -> TaskPet(state, content.petParts(), happy) },
+                    voice = { text -> ru.onefortwo.finny.ui.state.PetVoice.of(state.game.stage, text) },
                     // Текущее задание заменяется следующим, а не остаётся под
                     // ним в стеке: «Назад» из следующего ведёт туда, откуда
                     // пришли, а не к уже решённому заданию.
@@ -398,6 +410,14 @@ private fun AppNavHost(
                 parts = content.petParts(),
                 afterClaim = state.achievedGoalIds.isNotEmpty(),
                 onOpenPlan = { navController.navigate(Routes.PLAN) },
+                growthLine = Growth.claimLine(
+                    stage = state.game.stage,
+                    achievedBefore = state.achievedGoalIds.size,
+                    tasks = state.extras.tasksSolved,
+                    petName = state.profile?.petName ?: "Финни",
+                    goalTitle = content.goals().firstOrNull { it.id == state.game.savings.goal?.id }?.title ?: "мечту",
+                ),
+                goalTip = Growth.goalTip(state.game.stage, state.achievedGoalIds.size, state.profile?.petName ?: "Финни"),
             )
         }
 
@@ -460,7 +480,7 @@ private fun AppNavHost(
             HistoryScreen(
                 state = state,
                 parts = content.petParts(),
-                toSurprise = ru.onefortwo.finny.ui.state.Season.tasksToNextSurprise(content.shopItems(), state.extras),
+                toSurprise = ru.onefortwo.finny.ui.state.Season.tasksToNextSurprise(content.shopItems(), state.extras, state.profile?.appearance?.speciesId),
                 onOpenTasks = { navController.navigate(Routes.TASKS) },
                 game = state.game,
                 petName = state.profile?.petName ?: "Финни",

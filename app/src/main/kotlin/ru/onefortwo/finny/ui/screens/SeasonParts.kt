@@ -1,7 +1,19 @@
 package ru.onefortwo.finny.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -73,6 +85,7 @@ import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.EventResult
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.PetReaction
+import ru.onefortwo.finny.ui.state.PetVoice
 import ru.onefortwo.finny.ui.state.PetReactions
 import ru.onefortwo.finny.ui.state.SavingsAsk
 import ru.onefortwo.finny.ui.state.Season
@@ -116,6 +129,78 @@ internal fun ProfilePet(
 }
 
 /** Значок погоды события. */
+/**
+ * Погода на картинке события: небо и частицы — капли дождя, снежинки,
+ * лучи солнца, вспышка молнии. При выключенных движениях частицы стоят
+ * на месте. Картинка только украшает: что происходит, говорит текст события.
+ */
+@Composable
+private fun WeatherBackdrop(weather: String?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val sky = when (weather) {
+        "rain" -> Color(0xFFCAD6E3)
+        "storm" -> Color(0xFFB4BFCC)
+        "cold" -> Color(0xFFB9CFE4)
+        "heat" -> Color(0xFFFFEDBF)
+        else -> null
+    }
+    if (sky == null) {
+        Box(modifier) { content() }
+        return
+    }
+    val motion = motionAllowed()
+    val phase = if (motion) {
+        val transition = rememberInfiniteTransition(label = "weather")
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(if (weather == "cold") 3600 else 1100, easing = LinearEasing), RepeatMode.Restart),
+            label = "phase",
+        ).value
+    } else {
+        0.35f
+    }
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(sky)
+            .drawBehind {
+                val px = 3.dp.toPx()
+                when (weather) {
+                    "rain", "storm" -> for (i in 0 until 22) {
+                        val x = size.width * ((i * 37 % 100) / 100f)
+                        val y = size.height * (((i * 53 % 100) / 100f + phase) % 1f)
+                        drawRect(Color(0xFF4F7FAE), Offset(x, y - 3 * px), Size(px * 0.8f, px * 3))
+                    }
+
+                    "cold" -> for (i in 0 until 16) {
+                        val x = size.width * ((i * 41 % 100) / 100f) + px * 2 * kotlin.math.sin((phase + i * 0.13f) * 6.28f)
+                        val y = size.height * (((i * 29 % 100) / 100f + phase) % 1f)
+                        drawRect(Color.White, Offset(x, y), Size(px * 1.4f, px * 1.4f))
+                    }
+
+                    "heat" -> {
+                        val c = Offset(size.width - 14 * px, 12 * px)
+                        for (k in 0 until 8) {
+                            val a = (k / 8f + phase / 8f) * 6.28f
+                            val r = 7 * px + px * (if (k % 2 == 0) 2f else 1f)
+                            drawRect(
+                                Color(0xFFF2A93B),
+                                Offset(c.x + kotlin.math.cos(a) * r - px / 2, c.y + kotlin.math.sin(a) * r - px / 2),
+                                Size(px, px),
+                            )
+                        }
+                        drawCircle(Color(0xFFF2C94C), radius = 5 * px, center = c)
+                    }
+                }
+                // Молния — короткая вспышка в конце каждого круга.
+                if (weather == "storm" && phase > 0.85f) {
+                    drawRect(Color(0x55FFFFFF), Offset.Zero, size)
+                }
+            }
+            .padding(8.dp),
+    ) { content() }
+}
+
 private fun weatherIcon(weather: String?): String? = when (weather) {
     "rain" -> "item_cloud_rain"
     "cold" -> "item_snowflake"
@@ -151,7 +236,7 @@ internal fun EventDialog(
                 Text(title, style = MaterialTheme.typography.bodyMedium, color = FinnyTheme.colors.onSurfaceMuted)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            Row(
+            WeatherBackdrop(event.weather, Modifier.fillMaxWidth()) { Row(
                 verticalAlignment = Alignment.Bottom,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -169,7 +254,7 @@ internal fun EventDialog(
                     weatherIcon(event.weather)?.let { Sprite(art, it, cell = 3.dp) }
                     event.icon?.let { Sprite(art, it, cell = 4.dp) }
                 }
-            }
+            } }
             if (result == null) {
                 if (event.cost) {
                     val jar = if (event.category == ItemCategory.WANTS) BudgetCategory.WANTS.displayName else BudgetCategory.NEEDS.displayName
@@ -249,29 +334,45 @@ internal fun SavingsAskDialog(ask: SavingsAsk, onConfirm: () -> Unit, onCancel: 
 
 /** Сюрприз за задания: в лавке появился новый товар. */
 @Composable
-internal fun SurpriseDialog(item: ShopItemContent, solved: Int, petName: String, onDismiss: () -> Unit) {
+internal fun SurpriseDialog(
+    item: ShopItemContent,
+    solved: Int,
+    petName: String,
+    onDismiss: () -> Unit,
+    /** Товары, открытые вместе с главным сюрпризом: еда, билеты, аптечка. */
+    also: List<ShopItemContent> = emptyList(),
+) {
     val art = rememberPixelArt()
+    val all = listOf(item) + also
     FinnyDialog(
         title = "Сюрприз!",
         onDismiss = onDismiss,
         content = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                item.icon?.let { Sprite(art, it, cell = 4.dp) }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Ты выполнил ${Explanations.tasks(solved)}! В лавке появилось: «${item.title}».",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
             Text(
-                text = item.effectFor(petName) + ".",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 10.dp),
+                text = "Ты выполнил ${Explanations.tasks(solved)}! В лавке появилось: " +
+                    all.joinToString(" и ") { "«${it.title}»" } + ".",
+                style = MaterialTheme.typography.titleMedium,
             )
+            all.forEach { shown ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 10.dp)) {
+                    shown.icon?.let { Sprite(art, it, cell = 3.dp) }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = shown.effectFor(petName) + ".", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         },
         actions = { PrimaryButton(text = "Ура!", onClick = onDismiss) },
     )
 }
+
+/** Что говорит питомец, когда ребёнок вернулся после пропущенного сезона. */
+private val MISSED_PHRASES = listOf(
+    "Я тебя ждал.",
+    "Я так скучал!",
+    "Я же тебя жду!",
+    "Не забывай про меня!",
+    "Я хочу с тобой играть!",
+)
 
 /** Сезон закрылся сам — ребёнок не приходил шесть дней. */
 @Composable
@@ -283,7 +384,16 @@ internal fun MissedDialog(state: AppState, parts: PetPartsContent, onDismiss: ()
         onDismiss = onDismiss,
         content = {
             ProfilePet(state, parts, 96.dp)
-            SpeechBubble(colors, "Я тебя ждал. Давай начнём новый сезон?", modifier = Modifier.padding(top = 8.dp))
+            // Питомец не говорит о монетах: только о том, что ждал (разные слова от сезона к сезону).
+            val missed = MISSED_PHRASES[(state.extras.season - 1).mod(MISSED_PHRASES.size)]
+            SpeechBubble(colors, "$missed Давай начнём новый сезон?", modifier = Modifier.padding(top = 8.dp))
+            // О монетах — отдельной строкой, а не словами питомца.
+            Text(
+                text = "Пока тебя не было, новые сезоны не начинались и монеты не приходили. " +
+                    "Заходи регулярно, чтобы не пропускать сезоны.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 10.dp),
+            )
         },
         actions = { PrimaryButton(text = "Давай!", onClick = onDismiss) },
     )
@@ -437,7 +547,7 @@ fun SeasonResultScreen(
                     size = 110.dp,
                     reaction = if (reactionId > 0) PetReaction(PetReactions.PLAY, id = reactionId) else null,
                 )
-                saying?.let { SpeechBubble(colors, it, modifier = Modifier.padding(start = 8.dp, bottom = 40.dp)) }
+                saying?.let { SpeechBubble(colors, PetVoice.of(state.game.stage, it), modifier = Modifier.padding(start = 8.dp, bottom = 40.dp)) }
             }
             SecondaryButton(
                 text = "Поиграть",
@@ -543,7 +653,7 @@ fun GrowthCelebrationScreen(state: AppState, parts: PetPartsContent, onDone: () 
                         if (scene >= 1) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Sprite(art, "item_cap", Modifier.graphicsLayer { alpha = if (scene == 1) grow.value else 1f }, cell = 3.dp)
+                                Sprite(art, "item_bow", Modifier.graphicsLayer { alpha = if (scene == 1) grow.value else 1f }, cell = 3.dp)
                                 Sprite(art, "item_notebook", Modifier.graphicsLayer { alpha = if (scene == 1) grow.value else 1f }, cell = 3.dp)
                             }
                         }

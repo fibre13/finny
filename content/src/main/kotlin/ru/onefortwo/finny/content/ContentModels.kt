@@ -72,7 +72,16 @@ data class ShopItemContent(
      */
     @SerialName("unlock_after")
     val unlockAfter: Int? = null,
-)
+
+    /**
+     * Для каких видов питомца товар: миска молока — котёнку, косточка —
+     * щенку, морковка — крольчонку. `null` — для всех.
+     */
+    val species: List<String>? = null,
+) {
+    /** Товар подходит питомцу вида [speciesId]. */
+    fun fits(speciesId: String?): Boolean = species == null || speciesId == null || speciesId in species
+}
 
 /** Финансовая цель для накоплений (ТЗ 2.5.7). */
 @Serializable
@@ -190,7 +199,24 @@ data class EventContent(
     /** Бывает, только если эта мечта уже получена. */
     @SerialName("requires_goal")
     val requiresGoal: String? = null,
+    /**
+     * Товар лавки, который покупают в событии. Событие бывает, только
+     * когда этот товар уже есть в лавке: предмет сначала появляется в
+     * лавке (сразу или за задания), а потом о нём просит питомец.
+     */
+    val item: String? = null,
+    /** Для каких видов питомца событие; `null` — для всех. */
+    val species: List<String>? = null,
+    /** Бывает, только если этот товар у питомца уже есть: «поиграть в мячик». */
+    @SerialName("requires_owned")
+    val requiresOwned: String? = null,
+    /** Бывает, только если этого товара у питомца ещё нет: «хочу мячик». */
+    @SerialName("requires_not_owned")
+    val requiresNotOwned: String? = null,
 ) {
+    /** Событие подходит питомцу вида [speciesId]. */
+    fun fits(speciesId: String?): Boolean = species == null || speciesId == null || speciesId in species
+
     /** Формулировки события: основная и запасные. */
     val allTitles: List<String> get() = (listOf(title) + titles).distinct()
 }

@@ -125,6 +125,7 @@ import ru.onefortwo.finny.ui.state.FeedbackMessage
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.layout.layout
 import ru.onefortwo.finny.ui.state.PetSpeech
+import ru.onefortwo.finny.ui.state.PetVoice
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.Layout
@@ -308,6 +309,7 @@ fun YardScreen(
     onConfirmSavings: () -> Unit = {},
     onCancelSavings: () -> Unit = {},
     surprise: ShopItemContent? = null,
+    surpriseAlso: List<ShopItemContent> = emptyList(),
     onDismissSurprise: () -> Unit = {},
     onMissedShown: () -> Unit = {},
     onPlay: () -> Unit = {},
@@ -513,10 +515,11 @@ fun YardScreen(
                     val planMissing = !state.extras.planned && !dayFinished && guide == null
                     YardObject(
                         art, colors, "yard_plan", "План",
-                        description = "План на день",
+                        description = "План сезона",
                         state = if (planMissing) "не составлен" else null,
                         onPlaced = { places["plan"] = it.center; bounds[GuideTarget.PLAN] = it },
-                        onClick = { if (dayFinished) onSleepingTap() else runTo(places["plan"], onOpenPlan) },
+                        // План и факт открыты всегда, и когда питомец спит.
+                        onClick = { runTo(places["plan"], onOpenPlan) },
                         overlay = { if (planMissing) Badge(colors, Modifier.align(Alignment.TopEnd)) },
                     )
                     // Питомец рисуется поверх соседей по ряду: иначе, подбежав к
@@ -532,7 +535,7 @@ fun YardScreen(
                             // Облачко-желание — только без подсказки: подсказка
                             // уже говорит, куда идти.
                             desire = if (guide != null || dayFinished) null else desireOf(game.pet.care.level, game.pet.joy.level),
-                            speech = if (farewell) PetSpeech.FAREWELL else speech,
+                            speech = (if (farewell) PetSpeech.FAREWELL else speech)?.let { PetVoice.of(game.stage, it) },
                             onSpeechClick = onSpeechShown,
                             art = art,
                             colors = colors,
@@ -575,25 +578,8 @@ fun YardScreen(
             contentAlignment = Alignment.Center,
         ) {
             Column(modifier = Modifier.widthIn(max = YARD_MAX_WIDTH * k).fillMaxWidth()) {
-                // Экранное время: предупреждение за 5 минут и сообщение, что
-                // время на сегодня вышло (основание — docs/01, «Экранное время»).
-                val timeNote = when {
-                    state.isTimeUp(today) -> "На сегодня время вышло. Приходи завтра!"
-                    state.isTimeRunningOut(today) -> "Осталось ${Explanations.minutes(state.minutesLeft(today))} на сегодня."
-                    else -> null
-                }
-                if (timeNote != null) {
-                    Text(
-                        text = timeNote,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.outline,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 4.dp)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
+                // Экранное время — сообщением с крестиком (GameViewModel.countMinute), а не
+                // отдельной строкой: главный экран помещается без прокрутки.
                 if (dayFinished) {
                     SleepPlate(colors = colors, petName = profile.petName)
                 } else {
@@ -733,7 +719,7 @@ fun YardScreen(
             if (ask.eventId != null) SavingsAskDialog(ask, onConfirm = onConfirmSavings, onCancel = onCancelSavings)
         }
         if (surprise != null && arrival == null && shownEvent == null) {
-            SurpriseDialog(surprise, state.extras.tasksSolved, profile.petName, onDismissSurprise)
+            SurpriseDialog(surprise, state.extras.tasksSolved, profile.petName, onDismissSurprise, also = surpriseAlso)
         }
         if (state.extras.missed && arrival == null && shownEvent == null) {
             MissedDialog(state, parts, onMissedShown)

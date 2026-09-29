@@ -379,7 +379,10 @@ class GameViewModel(
                 tasksToday = x.tasksToday,
                 rewarded = x.rewarded,
                 unlocked = x.unlocked,
+                unlockedAt = x.unlockedAt,
                 surprise = x.surprise,
+                surpriseAlso = x.surpriseAlso,
+                owned = x.owned,
                 growthShown = x.growthShown,
                 playedDay = x.playedDay,
                 missed = x.missed,
@@ -431,6 +434,11 @@ class GameViewModel(
                     refused = x.refused,
                     scenery = current.ownedScenery,
                     achievedGoals = current.achievedGoalIds,
+                    species = current.profile?.appearance?.speciesId,
+                    owned = x.owned.toSet(),
+                    items = content.shopItems(),
+                    x = x,
+                    month = runCatching { LocalDate.parse(dates.today()).monthValue }.getOrDefault(9),
                 )
                 current.copy(extras = x.copy(eventsDay = period, dayEvents = picked, answered = 0))
             }
@@ -451,7 +459,7 @@ class GameViewModel(
             it.copy(
                 message = FeedbackMessage(
                     text = "$petName спит. Новый день начнётся завтра.",
-                    nextStep = "Пока можно заглянуть в словарик или в гардероб.",
+                    nextStep = "Пока можно заглянуть в план, словарик или гардероб.",
                 ),
             )
         }
@@ -559,7 +567,9 @@ class GameViewModel(
                     val scenery = itemContent.unlocksScenery
                     it.copy(
                         game = result.state,
-                        extras = spend(withdrawn.extras, payment, itemContent.category),
+                        extras = spend(withdrawn.extras, payment, itemContent.category).let { x ->
+                            if (itemId in x.owned) x else x.copy(owned = x.owned + itemId)
+                        },
                         savingsAsk = null,
                         ownedAccessories = if (unlocked != null) it.ownedAccessories + unlocked else it.ownedAccessories,
                         ownedScenery = if (scenery != null) it.ownedScenery + scenery else it.ownedScenery,
@@ -654,21 +664,28 @@ class GameViewModel(
         val category = event.category ?: ItemCategory.NEEDS
         val needs = category == ItemCategory.NEEDS
         val stat = (event.stat ?: if (needs) PetStat.CARE else PetStat.JOY).toKind()
-        val item = ShopItem(
+        val purchase = ShopItem(
             id = "event:${event.id}",
             price = Coins(event.price),
             category = if (needs) BudgetCategory.NEEDS else BudgetCategory.WANTS,
             stat = stat,
             statDelta = event.statDelta.coerceAtLeast(1),
         )
-        val result = withdrawn.game.buy(item) as? PurchaseResult.Success
+        val result = withdrawn.game.buy(purchase) as? PurchaseResult.Success
         if (result == null) {
             decline(event, shortage = true)
             return
         }
         react(if (needs) PetReactions.EAT else PetReactions.PLAY)
         event.unlocksAccessory?.let { acc -> _state.update { it.copy(ownedAccessories = it.ownedAccessories + acc) } }
-        finishEvent(event, accepted = true, game = result.state, extras = spend(withdrawn.extras, payment, category))
+        val spent = spend(withdrawn.extras, payment, category)
+        val item = event.item
+        finishEvent(
+            event,
+            accepted = true,
+            game = result.state,
+            extras = if (item == null || item in spent.owned) spent else spent.copy(owned = spent.owned + item),
+        )
     }
 
     private fun decline(event: EventContent, shortage: Boolean) {
@@ -707,12 +724,24 @@ class GameViewModel(
         } else {
             0
         }
+        // Отказ, у которого есть продолжение: оно вставляется сразу следом («промок» после «зонта»).
+        val next = if (accepted) {
+            null
+        } else {
+            Season.followUp(content.events(), event.id, it_species())?.takeIf { it.id !in extras.dayEvents }
+        }
+        val dayEvents = if (next == null) {
+            extras.dayEvents
+        } else {
+            extras.dayEvents.toMutableList().apply { add((extras.answered + 1).coerceAtMost(size), next.id) }
+        }
         _state.update {
             it.copy(
                 game = game,
                 savingsAsk = null,
                 extras = extras.copy(
                     answered = extras.answered + 1,
+                    dayEvents = dayEvents,
                     usedEvents = extras.usedEvents + event.id,
                     refused = if (accepted) null else event.id,
                 ),
@@ -794,8 +823,10 @@ class GameViewModel(
 
     /** О сюрпризе сказали. */
     fun dismissSurprise() {
-        _state.update { it.copy(extras = it.extras.copy(surprise = null)) }
+        _state.update { it.copy(extras = it.extras.copy(surprise = null, surpriseAlso = emptyList())) }
     }
+
+    private fun it_species(): String? = _state.value.profile?.appearance?.speciesId
 
     /** Праздник роста показан. */
     fun growthCelebrated() {
@@ -964,17 +995,21 @@ class GameViewModel(
                 tasksDay = day,
                 tasksToday = if (x.tasksDay == day) x.tasksToday + 1 else 1,
             )
-            val surprise = Season.pendingSurprise(content.shopItems(), counted3)
-            val withSurprise = if (surprise == null) {
+            val species = it.profile?.appearance?.speciesId
+            val opened = Season.pendingSurprise(content.shopItems(), counted3, species)
+            val withSurprise = if (opened.isEmpty()) {
                 counted3
             } else {
+                val ids = opened.map { item -> item.id }
                 counted3.copy(
-                    rewarded = counted3.rewarded + surprise.unlockAfter!!,
-                    unlocked = counted3.unlocked + surprise.id,
-                    surprise = surprise.id,
+                    rewarded = counted3.rewarded + opened.first().unlockAfter!!,
+                    unlocked = counted3.unlocked + ids,
+                    unlockedAt = counted3.unlockedAt + ids.associateWith { day },
+                    surprise = ids.first(),
+                    surpriseAlso = ids.drop(1),
                 )
             }
-            val next = Season.tasksToNextSurprise(content.shopItems(), withSurprise)
+            val next = Season.tasksToNextSurprise(content.shopItems(), withSurprise, species)
             it.copy(
                 game = game,
                 completedTaskIds = solvedBefore + taskId,
@@ -1009,7 +1044,7 @@ class GameViewModel(
             return
         }
         val lastDay = current.seasonDay == SEASON_DAYS
-        when (val result = current.game.finishPeriod(payIncome = false, force = true)) {
+        when (val result = current.game.finishPeriod(payIncome = false, force = true, decay = false)) {
             is PeriodCompletion.Success -> {
                 _state.update {
                     val finished = it.copy(
@@ -1078,10 +1113,27 @@ class GameViewModel(
         val today = dates.today()
 
         _state.update {
-            if (it.usageDate == today) {
+            val counted = if (it.usageDate == today) {
                 it.copy(usageMinutes = it.usageMinutes + 1)
             } else {
                 it.copy(usageDate = today, usageMinutes = 1)
+            }
+            // Экранное время — не строкой на дворе, а сообщением, которое закрывается крестиком.
+            val limited = !counted.isDemo && counted.timeLimitEnabled
+            when {
+                limited && counted.usageMinutes == ScreenTime.WARNING_AT_MINUTES -> counted.copy(
+                    message = FeedbackMessage(
+                        text = "Осталось ${Explanations.minutes(counted.minutesLeft(today))} на сегодня.",
+                        nextStep = "Не забудь доделать все дела, если какие-то остались.",
+                    ),
+                )
+
+                limited && counted.usageMinutes == ScreenTime.DAILY_LIMIT_MINUTES -> {
+                    _speech.value = PetVoice.of(counted.game.stage, "Пока-пока! Увидимся завтра.")
+                    counted.copy(message = FeedbackMessage(text = "Экранное время на сегодня закончилось."))
+                }
+
+                else -> counted
             }
         }
     }

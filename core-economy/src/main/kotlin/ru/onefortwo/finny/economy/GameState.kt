@@ -239,6 +239,12 @@ fun GameState.finishPeriod(
      * ведётся (план — на сезон, по банкам); неутверждённый план — пустой.
      */
     force: Boolean = false,
+    /**
+     * Снижать заботу и радость в конце дня. В сезоне (приложение 0.9.0)
+     * показатели меняются только от решений ребёнка в событиях и покупках,
+     * поэтому приложение закрывает день без снижения.
+     */
+    decay: Boolean = true,
 ): PeriodCompletion {
     val plan = period.plan ?: if (force) BudgetPlan.EMPTY else return PeriodCompletion.PlanNotConfirmed
     if (!force && !period.canFinish) return PeriodCompletion.NoDecision
@@ -252,7 +258,7 @@ fun GameState.finishPeriod(
         if (period.depositedToSavings > Coins.ZERO) add(GrowthCondition.SAVED_SOMETHING)
     }
 
-    val petAfter = pet.afterPeriodDecay(stage)
+    val petAfter = if (decay) pet.afterPeriodDecay(stage) else pet
     val pointsAfter = growthPoints + conditions.size
 
     val afterDecay = copy(
