@@ -25,6 +25,7 @@ import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.SURPRISE_LIMIT
 import ru.onefortwo.finny.ui.state.Season
 
 /**
@@ -303,10 +304,47 @@ class GameViewModelTest {
         assertTrue(answered.check.explanation.isNotBlank())
         assertEquals(before, model.state.value.game.balance.amount)
         val message = model.state.value.message!!
-        assertEquals("Задание засчитано. Решено заданий: 1.", message.text)
-        val left = Season.tasksToNextSurprise(content.shopItems(), model.state.value.extras, "cat")!!
-        assertEquals("До новых товаров в лавке — ${Explanations.tasks(left)}.", message.nextStep)
+        assertEquals("Задание засчитано. Решено заданий: 1", message.text)
+        assertEquals("До новой покупки в лавке — ${Explanations.tasks(2)} за этот заход", message.nextStep)
         assertEquals(1, model.state.value.extras.tasksSolved)
+    }
+
+    @Test
+    fun `три задания за один заход открывают новую покупку, выход из заданий сбрасывает счётчик`() {
+        val model = viewModel()
+        val task = numberTask("save_rate")
+        val wrong = TaskAnswer.Number(task.answer + 3)
+
+        model.answerTask(task, wrong)
+        model.answerTask(task, wrong)
+        assertEquals(1, model.tasksToSurprise())
+        // Ребёнок вышел из заданий: два решённых задания не переносятся.
+        model.leaveTasks()
+        assertEquals(3, model.tasksToSurprise())
+        model.answerTask(task, wrong)
+        assertNull(model.state.value.extras.surprise)
+
+        model.answerTask(task, wrong)
+        model.answerTask(task, wrong)
+        assertNotNull(model.state.value.extras.surprise)
+        assertEquals(0, model.state.value.extras.sessionSolved)
+    }
+
+    @Test
+    fun `малыш открывает одну новую покупку в день, дальше — текст про завтра`() {
+        val model = viewModel()
+        val task = numberTask("save_rate")
+        val wrong = TaskAnswer.Number(task.answer + 3)
+
+        repeat(3) { model.answerTask(task, wrong) }
+        val first = model.state.value.extras.surprise
+        assertNotNull(first)
+        model.dismissSurprise()
+        assertNull(model.tasksToSurprise())
+
+        repeat(3) { model.answerTask(task, wrong) }
+        assertNull(model.state.value.extras.surprise)
+        assertEquals(SURPRISE_LIMIT.replace("{name}", "Финни"), model.state.value.message!!.nextStep)
     }
 
     // --- План, покупки и оповещения ---------------------------------------

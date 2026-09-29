@@ -92,6 +92,11 @@ data class SeasonExtras(
     val unlockedAt: Map<String, Int> = emptyMap(),
     /** Сюрприз, о котором ещё не сказали ребёнку. */
     val surprise: String? = null,
+    /** Сколько заданий решено за текущий заход в раздел заданий: каждые три — новая покупка. */
+    val sessionSolved: Int = 0,
+    /** Игровой день последнего сюрприза и сколько сюрпризов открыто в этот день. */
+    val surpriseDay: Int = 0,
+    val surprisesToday: Int = 0,
     /** Товары, открытые вместе с сюрпризом: еда, билеты, аптечка. */
     val surpriseAlso: List<String> = emptyList(),
     /** Купленные товары — в лавке и в событиях: мячик, палатка, игрушка. */
@@ -307,6 +312,27 @@ object Season {
         val due = items.filter { val n = it.unlockAfter; n != null && n <= x.tasksSolved && it.id !in x.unlocked && it.fits(species) }
         val first = due.minOfOrNull { it.unlockAfter!! } ?: return emptyList()
         return due.filter { it.unlockAfter == first }
+    }
+
+    /** Сколько заданий за один заход открывают новую покупку в лавке. */
+    const val TASKS_PER_SURPRISE = 3
+
+    /** Сколько новых покупок можно открыть за игровой день: малышу — одну, дальше — две. */
+    fun surprisesPerDay(stage: GrowthStage): Int = if (stage == GrowthStage.BABY) 1 else 2
+
+    /** Лимит новых покупок на сегодня исчерпан. */
+    fun surpriseLimitReached(x: SeasonExtras, day: Int, stage: GrowthStage): Boolean =
+        x.surpriseDay == day && x.surprisesToday >= surprisesPerDay(stage)
+
+    /**
+     * Следующая новая покупка: товары ближайшей по порядку ступени лестницы
+     * сюрпризов, которых ещё нет в лавке (одежда первой, за ней — еда по
+     * виду питомца, билеты, аптечка). Порядок открытия — по `unlock_after`.
+     */
+    fun nextSurpriseGroup(items: List<ShopItemContent>, x: SeasonExtras, species: String? = null): List<ShopItemContent> {
+        val left = items.filter { it.unlockAfter != null && it.id !in x.unlocked && it.fits(species) }
+        val first = left.minOfOrNull { it.unlockAfter!! } ?: return emptyList()
+        return left.filter { it.unlockAfter == first }
     }
 
     /** Сколько заданий до следующего сюрприза; `null` — сюрпризы кончились. */

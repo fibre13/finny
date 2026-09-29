@@ -252,11 +252,9 @@ class SeasonScreensTest {
         }
 
         compose.onNodeWithText("Сюрприз!").assertIsDisplayed()
-        compose.onNodeWithText(
-            "Ты выполнил 3 задания! В лавке появилось: «${pants.title}» и «${sausage.title}».",
-        ).assertIsDisplayed()
-        compose.onNodeWithText(pants.effectFor("Финни") + ".").assertIsDisplayed()
-        compose.onNodeWithText(sausage.effectFor("Финни") + ".").assertIsDisplayed()
+        compose.onNodeWithText("Ты выполнил 3 задания!").assertIsDisplayed()
+        compose.onNodeWithText("В лавке появилось: «${pants.title}» и «${sausage.title}»").assertIsDisplayed()
+        compose.onNodeWithText("Теперь ты сможешь купить их для своего питомца!").assertIsDisplayed()
         compose.onNodeWithText("Ура!").performClick()
         assertTrue(closed)
     }

@@ -440,26 +440,31 @@ internal fun SurpriseDialog(
         title = "Сюрприз!",
         onDismiss = onDismiss,
         content = {
+            Text(text = "Ты выполнил ${Explanations.tasks(Season.TASKS_PER_SURPRISE)}!", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Ты выполнил ${Explanations.tasks(solved)}! В лавке появилось: " +
-                    all.joinToString(" и ") { "«${it.title}»" } + ".",
-                style = MaterialTheme.typography.titleMedium,
+                text = "В лавке появилось: " + all.joinToString(" и ") { "«${it.title}»" },
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 6.dp),
             )
-            all.forEach { shown ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 10.dp)) {
-                    shown.icon?.let { Sprite(art, it, cell = 3.dp) }
+            Row(modifier = Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                all.forEach { shown ->
+                    shown.icon?.let { Sprite(art, it, cell = 4.dp) }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = shown.effectFor(petName) + ".", style = MaterialTheme.typography.bodyMedium)
                 }
             }
+            Text(
+                text = "Теперь ты сможешь купить их для своего питомца!",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 10.dp),
+            )
         },
         actions = { PrimaryButton(text = "Ура!", onClick = onDismiss) },
     )
 }
 
 /**
- * Экранное время на сегодня вышло. Питомец неторопливо машет лапкой и
- * прощается до завтра; незаконченные дела дня продолжатся с того же места.
+ * Экранное время на сегодня вышло. Питомец прощается до завтра;
+ * незаконченные дела дня продолжатся с того же места.
  */
 @Composable
 internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -> Unit) {
@@ -666,7 +671,7 @@ fun SeasonResultScreen(
                 reaction = if (reactionId > 0) PetReaction(PetReactions.PLAY, id = reactionId) else null,
             )
             SecondaryButton(
-                text = "Поиграть",
+                text = "Играть",
                 onClick = {
                     onPlay()
                     reactionId++

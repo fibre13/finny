@@ -58,7 +58,10 @@ fun OnboardingScreen(
     onBack: (() -> Unit)? = null,
     continueText: String = "Далее",
     step: Int? = null,
+    /** Имя питомца, которое дал ребёнок; до знакомства — `null`. */
+    petName: String? = null,
 ) {
+    val pet = petName ?: "питомец"
     ScreenScaffold(
         title = "Как играть",
         onBack = onBack,
@@ -68,7 +71,7 @@ fun OnboardingScreen(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SupportingText(
-                "У тебя есть питомец Финни. В начале каждого сезона — на три дня — приходят монеты. " +
+                (if (petName != null) "У тебя есть питомец $petName. " else "У тебя есть питомец. ") + "В начале каждого сезона — на три дня — приходят монеты. " +
                     "Монет мало, а хочется многого — поэтому ты решаешь, на что их потратить.",
             )
 
@@ -81,14 +84,14 @@ fun OnboardingScreen(
                         category = BudgetCategory.NEEDS,
                         tile = FinnyTheme.colors.selectedContainer,
                         title = "1. Купить нужное",
-                        text = "Корм, вода, уход. Без этого Финни грустит. Покупают первым.",
+                        text = "Корм, вода, уход. Без этого $pet грустит. Покупают первым",
                     )
                     DecisionDivider()
                     DecisionRow(
                         category = BudgetCategory.WANTS,
                         tile = FinnyTheme.colors.coinContainer,
                         title = "2. Купить желаемое",
-                        text = "Игрушки и украшения радуют Финни. Их можно отложить на завтра — это не ошибка.",
+                        text = "Игрушки и украшения — это радость. Их можно отложить на завтра — это не ошибка",
                     )
                     DecisionDivider()
                     DecisionRow(

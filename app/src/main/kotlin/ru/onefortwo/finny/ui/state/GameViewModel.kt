@@ -85,6 +85,10 @@ data class AnsweredTask(
     val isRepeat: Boolean,
 )
 
+/** Новая покупка на сегодня уже открыта. */
+const val SURPRISE_LIMIT = "Ты уже открыл новую покупку сегодня! Заходи завтра за новыми сюрпризами. " +
+    "А сейчас — поиграй для себя или с {name}!"
+
 /** Что делать, когда монет не хватает даже с копилкой: ждать сезона и поиграть с питомцем. */
 private const val SHORTAGE_NEXT = "Дождись начала следующего сезона — тебе начислят новые монеты. " +
     "А чтобы ожидание не было скучным — поиграй с питомцем"
@@ -463,7 +467,7 @@ class GameViewModel(
             it.copy(
                 message = FeedbackMessage(
                     text = "$petName спит. Новый день начнётся завтра.",
-                    nextStep = "Пока можно заглянуть в план, словарик или гардероб.",
+                    nextStep = "Пока можно заглянуть в план, задания, словарик или гардероб",
                 ),
             )
         }
@@ -827,6 +831,23 @@ class GameViewModel(
         ensureDayEvents()
     }
 
+    /**
+     * Ребёнок вышел из раздела заданий: счётчик «трёх заданий за заход»
+     * начинается заново.
+     */
+    fun leaveTasks() {
+        _state.update { if (it.extras.sessionSolved == 0) it else it.copy(extras = it.extras.copy(sessionSolved = 0)) }
+    }
+
+    /** Сколько заданий за этот заход до новой покупки; `null` — сегодня уже открыта или покупки кончились. */
+    fun tasksToSurprise(state: AppState = _state.value): Int? {
+        val species = state.profile?.appearance?.speciesId
+        val day = state.game.period.number
+        if (Season.surpriseLimitReached(state.extras, day, state.game.stage)) return null
+        if (Season.nextSurpriseGroup(content.shopItems(), state.extras, species).isEmpty()) return null
+        return Season.TASKS_PER_SURPRISE - state.extras.sessionSolved
+    }
+
     /** О сюрпризе сказали. */
     fun dismissSurprise() {
         _state.update { it.copy(extras = it.extras.copy(surprise = null, surpriseAlso = emptyList())) }
@@ -1002,9 +1023,18 @@ class GameViewModel(
                 tasksToday = if (x.tasksDay == day) x.tasksToday + 1 else 1,
             )
             val species = it.profile?.appearance?.speciesId
-            val opened = Season.pendingSurprise(content.shopItems(), counted3, species)
+            // Новая покупка — за три задания за один заход в раздел заданий и не
+            // больше лимита в день; после трёх заданий счётчик захода начинается заново.
+            val session = x.sessionSolved + 1
+            val stage = it.game.stage
+            val limit = Season.surpriseLimitReached(counted3, day, stage)
+            val opened = if (session >= Season.TASKS_PER_SURPRISE && !limit) {
+                Season.nextSurpriseGroup(content.shopItems(), counted3, species)
+            } else {
+                emptyList()
+            }
             val withSurprise = if (opened.isEmpty()) {
-                counted3
+                counted3.copy(sessionSolved = if (session >= Season.TASKS_PER_SURPRISE) 0 else session)
             } else {
                 val ids = opened.map { item -> item.id }
                 counted3.copy(
@@ -1013,9 +1043,17 @@ class GameViewModel(
                     unlockedAt = counted3.unlockedAt + ids.associateWith { day },
                     surprise = ids.first(),
                     surpriseAlso = ids.drop(1),
+                    sessionSolved = 0,
+                    surpriseDay = day,
+                    surprisesToday = if (counted3.surpriseDay == day) counted3.surprisesToday + 1 else 1,
                 )
             }
-            val next = Season.tasksToNextSurprise(content.shopItems(), withSurprise, species)
+            val limitNow = Season.surpriseLimitReached(withSurprise, day, stage)
+            val next = if (Season.nextSurpriseGroup(content.shopItems(), withSurprise, species).isEmpty()) {
+                null
+            } else {
+                Season.TASKS_PER_SURPRISE - withSurprise.sessionSolved
+            }
             it.copy(
                 game = game,
                 completedTaskIds = solvedBefore + taskId,
@@ -1031,8 +1069,13 @@ class GameViewModel(
                     )
                 } else {
                     FeedbackMessage(
-                        text = "Задание засчитано. Решено заданий: ${withSurprise.tasksSolved}.",
-                        nextStep = next?.let { n -> "До новых товаров в лавке — ${Explanations.tasks(n)}." },
+                        text = "Задание засчитано. Решено заданий: ${withSurprise.tasksSolved}",
+                        nextStep = when {
+                            opened.isNotEmpty() -> null
+                            limitNow -> SURPRISE_LIMIT.replace("{name}", petName)
+                            next != null -> "До новой покупки в лавке — ${Explanations.tasks(next)} за этот заход"
+                            else -> null
+                        },
                     )
                 },
             ).withGrowth()

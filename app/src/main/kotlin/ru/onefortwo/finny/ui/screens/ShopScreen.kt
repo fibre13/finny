@@ -53,6 +53,9 @@ import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.FeedbackMessage
 import ru.onefortwo.finny.ui.theme.FinnyTheme
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import ru.onefortwo.finny.ui.theme.PillShape
 
 /**
@@ -86,6 +89,8 @@ fun ShopScreen(
     onDismissMessage: () -> Unit,
     onBuy: (String) -> Unit,
     onBack: () -> Unit,
+    /** Строка под списком «Играй в задания…» — переход к заданиям. */
+    onOpenTasks: () -> Unit = {},
 ) {
     // Хранится идентификатор, а не сама позиция: строка переживает поворот
     // экрана, позиция восстанавливается из каталога.
@@ -153,6 +158,17 @@ fun ShopScreen(
                 balance = balance,
                 boughtIds = boughtIds,
                 onBuy = { pendingId = it },
+            )
+            // Мягкий призыв: не кнопка, а строка, по которой можно нажать.
+            Text(
+                text = "Играй в задания — открывай новые покупки для питомца",
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinnyTheme.colors.onSurfaceMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Button, onClick = onOpenTasks)
+                    .padding(vertical = 12.dp),
             )
         }
     }

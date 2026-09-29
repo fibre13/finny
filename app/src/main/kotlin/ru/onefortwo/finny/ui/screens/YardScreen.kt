@@ -301,6 +301,8 @@ fun YardScreen(
     onArrivalShown: () -> Unit = {},
     /** Открыть следующее задание сразу — для напоминания о задании. */
     onOpenTask: (() -> Unit)? = null,
+    /** Раздел «Игры»: задания и игры с питомцем. */
+    onOpenGames: () -> Unit = {},
     /** «Не сейчас» у напоминания двора. */
     onDismissReminder: (Reminder) -> Unit = {},
     /** Событие дня, ждущее решения, и событие, по которому показан итог. */
@@ -485,28 +487,12 @@ fun YardScreen(
                         onClick = { if (dayFinished) onSleepingTap() else runTo(places["shop"], onOpenShop) },
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    val board = when {
-                        state.isTimeUp(today) -> "На сегодня хватит. Приходи завтра!"
-                        activeTask != null -> "Задание: ${activeTask.title}"
-                        else -> "Заданий пока нет."
-                    }
+                    // Не доска с текстом, а понятный значок: «Игры» — задания и игры с питомцем.
                     YardObject(
-                        art, colors, "yard_tasks", "Задания",
-                        description = "Задания. На доске: $board",
+                        art, colors, "yard_games", "Игры",
+                        description = "Игры: задания и игры с питомцем",
                         onPlaced = { places["tasks"] = it.center; bounds[GuideTarget.TASKS] = it },
-                        onClick = { runTo(places["tasks"], onOpenTasks) },
-                        overlay = {
-                            Text(
-                                text = board,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = colors.card,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .padding(start = YARD_CELL * 6, top = YARD_CELL * 5, end = YARD_CELL * 5)
-                                    .width(YARD_CELL * 54),
-                            )
-                        },
+                        onClick = { runTo(places["tasks"], onOpenGames) },
                     )
                 }
                 Row(
@@ -683,8 +669,8 @@ fun YardScreen(
                     GuideTarget.SHOP -> ({ runTo(places["shop"], onOpenShop) })
                     // Напоминание о задании ведёт сразу к заданию, а не к списку.
                     GuideTarget.TASKS -> {
-                        val open = if (guide.reminder == Reminder.TASK && onOpenTask != null) onOpenTask else onOpenTasks
-                        ({ runTo(places["tasks"], open) })
+                        // В задания — всегда через список: ребёнок видит звёзды и выбирает сам.
+                        ({ runTo(places["tasks"], onOpenTasks) })
                     }
                     GuideTarget.SAVINGS -> ({ runTo(places["savings"], onOpenSavings) })
                     GuideTarget.GLOSSARY -> ({ runTo(places["glossary"], onOpenGlossary) })
@@ -738,7 +724,16 @@ fun YardScreen(
             )
         }
         state.savingsAsk?.let { ask ->
-            if (ask.eventId != null) SavingsAskDialog(ask, onConfirm = onConfirmSavings, onCancel = onCancelSavings)
+            if (ask.eventId != null) {
+                SavingsAskDialog(
+                    ask,
+                    onConfirm = onConfirmSavings,
+                    onCancel = onCancelSavings,
+                    // «Купить корм» → «корм».
+                    what = shownEvent?.yes?.removePrefix("Купить ")?.takeIf { it != shownEvent.yes },
+                    dream = goal?.claimTitle,
+                )
+            }
         }
         if (surprise != null && arrival == null && shownEvent == null) {
             SurpriseDialog(surprise, state.extras.tasksSolved, profile.petName, onDismissSurprise, also = surpriseAlso)

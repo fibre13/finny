@@ -84,9 +84,9 @@ fun TasksScreen(
                 // Две короткие строки без точек в конце.
                 Text(
                     text = "Решено заданий: $solved\n" + if (toSurprise != null) {
-                        "До новых товаров в лавке — ${Explanations.tasks(toSurprise)}"
+                        "Реши ещё ${Explanations.tasks(toSurprise)} — и в лавке появится новая покупка"
                     } else {
-                        "Все сюрпризы открыты!"
+                        "Новая покупка на сегодня открыта — заходи завтра"
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,

@@ -914,6 +914,7 @@ class ScreenRenderTest {
                         onOpenSavings = { opened += "savings" },
                         onOpenGlossary = { opened += "glossary" },
                         onOpenTasks = { opened += "tasks" },
+                        onOpenGames = { opened += "games" },
                         onOpenPet = { opened += "pet" },
                         onOpenProgress = { opened += "progress" },
                         onOpenHelp = { opened += "help" },
@@ -928,14 +929,14 @@ class ScreenRenderTest {
         compose.onNodeWithContentDescription("Покупки: лавка для питомца").performScrollTo().performClick()
         compose.onNodeWithContentDescription("План сезона").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Словарик: финансовые слова").performScrollTo().performClick()
-        compose.onNode(hasContentDescriptionPrefix("Задания. На доске:")).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Игры: задания и игры с питомцем").performScrollTo().performClick()
         compose.onNode(hasContentDescriptionPrefix("Копилка:")).performScrollTo().performClick()
         compose.onNode(hasContentDescriptionPrefix("Финни")).performScrollTo().performClick()
         compose.onNode(hasContentDescriptionPrefix("Мой прогресс.")).performClick()
         compose.onNodeWithContentDescription("Как играть").performClick()
         compose.onNodeWithContentDescription("Для взрослого").performClick()
         assertEquals(
-            listOf("shop", "plan", "glossary", "tasks", "savings", "pet", "progress", "help", "adult"),
+            listOf("shop", "plan", "glossary", "games", "savings", "pet", "progress", "help", "adult"),
             opened,
         )
         // План не составлен — отметка передана словами.
@@ -1069,7 +1070,7 @@ class ScreenRenderTest {
             }
         val objects = mapOf(
             "лавка" to bounds(hasContentDescriptionPrefix("Покупки:")),
-            "доска заданий" to bounds(hasContentDescriptionPrefix("Задания.")),
+            "игры" to bounds(hasContentDescriptionPrefix("Игры:")),
             "доска плана" to bounds(hasContentDescriptionPrefix("План сезона")),
             "книга" to bounds(hasContentDescriptionPrefix("Словарик:")),
             "питомец" to bounds(hasContentDescriptionPrefix("Финни")),
