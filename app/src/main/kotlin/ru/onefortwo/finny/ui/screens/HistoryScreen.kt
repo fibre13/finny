@@ -128,7 +128,7 @@ fun HistoryScreen(
                         SupportingText(text = Explanations.forecast(game.goalForecast()), modifier = Modifier.padding(top = 8.dp))
                         if (next != null && dreams == next.first - 1) {
                             Text(
-                                text = "Это твоя вторая мечта! Накопи на неё — и $petName вырастет.",
+                                text = "Это твоя ${if (next.first == 2) "вторая" else "третья"} мечта! Накопи на неё — и $petName вырастет.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 8.dp),
