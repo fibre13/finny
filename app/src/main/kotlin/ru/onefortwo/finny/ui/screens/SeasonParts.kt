@@ -252,6 +252,7 @@ internal fun EventDialog(
     val petName = state.profile?.petName ?: "Питомец"
     val period = state.game.period.number
     val title = Season.titleOf(event, period).withPetName(petName)
+    val stroking = result?.accepted == true && event.id == "pet_stroke"
     FinnyDialog(
         title = if (result == null) title else if (result.accepted) "Готово!" else "Решение принято",
         onDismiss = { if (result != null) onClose(false) },
@@ -266,7 +267,6 @@ internal fun EventDialog(
                     .fillMaxWidth()
                     .semantics(mergeDescendants = true) { contentDescription = event.scene.withPetName(petName) },
             ) {
-                val stroking = result?.accepted == true && event.id == "pet_stroke"
                 Box {
                     ProfilePet(
                         state = state,
@@ -296,7 +296,7 @@ internal fun EventDialog(
                 }
             } else {
                 result.emotion?.let {
-                    SpeechBubble(colors, it, modifier = Modifier.padding(top = 10.dp))
+                    SpeechBubble(colors, it, modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = if (stroking) 60.dp else 32.dp)
                 }
                 result.hint?.let {
                     Text(
@@ -425,7 +425,7 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
                 ProfilePet(state, parts, 140.dp)
                 Sprite(art, "paw_wave_$frame", Modifier.offset(x = 84.dp, y = 46.dp), cell = 4.dp)
             }
-            SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(top = 8.dp))
+            SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = 56.dp)
             Text(
                 text = "Экранное время на сегодня закончилось. Приходи завтра — продолжим с того же места.",
                 style = MaterialTheme.typography.bodyLarge,
@@ -457,7 +457,7 @@ internal fun MissedDialog(state: AppState, parts: PetPartsContent, onDismiss: ()
             ProfilePet(state, parts, 96.dp)
             // Питомец не говорит о монетах: только о том, что ждал (разные слова от сезона к сезону).
             val missed = MISSED_PHRASES[(state.extras.season - 1).mod(MISSED_PHRASES.size)]
-            SpeechBubble(colors, "$missed Давай начнём новый сезон?", modifier = Modifier.padding(top = 8.dp))
+            SpeechBubble(colors, "$missed Давай начнём новый сезон?", modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = 32.dp)
             // О монетах — отдельной строкой, а не словами питомца.
             Text(
                 text = "Пока тебя не было, новые сезоны не начинались и монеты не приходили. " +

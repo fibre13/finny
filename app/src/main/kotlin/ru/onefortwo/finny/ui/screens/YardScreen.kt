@@ -1117,8 +1117,42 @@ private fun Pet(
  * TalkBack зачитывает реплику сам, с именем говорящего.
  */
 @Composable
-internal fun SpeechBubble(colors: YardColors, text: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+internal fun SpeechBubble(
+    colors: YardColors,
+    text: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    /** Питомец над облачком — уголок сверху, иначе снизу. */
+    tailUp: Boolean = false,
+    /** Отступ уголка от левого края — под ртом питомца, стоящего слева; `null` — по центру. */
+    tailStart: Dp? = null,
+) {
+    val tail: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier
+                .then(if (tailStart != null) Modifier.padding(start = tailStart) else Modifier)
+                .offset(y = if (tailUp) YARD_CELL * 2 else -YARD_CELL * 2)
+                .size(YARD_CELL * 8, YARD_CELL * 4)
+                .drawBehind {
+                    val c = max(1f, floor(YARD_CELL.toPx()))
+                    for (row in 0 until 4) {
+                        val to = 7 - row
+                        // Уголок сверху — те же ряды снизу вверх: остриём к питомцу.
+                        val y = (if (tailUp) 3 - row else row) * c
+                        drawRect(colors.outline, Offset(row * c, y), Size((to - row + 1) * c, c))
+                        if (to - row >= 2) {
+                            drawRect(colors.card, Offset((row + 1) * c, y), Size((to - row - 1) * c, c))
+                        }
+                    }
+                }
+                .zIndex(1f),
+        )
+    }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (tailStart != null) Alignment.Start else Alignment.CenterHorizontally,
+    ) {
+        if (tailUp) tail()
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
@@ -1129,21 +1163,7 @@ internal fun SpeechBubble(colors: YardColors, text: String, modifier: Modifier =
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .padding(horizontal = 14.dp, vertical = 8.dp),
         )
-        Box(
-            modifier = Modifier
-                .offset(y = -YARD_CELL * 2)
-                .size(YARD_CELL * 8, YARD_CELL * 4)
-                .drawBehind {
-                    val c = max(1f, floor(YARD_CELL.toPx()))
-                    for (row in 0 until 4) {
-                        val to = 7 - row
-                        drawRect(colors.outline, Offset(row * c, row * c), Size((to - row + 1) * c, c))
-                        if (to - row >= 2) {
-                            drawRect(colors.card, Offset((row + 1) * c, row * c), Size((to - row - 1) * c, c))
-                        }
-                    }
-                },
-        )
+        if (!tailUp) tail()
     }
 }
 
