@@ -487,7 +487,6 @@ fun YardScreen(
                     Spacer(modifier = Modifier.weight(1f))
                     val board = when {
                         state.isTimeUp(today) -> "На сегодня хватит. Приходи завтра!"
-                        dayFinished -> "Задания — завтра."
                         activeTask != null -> "Задание: ${activeTask.title}"
                         else -> "Заданий пока нет."
                     }
