@@ -99,7 +99,6 @@ fun SavingsScreen(
     onDismissMessage: () -> Unit,
     onChooseGoal: (String) -> Unit,
     onClaimGoal: () -> Unit,
-    onDeposit: (Int) -> Unit,
     onPreviewWithdrawal: (Int) -> WithdrawalPreview,
     onWithdraw: (Int) -> Unit,
     onBack: () -> Unit,
@@ -112,10 +111,6 @@ fun SavingsScreen(
     /** «Изменить» — пополнение копилки делается в плане. */
     onOpenPlan: () -> Unit = {},
 ) {
-    // Суммы выставляются кнопками шага, как на экране плана: печатать
-    // число с клавиатуры не нужно (замечание тестировщика о вводе).
-    var depositAmount by rememberSaveable { mutableIntStateOf(0) }
-    var withdrawAmount by rememberSaveable { mutableIntStateOf(0) }
     // Хранится сумма, а не объект предпросмотра: примитив переживает
     // поворот экрана, а сам предпросмотр пересчитывается из неё.
     var previewAmount by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -218,7 +213,7 @@ fun SavingsScreen(
                 if (game.savings.saved.amount > 0) {
                     SecondaryButton(
                         text = "Забрать монеты на покупки",
-                        onClick = { withdrawAmount = 0; previewAmount = 0 },
+                        onClick = { previewAmount = 0 },
                     )
                 }
             }
@@ -232,7 +227,6 @@ fun SavingsScreen(
             onAmount = { previewAmount = it },
             onConfirm = {
                 if (amount > 0) onWithdraw(amount)
-                withdrawAmount = 0
                 previewAmount = null
             },
             onCancel = { previewAmount = null },

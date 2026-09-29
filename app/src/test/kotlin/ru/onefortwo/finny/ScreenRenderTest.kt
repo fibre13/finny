@@ -586,7 +586,6 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onChooseGoal = {},
                     onClaimGoal = {},
-                    onDeposit = {},
                     onPreviewWithdrawal = { GameState.newProfile().previewWithdrawal(Coins(0)) },
                     onWithdraw = {},
                     onBack = {},
@@ -601,7 +600,6 @@ class ScreenRenderTest {
     @Test
     fun `копилка без блоков «Отложить» и «Взять» — пополнение в плане`() {
         val goal = content.goals().first { it.id == "scooter" }.toDomain()
-        val deposits = mutableListOf<Int>()
         compose.setContent {
             FinnyTheme {
                 SavingsScreen(
@@ -611,7 +609,6 @@ class ScreenRenderTest {
                     onDismissMessage = {},
                     onChooseGoal = {},
                     onClaimGoal = {},
-                    onDeposit = { deposits += it },
                     onPreviewWithdrawal = { GameState.newProfile().previewWithdrawal(Coins(0)) },
                     onWithdraw = {},
                     onBack = {},
@@ -626,7 +623,6 @@ class ScreenRenderTest {
         compose.onNodeWithText("Изменить →").performScrollTo().assertIsDisplayed()
         // Копилка пуста: забирать нечего — кнопки «Забрать» нет.
         compose.onNodeWithText("Забрать монеты на покупки").assertDoesNotExist()
-        assertTrue(deposits.isEmpty())
     }
 
     @Test

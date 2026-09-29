@@ -391,7 +391,6 @@ private fun AppNavHost(
                 onDismissMessage = viewModel::dismissMessage,
                 onChooseGoal = viewModel::chooseGoal,
                 onClaimGoal = viewModel::claimGoal,
-                onDeposit = viewModel::deposit,
                 onPreviewWithdrawal = viewModel::previewWithdrawal,
                 onWithdraw = viewModel::withdraw,
                 onBack = { navController.popBackStack() },

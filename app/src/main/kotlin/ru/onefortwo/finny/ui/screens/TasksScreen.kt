@@ -96,7 +96,8 @@ fun TasksScreen(
             if (recoveryFirst) {
                 sections.recovery.forEach { TaskRow(art, colors, it, highlight = true) { onOpenTask(it.id) } }
             }
-            // Решённые — в конце, с кнопкой «Повтор»: числа в них будут другие.
+            // Решённые — в конце, с кнопкой «Повтор»: числа в них будут другие,
+            // кроме заданий с циферблатом — у них те же значения.
             regular.forEach { task ->
                 TaskRow(art, colors, task, highlight = false, repeat = task.id in completedIds) { onOpenTask(task.id) }
             }
