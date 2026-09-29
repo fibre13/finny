@@ -10,15 +10,16 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
 import ru.onefortwo.finny.content.NumberTask
 import ru.onefortwo.finny.content.PetAppearance
 import ru.onefortwo.finny.content.TaskAnswer
+import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.Difficulty
@@ -27,10 +28,10 @@ import ru.onefortwo.finny.ui.state.GameViewModel
 /**
  * Сквозная проверка действий пользователя через слой состояния.
  *
- * Повторяет обязательный сценарий из Приложения А: создание профиля,
- * план бюджета, выполнение задания, обязательная и необязательная покупка,
- * попытка покупки при нехватке средств, выбор цели и пополнение копилки,
- * завершение дня и изменение прогресса.
+ * Повторяет обязательный сценарий из Приложения А в механике сезона:
+ * создание профиля, план сезона по банкам, выполнение задания, покупка
+ * нужного и желаемого, попытка покупки при нехватке средств, выбор цели
+ * и пополнение копилки, события и завершение дня, рост питомца.
  *
  * Выполняется на JVM: контент читается из файлов модуля `content`,
  * поэтому эмулятор не требуется.
@@ -85,56 +86,77 @@ class GameViewModelTest {
         assertTrue(arrival!!.text.contains("50 монет"))
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `план без выбранной цели не принимает накопления`() {
+    fun `план сезона с копилкой без цели отклоняется с просьбой выбрать цель`() {
         val model = viewModel()
 
-        model.confirmPlan(needs = 15, wants = 10, savings = 10)
+        // Все 50 монет разложены, но цели у нового профиля нет.
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
 
-        assertFalse(model.state.value.game.period.isPlanConfirmed)
-        assertTrue(model.state.value.message!!.isProblem)
-        assertTrue(model.state.value.message!!.text.contains("цель"))
+        val state = model.state.value
+        assertFalse(state.extras.planned)
+        assertTrue(state.message!!.isProblem)
+        assertTrue(state.message!!.text.contains("цель"))
+        // Введённые суммы не пропадают: об этом говорит следующий шаг.
+        assertTrue(state.message!!.nextStep!!.contains("сохранятся"))
+        // Отклонённый план не трогает монеты и не выбирает события дня.
+        assertEquals(50, state.game.balance.amount)
+        assertEquals(0, state.game.savings.saved.amount)
+        assertEquals(0, state.extras.needsJar + state.extras.wantsJar)
+        assertTrue(state.extras.dayEvents.isEmpty())
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `план сверх бюджета отклоняется с объяснением`() {
-        val model = viewModel()
-
-        model.confirmPlan(needs = 40, wants = 20, savings = 0)
-
-        assertFalse(model.state.value.game.period.isPlanConfirmed)
-        assertTrue(model.state.value.message!!.text.contains("больше, чем есть"))
-    }
-
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
-    @Test
-    fun `подтверждённый план сразу переводит монеты в копилку`() {
+    fun `план сезона сверх имеющихся монет отклоняется с объяснением`() {
         val model = viewModel()
         model.chooseGoal("scooter")
 
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
+        val accepted = model.confirmPlan(needs = 40, wants = 20, savings = 0)
 
-        val game = model.state.value.game
-        assertTrue(game.period.isPlanConfirmed)
-        assertEquals(10, game.savings.saved.amount)
-        assertEquals(40, game.balance.amount)
+        val state = model.state.value
+        assertFalse(accepted)
+        assertFalse(state.extras.planned)
+        assertTrue(state.message!!.isProblem)
+        assertTrue(state.message!!.text.contains("Разложи все монеты по банкам"))
+        assertEquals(50, state.game.balance.amount)
+        assertEquals(0, state.extras.needsJar + state.extras.wantsJar)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `обязательная покупка списывает монеты и повышает заботу`() {
+    fun `подтверждённый план сообщает, сколько монет сразу ушло в копилку, и записывает план сезона`() {
         val model = viewModel()
         model.chooseGoal("scooter")
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
+
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
+
+        val state = model.state.value
+        assertEquals("План на сезон готов!", state.message!!.text)
+        assertTrue(state.message!!.nextStep!!.contains("15 монет сразу ушли в копилку"))
+        // План сезона — основа итогов: с ним сравнивается факт.
+        assertEquals(20, state.extras.plannedNeeds)
+        assertEquals(15, state.extras.plannedWants)
+        assertEquals(15, state.extras.plannedSavings)
+        assertEquals(15, state.extras.deposited)
+    }
+
+    @Test
+    fun `покупка нужного в лавке берётся из банка «Нужное» и повышает заботу`() {
+        val model = viewModel()
+        model.chooseGoal("scooter")
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
+        val careBefore = model.state.value.game.pet.care.value
 
         model.buy("food")
 
-        val game = model.state.value.game
-        assertEquals(30, game.balance.amount)
-        assertEquals(90, game.pet.care.value)
-        assertTrue(model.state.value.message!!.text.contains("Корм"))
+        val state = model.state.value
+        assertEquals(10, state.extras.needsJar)
+        assertEquals(15, state.extras.wantsJar)
+        assertEquals(25, state.game.balance.amount)
+        assertEquals(15, state.game.savings.saved.amount)
+        assertEquals(10, state.extras.spentNeeds)
+        assertEquals(minOf(100, careBefore + 30), state.game.pet.care.value)
+        assertTrue(state.game.pet.care.value > careBefore)
+        assertTrue(state.message!!.text.contains("Корм"))
     }
 
     @Test
@@ -154,48 +176,73 @@ class GameViewModelTest {
         assertTrue("Сообщение: $text", text.contains("и так полная"))
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `покупка при нехватке монет объясняет разницу и предлагает выход`() {
+    fun `нехватка в банке объясняет, откуда платят, и предлагает выход`() {
         val model = viewModel()
         model.chooseGoal("scooter")
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
-        model.buy("tent")
-        model.buy("food")
+        model.confirmPlan(needs = 30, wants = 5, savings = 15)
 
-        // На балансе 5 монет, мячик стоит 12.
+        // Желаемое — только из банка «Хочу»: там 5 монет, мячик стоит 12,
+        // хотя в «Нужном» монеты есть.
         model.buy("ball")
 
-        val message = model.state.value.message!!
+        var state = model.state.value
+        val message = state.message!!
         assertTrue(message.isProblem)
-        assertTrue(message.text.contains("Не хватает"))
+        assertTrue(message.text.contains("В банке «Хочу» не хватает"))
         assertNotNull(message.nextStep)
-        assertEquals(5, model.state.value.game.balance.amount)
+        assertEquals(30, state.extras.needsJar)
+        assertEquals(5, state.extras.wantsJar)
+        assertEquals(35, state.game.balance.amount)
+
+        // Нужное при пустых банках не списывается молча: сначала вопрос о копилке.
+        repeat(3) { model.buy("food") }
+        model.buy("food")
+        state = model.state.value
+        val ask = state.savingsAsk
+        assertNotNull("Нет вопроса о копилке", ask)
+        assertEquals(5, ask!!.payment.fromSavings)
+        assertEquals(15, state.game.savings.saved.amount)
+        // «Не брать» — копилка и банки не меняются.
+        model.cancelSavingsAsk()
+        state = model.state.value
+        assertNull(state.savingsAsk)
+        assertEquals(15, state.game.savings.saved.amount)
+        assertEquals(5, state.extras.wantsJar + state.extras.needsJar)
     }
 
     /** Задание с вводом числа и уже подставленными числами. */
     private fun numberTask(id: String): NumberTask =
         content.task(id)!!.withNumbers(Random(1)) as NumberTask
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
+    /** «Помоги своему питомцу» — единственное задание, за которое платят монеты. */
+    private fun recoverHelp(): TaskContent = content.task("recover_help")!!
+
+    /** Отказывается от всех событий дня, в том числе от вставленных продолжений. */
+    private fun GameViewModel.declineDay() {
+        repeat(6) {
+            if (pendingEvent() == null) return
+            answerEvent(false)
+            closeEventResult(false)
+        }
+    }
+
     @Test
-    fun `верный ответ приносит награду, повтор — половину`() {
+    fun `«Помоги своему питомцу» приносит 10 монет, повтор — половину`() {
         val model = viewModel()
         val before = model.state.value.game.balance.amount
-        // Числа задания переменные, поэтому верный ответ берётся
-        // у того же условия, которое передаётся на проверку.
-        val task = numberTask("save_rate")
+        val task = recoverHelp()
 
-        val first = model.answerTask(task, TaskAnswer.Number(task.answer))
+        val first = model.answerTask(task, TaskAnswer.Chosen("food"))
 
         assertTrue(first.check.isCorrect)
         assertFalse(first.isRepeat)
         assertEquals(10, first.credited.amount)
         assertEquals(before + 10, model.state.value.game.balance.amount)
 
-        // Повтор даёт половину: задание остаётся упражнением, но
-        // набирать монеты повторением невыгодно.
-        val repeat = model.answerTask(task, TaskAnswer.Number(task.answer))
+        // Повтор даёт половину: помощь питомцу остаётся путём восстановления,
+        // но набирать монеты повторением невыгодно.
+        val repeat = model.answerTask(task, TaskAnswer.Chosen("food"))
         assertEquals(before + 15, model.state.value.game.balance.amount)
         assertTrue(model.state.value.message!!.text.contains("половина"))
 
@@ -205,23 +252,27 @@ class GameViewModelTest {
         assertEquals(5, repeat.credited.amount)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `повтор ошибочного ответа тоже приносит половину`() {
+    fun `ошибочный ответ в «Помоги своему питомцу» монет не приносит, повтор тоже`() {
         val model = viewModel()
-        val task = numberTask("save_rate")
-        model.answerTask(task, TaskAnswer.Number(task.answer + 3))
-        val after = model.state.value.game.balance.amount
+        val task = recoverHelp()
+        val before = model.state.value.game.balance.amount
 
-        model.answerTask(task, TaskAnswer.Number(task.answer + 3))
+        val first = model.answerTask(task, TaskAnswer.Chosen("toy"))
+        val repeat = model.answerTask(task, TaskAnswer.Chosen("toy"))
 
-        // Награда за старание — 5 монет, половина от неё — 2.
-        assertEquals(after + 2, model.state.value.game.balance.amount)
+        assertFalse(first.check.isCorrect)
+        assertTrue(first.check.explanation.isNotBlank())
+        assertEquals(0, first.credited.amount)
+        assertTrue(repeat.isRepeat)
+        assertEquals(0, repeat.credited.amount)
+        assertEquals(before, model.state.value.game.balance.amount)
+        // Попытки засчитываются к сюрпризу, как и любые решённые задания.
+        assertEquals(2, model.state.value.extras.tasksSolved)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `ошибочный ответ тоже даёт монеты и объяснение`() {
+    fun `ошибочный ответ даёт объяснение и засчитывается, до сюрприза назван остаток`() {
         val model = viewModel()
         val before = model.state.value.game.balance.amount
 
@@ -230,58 +281,72 @@ class GameViewModelTest {
 
         assertFalse(answered.check.isCorrect)
         assertTrue(answered.check.explanation.isNotBlank())
-        assertEquals(before + 5, model.state.value.game.balance.amount)
+        assertEquals(before, model.state.value.game.balance.amount)
+        val message = model.state.value.message!!
+        assertEquals("Задание засчитано. Решено заданий: 1.", message.text)
+        assertTrue(message.nextStep!!.contains("До сюрприза в лавке"))
+        assertEquals(1, model.state.value.extras.tasksSolved)
     }
 
     // --- План, покупки и оповещения ---------------------------------------
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `выполнение задания не отменяет подтверждённый план`() {
+    fun `задание не меняет план сезона, банки и события дня`() {
         val model = viewModel()
         model.chooseGoal("scooter")
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
-        assertTrue(model.state.value.game.period.isPlanConfirmed)
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
+        val before = model.state.value.extras
+        val pending = model.pendingEvent()
 
         val task = numberTask("save_rate")
         model.answerTask(task, TaskAnswer.Number(task.answer))
 
-        val period = model.state.value.game.period
-        assertTrue("План перестал быть подтверждённым", period.isPlanConfirmed)
-        assertTrue("День перестал завершаться", period.canFinish)
+        val after = model.state.value.extras
+        assertTrue("План перестал быть подтверждённым", after.planned)
+        assertEquals(before.needsJar, after.needsJar)
+        assertEquals(before.wantsJar, after.wantsJar)
+        assertEquals(before.dayEvents, after.dayEvents)
+        assertEquals(before.answered, after.answered)
+        assertEquals(pending?.id, model.pendingEvent()?.id)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `без покупки и без копилки план подтверждён, но день не завершить`() {
+    fun `план без копилки принимается без цели, но день не закончить до решения событий`() {
         val model = viewModel()
-        model.confirmPlan(needs = 20, wants = 10, savings = 0)
 
-        val period = model.state.value.game.period
-        assertTrue("План должен считаться подтверждённым", period.isPlanConfirmed)
-        assertFalse("Решения за день нет, завершать нечего", period.canFinish)
+        assertTrue(model.confirmPlan(needs = 35, wants = 15, savings = 0))
+
+        val state = model.state.value
+        assertTrue("План должен считаться подтверждённым", state.extras.planned)
+        assertNull(state.game.savings.goal)
+        assertFalse("События дня не решены", state.dayEventsDone)
+
+        model.finishPeriod()
+
+        assertEquals(1, model.state.value.game.period.number)
+        val message = model.state.value.message!!
+        assertTrue(message.isProblem)
+        assertEquals("Сначала реши все события дня.", message.text)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `план с копилкой без цели не принимается, и экран об этом узнаёт`() {
+    fun `план с копилкой без цели возвращает отказ, после выбора цели те же суммы принимаются`() {
         // У нового профиля цели нет, и план с ненулевой копилкой
         // отклоняется. Результат нужен экрану плана: закрываться он должен
         // только принятым планом, иначе отклонённый план выглядит принятым,
-        // а введённые суммы пропадают вместе с экраном. Тест
-        // «выполнение задания не отменяет подтверждённый план» этот случай
-        // не покрывает: там цель выбрана заранее.
+        // а введённые суммы пропадают вместе с экраном.
         val model = viewModel()
 
-        val accepted = model.confirmPlan(needs = 20, wants = 10, savings = 10)
+        val accepted = model.confirmPlan(needs = 20, wants = 15, savings = 15)
 
         assertFalse("План без цели не должен приниматься", accepted)
-        assertFalse(model.state.value.game.period.isPlanConfirmed)
+        assertFalse(model.state.value.extras.planned)
         assertTrue(model.state.value.message!!.isProblem)
 
         model.chooseGoal("scooter")
-        assertTrue(model.confirmPlan(needs = 20, wants = 10, savings = 10))
-        assertTrue(model.state.value.game.period.isPlanConfirmed)
+        assertTrue(model.confirmPlan(needs = 20, wants = 15, savings = 15))
+        assertTrue(model.state.value.extras.planned)
+        assertEquals(15, model.state.value.game.savings.saved.amount)
     }
 
     @Test
@@ -354,114 +419,153 @@ class GameViewModelTest {
         assertEquals(30, model.state.value.game.savings.saved.amount)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `день нельзя закончить без плана`() {
+    fun `без плана сезона событий нет и день не закончить`() {
         val model = viewModel()
+
+        assertNull(model.pendingEvent())
+        assertTrue(model.state.value.extras.dayEvents.isEmpty())
 
         model.finishPeriod()
 
-        assertTrue(model.state.value.message!!.text.contains("план"))
+        assertTrue(model.state.value.message!!.isProblem)
+        assertEquals(1, model.state.value.game.period.number)
+        assertNull(model.state.value.lastFinishedDate)
+    }
+
+    @Test
+    fun `день не закончить, пока решены не все события`() {
+        val model = viewModel()
+        model.chooseGoal("scooter")
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
+        val total = model.state.value.extras.dayEvents.size
+
+        // Решены два события из трёх: ответ отказом, продолжений не вставляем.
+        repeat(2) {
+            model.answerEvent(false)
+            model.closeEventResult(false)
+        }
+        assertTrue(model.state.value.extras.answered < model.state.value.extras.dayEvents.size)
+        assertTrue(total >= 3)
+
+        model.finishPeriod()
+
+        assertFalse(model.state.value.dayEventsDone)
+        assertEquals("Сначала реши все события дня.", model.state.value.message!!.text)
         assertEquals(1, model.state.value.game.period.number)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `день нельзя закончить без единого решения`() {
+    fun `день заканчивается после отказов во всех событиях без покупок в лавке`() {
         val model = viewModel()
         model.chooseGoal("scooter")
-        model.confirmPlan(needs = 15, wants = 12, savings = 0)
+        // Копилка пополнена планом, в лавке ничего не куплено.
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
 
-        model.finishPeriod()
-
-        assertTrue(model.state.value.message!!.text.contains("нет ни одного решения"))
-        assertEquals(1, model.state.value.game.period.number)
-    }
-
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
-    @Test
-    fun `день с отложенными монетами и без покупок заканчивается`() {
-        val model = viewModel()
-        model.chooseGoal("scooter")
-        // Подтверждение плана сразу переводит долю «Копилки» в накопления,
-        // поэтому решение за день уже есть, даже если ничего не куплено.
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
-
-        model.finishPeriod()
-
-        assertEquals(2, model.state.value.game.period.number)
-    }
-
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
-    @Test
-    fun `завершение дня начисляет шаги роста и открывает новый день`() {
-        val model = viewModel()
-        model.chooseGoal("scooter")
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
-        model.buy("food")
-        model.buy("ball")
-
+        model.declineDay()
+        assertTrue(model.state.value.dayEventsDone)
         model.finishPeriod()
 
         val state = model.state.value
-        val outcome = state.lastOutcome!!
-        assertEquals(3, outcome.earnedPoints)
-        assertFalse(outcome.isSetback)
         assertEquals(2, state.game.period.number)
-        assertEquals(3, state.game.growthPoints)
+        assertEquals(day.toString(), state.lastFinishedDate)
+        assertTrue(state.isSleeping(day.toString()))
+        assertTrue(state.message!!.text.contains("спит"))
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `обязательный сценарий за пять дней доводит питомца до третьей стадии`() {
+    fun `завершение дня не растит питомца, новый день открывается только в новые сутки`() {
+        val model = viewModel()
+        model.chooseGoal("scooter")
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
+        val pointsBefore = model.state.value.game.growthPoints
+        model.declineDay()
+
+        model.finishPeriod()
+
+        // Рост идёт за мечты и задания, а не за прожитые дни.
+        assertEquals(pointsBefore, model.state.value.game.growthPoints)
+        assertEquals(GrowthStage.BABY, model.state.value.game.stage)
+
+        // В те же сутки питомец спит, событий второго дня нет.
+        model.startNewDayIfDue()
+        assertNull(model.pendingEvent())
+        assertTrue(model.state.value.isSleeping(day.toString()))
+
+        // Новые сутки — второй день сезона со своими событиями.
+        nextMorning(model)
+        val state = model.state.value
+        assertEquals(2, state.seasonDay)
+        assertEquals("Новый день! День 2 из 3 в сезоне.", state.message!!.text)
+        assertNotNull(model.pendingEvent())
+        assertEquals(2, state.extras.eventsDay)
+    }
+
+    @Test
+    fun `полученные мечты и решённые задания доводят питомца до подростка`() {
         val model = viewModel()
         model.chooseGoal("scooter")
 
-        // План укладывается в карманные монеты периода — 25, поэтому
-        // пять дней подряд проходятся без ухода баланса в минус.
-        repeat(5) {
-            model.confirmPlan(needs = 10, wants = 12, savings = 3)
-            model.buy("food")
-            model.buy("ball")
-            model.finishPeriod()
-            nextMorning(model)
-        }
+        // Монеты на две мечты (60 + 90) — помощью питомцу: 10 за первый
+        // раз и по 5 за повтор. Вместе с 50 стартовыми — 155.
+        repeat(20) { model.answerTask(recoverHelp(), TaskAnswer.Chosen("food")) }
+        assertEquals(155, model.state.value.game.balance.amount)
+        assertTrue(model.state.value.extras.tasksSolved >= 9)
+        // Заданий хватает, но без мечт питомец не растёт.
+        assertEquals(GrowthStage.BABY, model.state.value.game.stage)
+
+        model.deposit(60)
+        model.claimGoal()
+        assertEquals(listOf("scooter"), model.state.value.achievedGoalIds.toList())
+        assertEquals(GrowthStage.BABY, model.state.value.game.stage)
+
+        model.chooseGoal("aquarium")
+        model.deposit(90)
+        model.claimGoal()
 
         val game = model.state.value.game
-        assertEquals(6, game.period.number)
-        assertEquals(5, game.history.size)
-        assertEquals(GrowthStage.ADULT, game.stage)
+        assertEquals(2, model.state.value.achievedGoalIds.size)
+        assertEquals(GrowthStage.TEEN, game.stage)
+        assertEquals(GrowthStage.TEEN.requiredPoints, game.growthPoints)
         assertTrue("Баланс ушёл в минус", game.balance.amount >= 0)
-        assertEquals(15, game.savings.saved.amount)
+        assertEquals(0, game.savings.saved.amount)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `неудачный день сохраняет прогресс и предлагает путь восстановления`() {
+    fun `нехватка монет на нужное не отнимает прогресс и предлагает спланировать лучше`() {
         val model = viewModel()
-        model.chooseGoal("scooter")
+        model.confirmPlan(needs = 35, wants = 15, savings = 0)
 
-        // Два продуманных дня.
-        repeat(2) {
-            model.confirmPlan(needs = 15, wants = 12, savings = 10)
-            model.buy("food")
-            model.buy("ball")
-            model.finishPeriod()
-            nextMorning(model)
-        }
-        val pointsBefore = model.state.value.game.growthPoints
+        // Все 50 монет из банков потрачены на корм: нужное берётся
+        // из «Нужного», затем из «Хочу».
+        repeat(5) { model.buy("food") }
+        assertEquals(0, model.state.value.game.balance.amount)
+        assertEquals(15, model.state.value.extras.wantsToNeeds)
 
-        // Третий день: только необязательная покупка сверх нулевого плана.
-        model.confirmPlan(needs = 0, wants = 0, savings = 0)
-        model.buy("tent")
-        model.finishPeriod()
+        model.buy("food")
+        val message = model.state.value.message!!
+        assertTrue(message.isProblem)
+        assertTrue(message.text.contains("Не хватает монет"))
+        assertEquals("Давай в следующем сезоне спланируем лучше?", message.nextStep)
 
-        val state = model.state.value
-        assertTrue(state.lastOutcome!!.isSetback)
-        assertEquals(pointsBefore, state.game.growthPoints)
-        assertEquals(GrowthStage.TEEN, state.game.stage)
-        assertTrue(state.message!!.isProblem)
-        assertNotNull(state.message!!.nextStep)
+        // Затратное событие дня без монет — отказ по нехватке с подсказкой.
+        val event = model.pendingEvent()!!
+        assertTrue(event.cost && event.price > 0)
+        model.answerEvent(true)
+        val result = model.state.value.eventResult!!
+        assertTrue(result.shortage)
+        assertFalse(result.accepted)
+        assertNotNull(result.hint)
+        model.closeEventResult(false)
+
+        // Прогресс на месте, путь восстановления — помощь питомцу.
+        assertEquals(1, model.state.value.game.period.number)
+        assertTrue(model.state.value.extras.planned)
+        model.answerTask(recoverHelp(), TaskAnswer.Chosen("food"))
+        assertEquals(10, model.state.value.game.balance.amount)
+        model.buy("food")
+        assertEquals(0, model.state.value.game.balance.amount)
+        assertFalse(model.state.value.message!!.isProblem)
     }
 
     @Test
@@ -480,7 +584,7 @@ class GameViewModelTest {
         assertEquals(0, state.game.savings.saved.amount)
     }
 
-    /** Новые сутки — карманные приходят при первом входе. */
+    /** Новые сутки — начинается следующий игровой день. */
     private fun nextMorning(model: GameViewModel) {
         day = day.plusDays(1)
         model.startNewDayIfDue()

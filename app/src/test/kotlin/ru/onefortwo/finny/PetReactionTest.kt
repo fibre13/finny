@@ -12,7 +12,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
@@ -55,20 +54,29 @@ class PetReactionTest {
 
     private fun GameViewModel.kinds() = reactions.value.map { it.kind }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `покупки, копилка и награда ставят свои реакции`() {
+    fun `покупки, копилка и помощь питомцу ставят свои реакции, задание без монет — нет`() {
         val model = viewModel()
+        // До плана монеты свободные: нужное и желаемое покупаются из них.
         model.buy("food")
         model.buy("ball")
         assertEquals(listOf(PetReactions.EAT, PetReactions.PLAY), model.kinds())
+        model.reactions.value.forEach { model.reactionPlayed(it.id) }
 
+        // Копилка пополняется и планом сезона, и отдельно.
         model.chooseGoal("scooter")
+        model.confirmPlan(needs = 10, wants = 8, savings = 10)
+        assertEquals(listOf(PetReactions.SAVE), model.kinds())
         model.deposit(5)
-        assertEquals(PetReactions.SAVE, model.kinds().last())
+        assertEquals(listOf(PetReactions.SAVE, PetReactions.SAVE), model.kinds())
 
+        // Задание без монет открывает путь к сюрпризу, но награды-реакции не даёт.
         val task = content.task("save_rate")!!.withNumbers(Random(1)) as NumberTask
         model.answerTask(task, TaskAnswer.Number(task.answer))
+        assertEquals(2, model.reactions.value.size)
+
+        // «Помоги своему питомцу» приносит монеты — питомец радуется награде.
+        model.answerTask(content.task("recover_help")!!, TaskAnswer.Chosen("food"))
         assertEquals(PetReactions.REWARD, model.kinds().last())
     }
 
@@ -92,21 +100,28 @@ class PetReactionTest {
         assertEquals(2, model.reactions.value.size)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `переход на новую стадию ставит реакцию роста со стадией до роста`() {
+    fun `переход на новую стадию ждёт праздника роста с прежней стадией`() {
+        // В сезоне рост показывается праздником из трёх сцен, а не реакцией
+        // в очереди: прежняя стадия хранится в growthShown до конца праздника.
         val model = viewModel()
         model.chooseGoal("scooter")
-        var grow: PetReaction? = null
-        repeat(3) {
-            model.confirmPlan(needs = 10, wants = 12, savings = 3)
-            model.buy("food")
-            model.buy("ball")
-            model.finishPeriod()
-            model.reactions.value.lastOrNull { it.kind == PetReactions.GROW }?.let { grow = it }
-            model.reactions.value.forEach { model.reactionPlayed(it.id) }
-        }
-        assertEquals(GrowthStage.BABY, grow?.stageBefore)
+        // Монеты на две мечты (60 + 90) и задания для роста — помощью питомцу.
+        repeat(20) { model.answerTask(content.task("recover_help")!!, TaskAnswer.Chosen("food")) }
+        model.deposit(60)
+        model.claimGoal()
+        model.chooseGoal("aquarium")
+        model.deposit(90)
+        model.claimGoal()
+
+        val state = model.state.value
+        assertEquals(GrowthStage.TEEN, state.game.stage)
+        assertEquals(GrowthStage.BABY, state.extras.growthShown)
+        // Получение мечты — награда: питомец радуется ей на главной.
+        assertEquals(PetReactions.REWARD, model.kinds().last())
+
+        model.growthCelebrated()
+        assertEquals(GrowthStage.TEEN, model.state.value.extras.growthShown)
     }
 
     @Test
