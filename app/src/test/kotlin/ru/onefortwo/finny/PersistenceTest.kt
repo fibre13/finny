@@ -18,7 +18,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -34,6 +33,8 @@ import ru.onefortwo.finny.data.GameRepository
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.Difficulty
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.Season
+import ru.onefortwo.finny.ui.state.SeasonExtras
 
 /**
  * Проверка сохранения состояния между запусками (ТЗ 2.5.13,
@@ -88,6 +89,37 @@ class PersistenceTest {
 
     private fun viewModel() = GameViewModel(content, repository, dates = { clock })
 
+    /** Следующие календарные сутки. */
+    private fun nextDay() {
+        clock = java.time.LocalDate.parse(clock).plusDays(1).toString()
+    }
+
+    /** Верный ответ на задание с числом. */
+    private fun GameViewModel.solve(id: String) {
+        val task = content.task(id)!!.withNumbers(Random(1)) as NumberTask
+        answerTask(task, TaskAnswer.Number(task.answer))
+    }
+
+    /** «Помоги своему питомцу» — единственное задание сезона с монетами. */
+    private fun GameViewModel.helpPet() {
+        answerTask(content.task("recover_help")!!, TaskAnswer.Chosen("food"))
+    }
+
+    /** Отказ во всех событиях дня, вместе с продолжениями отказов: монеты не тратятся. */
+    private fun GameViewModel.declineDay() {
+        repeat(6) {
+            if (pendingEvent() == null) return
+            answerEvent(false)
+            closeEventResult(false)
+        }
+    }
+
+    /** Все свободные монеты — в копилку поправкой плана. */
+    private fun GameViewModel.saveAllFree() {
+        val x = state.value.extras
+        assertTrue(confirmPlan(needs = x.needsJar, wants = x.wantsJar, savings = state.value.freeCoins))
+    }
+
     @Test
     fun `выключенные движения сохраняются и переживают сброс профиля`() = runBlocking {
         val first = viewModel()
@@ -126,7 +158,7 @@ class PersistenceTest {
         val first = viewModel()
         first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
         first.chooseGoal("scooter")
-        first.confirmPlan(needs = 15, wants = 12, savings = 10)
+        assertTrue(first.confirmPlan(needs = 20, wants = 20, savings = 10))
         first.buy("food")
         first.buy("ball")
         val task = content.task("save_rate")!!.withNumbers(Random(1)) as NumberTask
@@ -146,30 +178,39 @@ class PersistenceTest {
         assertEquals(before.game.pet.care.value, after.game.pet.care.value)
         assertEquals(before.game.pet.joy.value, after.game.pet.joy.value)
         assertEquals(before.completedTaskIds, after.completedTaskIds)
+        assertEquals(before.extras, after.extras)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
-    @Test
-    fun `полученная цель сохраняется и освобождает место следующей`() = runBlocking {
-        val first = viewModel()
-        first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
-        first.chooseGoal("scooter")
-        // Самокат стоит 60, стартовых монет 50: недостающее добирается
-        // наградой за задание, как это и происходит в игре.
-        first.confirmPlan(needs = 0, wants = 0, savings = 50)
-        val task = content.task("save_rate")!!.withNumbers(Random(1)) as NumberTask
-        first.answerTask(task, TaskAnswer.Number(task.answer))
-        first.deposit(10)
+    /** Самокат (60 монет) получен: 50 монет сезона и 10 за «Помоги своему питомцу» — в копилку. */
+    private fun claimScooter(model: GameViewModel) {
+        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        model.dismissArrival()
+        model.chooseGoal("scooter")
+        assertTrue(model.confirmPlan(needs = 0, wants = 0, savings = 50))
+        model.helpPet()
+        model.saveAllFree()
+        assertEquals(60, model.state.value.game.savings.saved.amount)
+        model.claimGoal()
+    }
 
-        first.claimGoal()
+    @Test
+    fun `полученная мечта сохраняется и освобождает место следующей`() = runBlocking {
+        val first = viewModel()
+        claimScooter(first)
 
         assertEquals(setOf("scooter"), first.state.value.achievedGoalIds)
-        assertNull("Место цели должно освободиться", first.state.value.game.savings.goal)
+        assertNull("Место мечты должно освободиться", first.state.value.game.savings.goal)
+        assertEquals(0, first.state.value.game.savings.saved.amount)
 
-        // Повторный запуск: список достигнутых целей читается из базы.
+        // Повторный запуск: список полученных мечт читается из базы.
         val second = viewModel()
         assertEquals(setOf("scooter"), second.state.value.achievedGoalIds)
         assertNull(second.state.value.game.savings.goal)
+
+        // Следующая мечта выбирается на освободившееся место и тоже сохраняется.
+        second.chooseGoal("aquarium")
+        assertEquals("aquarium", viewModel().state.value.game.savings.goal?.id)
+        assertEquals(setOf("scooter"), viewModel().state.value.achievedGoalIds)
     }
 
     @Test
@@ -177,7 +218,7 @@ class PersistenceTest {
         val first = viewModel()
         first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
         first.chooseGoal("scooter")
-        first.confirmPlan(needs = 15, wants = 0, savings = 5)
+        assertTrue(first.confirmPlan(needs = 20, wants = 20, savings = 10))
         first.markTermsRead()
         first.buy("food")
         first.dismissReminder(ru.onefortwo.finny.ui.state.Reminder.TASK)
@@ -191,75 +232,120 @@ class PersistenceTest {
         assertEquals(before.game.period.number, after.remindersPeriod)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `сброс профиля удаляет и полученные цели`() = runBlocking {
+    fun `сброс профиля удаляет полученные мечты и состояние сезона`() = runBlocking {
         val first = viewModel()
-        first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
-        first.chooseGoal("scooter")
-        first.confirmPlan(needs = 0, wants = 0, savings = 50)
-        val task = content.task("save_rate")!!.withNumbers(Random(1)) as NumberTask
-        first.answerTask(task, TaskAnswer.Number(task.answer))
-        first.deposit(10)
-        first.claimGoal()
+        claimScooter(first)
         assertEquals(setOf("scooter"), first.state.value.achievedGoalIds)
+        assertTrue(first.state.value.extras.planned)
 
         first.resetProfile()
 
         // Сброс удаляет данные сразу, а не при следующем сохранении: в базе
-        // не остаётся ни профиля, ни целей прежнего игрока (ТЗ 3.5).
+        // не остаётся ни профиля, ни мечт прежнего игрока (ТЗ 3.5).
         assertNull(repository.load())
         assertTrue(database.gameDao().achievedGoals().isEmpty())
         first.createProfile("Барсик", PetAppearance("dog", "grey", "none"), Difficulty.SIMPLE)
-        assertTrue(viewModel().state.value.achievedGoalIds.isEmpty())
+
+        // Новый профиль начинает первый сезон с нуля: план, банки, задания — прежние не переходят.
+        val restored = viewModel().state.value
+        assertTrue(restored.achievedGoalIds.isEmpty())
+        assertEquals(SeasonExtras(season = 1, seasonStart = TODAY), restored.extras)
+        assertEquals(50, restored.game.balance.amount)
+        assertEquals(0, restored.game.savings.saved.amount)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `покупки текущего дня и подтверждённый план переживают перезапуск`() = runBlocking {
+    fun `план сезона, банки, события дня и открытые товары переживают перезапуск`() = runBlocking {
         val first = viewModel()
         first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        first.dismissArrival()
         first.chooseGoal("scooter")
-        first.confirmPlan(needs = 15, wants = 12, savings = 10)
+        assertTrue(first.confirmPlan(needs = 20, wants = 15, savings = 15))
+        // Корм — из банка «Нужное».
         first.buy("food")
+        // Первое событие дня решено, остальные ждут решения.
+        val firstEvent = first.pendingEvent()!!.id
+        first.answerEvent(false)
+        first.closeEventResult(false)
+        // Три задания открывают сюрприз в лавке.
+        repeat(3) { first.solve("save_rate") }
 
-        val after = viewModel().state.value
+        val before = first.state.value
+        assertEquals(10, before.extras.needsJar)
+        assertEquals(1, before.extras.answered)
+        assertTrue("pants" in before.extras.unlocked)
+        val waiting = first.pendingEvent()?.id
+        assertNotNull(waiting)
 
-        assertTrue(after.game.period.isPlanConfirmed)
-        assertEquals(1, after.game.period.purchases.size)
-        assertEquals("food", after.game.period.purchases.single().itemId)
-        assertEquals(10, after.game.period.depositedToSavings.amount)
-        assertTrue(after.game.period.canFinish)
+        // Повторный запуск приложения: новая модель читает ту же базу.
+        val second = viewModel()
+        val after = second.state.value
+
+        assertEquals("состояние сезона восстановлено целиком", before.extras, after.extras)
+        // План и банки.
+        assertTrue(after.extras.planned)
+        assertEquals(20, after.extras.plannedNeeds)
+        assertEquals(15, after.extras.plannedWants)
+        assertEquals(15, after.extras.plannedSavings)
+        assertEquals(10, after.extras.needsJar)
+        assertEquals(15, after.extras.wantsJar)
+        assertEquals(10, after.extras.spentNeeds)
+        assertEquals(25, after.game.balance.amount)
+        assertEquals(15, after.game.savings.saved.amount)
+        assertEquals(0, after.freeCoins)
+        // События дня: те же, решённое не повторяется, ждёт то же следующее.
+        assertEquals(1, after.extras.eventsDay)
+        assertTrue(after.extras.dayEvents.size >= 3)
+        assertEquals(before.extras.dayEvents, after.extras.dayEvents)
+        assertTrue(firstEvent in after.extras.usedEvents)
+        assertEquals(waiting, second.pendingEvent()?.id)
+        assertFalse(after.dayEventsDone)
+        // Открытые товары и купленное.
+        assertEquals(3, after.extras.tasksSolved)
+        assertEquals("pants", after.extras.surprise)
+        assertTrue(Season.visibleItems(content.shopItems(), after.extras, "cat").any { it.id == "pants" })
+        assertTrue("food" in after.extras.owned)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `история завершённых дней и стадия развития сохраняются`() = runBlocking {
+    fun `итоги прожитых дней сезона и стадия роста переживают перезапуск`() = runBlocking {
         val first = viewModel()
-        first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
-        first.chooseGoal("scooter")
+        claimScooter(first)
+        // Вторая мечта: аквариум за 90 монет — из «Помоги своему питомцу» (повтор — 5 монет).
+        first.chooseGoal("aquarium")
+        repeat(18) { first.helpPet() }
+        first.saveAllFree()
+        assertEquals(90, first.state.value.game.savings.saved.amount)
+        first.claimGoal()
+        // Две мечты и девятнадцать заданий — питомец подрос.
+        assertEquals(GrowthStage.TEEN, first.state.value.game.stage)
 
-        repeat(5) {
-            first.confirmPlan(needs = 10, wants = 12, savings = 3)
-            first.buy("food")
-            first.buy("ball")
+        // Три дня сезона в обычном режиме: каждый — в свои календарные сутки.
+        repeat(3) { index ->
+            if (index > 0) {
+                nextDay()
+                first.startNewDayIfDue()
+            }
+            first.declineDay()
             first.finishPeriod()
-            // Карманные на новый день приходят в новые сутки.
-            clock = java.time.LocalDate.parse(clock).plusDays(1).toString()
-            first.startNewDayIfDue()
         }
+        val before = first.state.value
+        assertTrue(before.extras.seasonDone)
 
         val after = viewModel().state.value
 
-        assertEquals(5, after.game.history.size)
-        assertEquals(6, after.game.period.number)
-        assertEquals(15, after.game.growthPoints)
-        assertEquals(GrowthStage.ADULT, after.game.stage)
-        // Прогноз срока цели опирается на пополнения по завершённым дням.
-        assertEquals(
-            listOf(3, 3, 3, 3, 3),
-            after.game.savings.depositsByPeriod.map { it.amount },
-        )
+        assertEquals(3, after.game.history.size)
+        assertEquals(4, after.game.period.number)
+        assertEquals(clock, after.lastFinishedDate)
+        assertTrue("итоги сезона ждут показа", after.extras.seasonDone)
+        assertEquals(setOf("scooter", "aquarium"), after.achievedGoalIds)
+        assertEquals(GrowthStage.TEEN, after.game.stage)
+        assertEquals(before.game.growthPoints, after.game.growthPoints)
+        assertEquals(19, after.extras.tasksSolved)
+        assertEquals(before.extras.unlocked, after.extras.unlocked)
+        assertEquals(before.extras.unlockedAt, after.extras.unlockedAt)
+        assertEquals(before.extras, after.extras)
     }
 
     @Test
@@ -315,17 +401,18 @@ class PersistenceTest {
         assertNull(state.game.savings.goal)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `сброс тестового профиля возвращает исходное состояние`() = runBlocking {
+    fun `сброс тестового профиля возвращает сезон к началу`() = runBlocking {
         val model = viewModel()
         startDemoProfile(model)
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
+        assertTrue(model.confirmPlan(needs = 20, wants = 15, savings = 15))
         model.buy("food")
-        model.buy("ball")
+        model.declineDay()
         model.finishPeriod()
+        repeat(3) { model.solve("save_rate") }
 
         assertEquals(2, model.state.value.game.period.number)
+        assertTrue(model.state.value.extras.unlocked.isNotEmpty())
 
         model.resetDemo()
         // Сброс возвращает к подарку: знакомство проходится заново.
@@ -341,6 +428,11 @@ class PersistenceTest {
         assertEquals(0, state.game.growthPoints)
         assertTrue(state.game.history.isEmpty())
         assertTrue(state.completedTaskIds.isEmpty())
+        // Сезон — с первого дня: план не составлен, банки пусты, сюрпризы закрыты.
+        val fresh = SeasonExtras(season = 1, seasonStart = TODAY)
+        assertEquals(fresh, state.extras)
+        // И в базе — то же начальное состояние сезона.
+        assertEquals(fresh, SeasonExtras.decode(repository.load()!!.extras))
     }
 
     @Test
@@ -360,14 +452,12 @@ class PersistenceTest {
         assertTrue(available.all { it.level.suits(difficulty) })
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `демонстрационный режим не ограничен днём и временем`() = runBlocking {
+    fun `в демонстрационном режиме следующий день сезона начинается сразу, без ожидания суток и предела времени`() = runBlocking {
         val model = viewModel()
         startDemoProfile(model)
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
-        model.buy("food")
-        model.buy("ball")
+        assertTrue(model.confirmPlan(needs = 20, wants = 15, savings = 15))
+        model.declineDay()
         model.finishPeriod()
 
         val state = model.state.value
@@ -375,57 +465,94 @@ class PersistenceTest {
         // Демонстрационный режим должен проходиться подряд: ни отметка
         // прожитого дня, ни лимит времени на него не действуют (ТЗ 2.5.13).
         assertFalse(state.isDayFinished(TODAY))
-        assertFalse(state.isTimeUp(TODAY))
+        assertFalse(state.isSleeping(TODAY))
+        assertFalse(state.copy(usageDate = TODAY, usageMinutes = 25).isTimeUp(TODAY))
         assertEquals(2, state.game.period.number)
+        assertEquals(2, state.seasonDay)
+        // События второго дня выбраны сразу, в те же сутки.
+        assertEquals(2, state.extras.eventsDay)
+        assertEquals(3, state.extras.dayEvents.size)
+        assertNotNull(model.pendingEvent())
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `в обычном режиме второй игровой день в те же сутки не начинается`() = runBlocking {
+    fun `в обычном режиме второй день сезона в те же сутки не начинается`() = runBlocking {
         val model = viewModel()
         model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        model.dismissArrival()
         model.chooseGoal("scooter")
-        model.confirmPlan(needs = 15, wants = 12, savings = 10)
-        model.buy("food")
-        model.buy("ball")
+        assertTrue(model.confirmPlan(needs = 20, wants = 15, savings = 15))
+        model.declineDay()
         model.finishPeriod()
 
+        // Вход в те же сутки: питомец спит, события второго дня не выбираются.
+        model.startNewDayIfDue()
         val state = model.state.value
-
         assertEquals(TODAY, state.lastFinishedDate)
         assertTrue(state.isDayFinished(TODAY))
-        // Наступили следующие сутки — игра снова доступна.
-        assertFalse(state.isDayFinished("2026-09-16"))
+        assertTrue(state.isSleeping(TODAY))
+        assertEquals(1, state.extras.eventsDay)
+        assertNull(model.pendingEvent())
+        // Закрыть день ещё раз нельзя: второй день в эти сутки не прожить.
+        model.finishPeriod()
+        assertEquals(2, model.state.value.game.period.number)
+        assertEquals(1, model.state.value.game.history.size)
+
+        // Наступили следующие сутки — день второй, события ждут решения.
+        nextDay()
+        model.startNewDayIfDue()
+        val next = model.state.value
+        assertFalse(next.isSleeping(clock))
+        assertEquals(2, next.extras.eventsDay)
+        assertNotNull(model.pendingEvent())
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `отметка прожитого дня переживает перезапуск`() = runBlocking {
+    fun `отметка прожитого дня сезона переживает перезапуск, питомец спит до новых суток`() = runBlocking {
         val first = viewModel()
         first.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        first.dismissArrival()
         first.chooseGoal("scooter")
-        first.confirmPlan(needs = 15, wants = 12, savings = 10)
-        first.buy("food")
+        assertTrue(first.confirmPlan(needs = 20, wants = 15, savings = 15))
+        first.declineDay()
         first.finishPeriod()
 
-        val after = viewModel().state.value
-
+        // Повторный запуск в те же сутки: день не начинается заново.
+        val second = viewModel()
+        second.startNewDayIfDue()
+        val after = second.state.value
         assertEquals(TODAY, after.lastFinishedDate)
         assertTrue(after.isDayFinished(TODAY))
+        assertTrue(after.isSleeping(TODAY))
+        assertEquals(2, after.game.period.number)
+        assertNull(second.pendingEvent())
+
+        // Запуск в новые сутки: второй день сезона с событиями, банки прежние.
+        nextDay()
+        val third = viewModel()
+        third.startNewDayIfDue()
+        val nextDayState = third.state.value
+        assertFalse(nextDayState.isSleeping(clock))
+        assertEquals(2, nextDayState.seasonDay)
+        assertEquals(after.extras.needsJar, nextDayState.extras.needsJar)
+        assertEquals(after.extras.wantsJar, nextDayState.extras.wantsJar)
+        assertNotNull(third.pendingEvent())
     }
 
     @Test
     fun `купленная обстановка переживает завершение дня и перезапуск`() = runBlocking {
         val model = viewModel()
         model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
-        model.confirmPlan(needs = 10, wants = 25, savings = 0)
+        assertTrue(model.confirmPlan(needs = 10, wants = 40, savings = 0))
         model.buy("tent")
 
         assertTrue("Дом не появился после покупки", model.state.value.hasScenery("house"))
 
         // Покупки периода очищаются при завершении дня, а обстановка —
         // нет: иначе дом исчезал бы наутро после покупки.
+        model.declineDay()
         model.finishPeriod()
+        assertNotNull("День не закрылся", model.state.value.lastFinishedDate)
 
         assertTrue("Дом пропал после завершения дня", model.state.value.hasScenery("house"))
         assertTrue("Дом не восстановился из базы", viewModel().state.value.hasScenery("house"))
@@ -436,7 +563,7 @@ class PersistenceTest {
         val model = viewModel()
         model.createProfile("Финни", PetAppearance("cat", "ginger", "none"), Difficulty.HARDER)
         model.chooseGoal("scooter")
-        model.confirmPlan(needs = 10, wants = 10, savings = 5)
+        assertTrue(model.confirmPlan(needs = 20, wants = 20, savings = 10))
 
         // До покупки украшение недоступно.
         assertFalse(model.state.value.isAccessoryAvailable("scarf"))

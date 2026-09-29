@@ -13,7 +13,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
@@ -29,8 +28,8 @@ import ru.onefortwo.finny.ui.state.Reminder
 import ru.onefortwo.finny.ui.state.YardGuide
 
 /**
- * Одна цель на экране, день = календарные
- * сутки, монеты за первые два задания дня.
+ * Одна цель на экране: подсказки двора в сезоне. Мечта → план сезона →
+ * события дня → напоминания по порядку дня; день = календарные сутки.
  */
 class YardGuideTest {
 
@@ -54,9 +53,49 @@ class YardGuideTest {
         answerTask(task, TaskAnswer.Number(task.answer))
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
+    /** «Помоги своему питомцу» — единственное задание сезона с монетами. */
+    private fun GameViewModel.helpPet() {
+        answerTask(content.task("recover_help")!!, TaskAnswer.Chosen("food"))
+    }
+
+    /** Отказ во всех событиях дня, вместе с продолжениями отказов: монеты не тратятся и не приходят. */
+    private fun GameViewModel.declineDay() {
+        repeat(6) {
+            if (pendingEvent() == null) return
+            answerEvent(false)
+            closeEventResult(false)
+        }
+    }
+
+    private fun nextDay() {
+        today = java.time.LocalDate.parse(today).plusDays(1).toString()
+    }
+
+    /** Профиль с мечтой и планом сезона; события первого дня ещё не решены. */
+    private fun plannedModel(): GameViewModel {
+        val model = model()
+        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+        model.dismissArrival()
+        model.chooseGoal("scooter")
+        assertTrue(model.confirmPlan(needs = 20, wants = 15, savings = 15))
+        return model
+    }
+
+    /** Первый день прожит, наступили вторые сутки, события второго дня решены. */
+    private fun secondDayEventsDone(): GameViewModel {
+        val model = plannedModel()
+        model.declineDay()
+        model.finishPeriod()
+        nextDay()
+        model.startNewDayIfDue()
+        model.declineDay()
+        assertTrue(model.state.value.dayEventsDone)
+        assertEquals(2, model.state.value.seasonDay)
+        return model
+    }
+
     @Test
-    fun `первый день ведёт по шагам в порядке Приложения А`() {
+    fun `первый день сезона ведёт от мечты к плану, событиям и напоминаниям`() {
         val model = model()
         assertNull("до знакомства подсказок нет", model.guide())
 
@@ -66,84 +105,87 @@ class YardGuideTest {
         assertNull(model.guide())
         model.dismissArrival()
 
-        assertEquals(1, model.guide()?.number)
+        // Мечта — раньше плана: без цели монеты в копилку не отложить.
         assertEquals(GuideTarget.SAVINGS, model.guide()?.target)
-
         model.chooseGoal("scooter")
         assertEquals(GuideTarget.PLAN, model.guide()?.target)
+        assertTrue(model.guide()!!.text.contains("50 монет"))
 
-        model.confirmPlan(needs = 10, wants = 12, savings = 5)
-        assertEquals(3, model.guide()?.number)
-        assertEquals(GuideTarget.SHOP, model.guide()?.target)
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
+        // Пока события дня не решены, двор ничего не выделяет: событие — в своём окне.
+        assertNotNull(model.pendingEvent())
+        assertNull(model.guide())
 
-        model.buy("food")
+        model.declineDay()
+        assertEquals(Reminder.TASK, model.guide()?.reminder)
         assertEquals(GuideTarget.TASKS, model.guide()?.target)
+        assertEquals(0, model.guide()?.number)
 
         model.solve("save_rate")
-        assertEquals(5, model.guide()?.number)
-        assertEquals(GuideTarget.SHOP, model.guide()?.target)
-
-        model.buy("ball")
+        assertEquals(GuideTarget.GLOSSARY, model.guide()?.target)
+        model.markTermsRead()
+        assertEquals(Reminder.PLAN_FIX, model.guide()?.reminder)
+        model.dismissReminder(Reminder.PLAN_FIX)
         assertEquals(GuideTarget.FINISH, model.guide()?.target)
+
+        model.finishPeriod()
+        assertNull("питомец спит — подсказок нет", model.guide())
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `после закрытия дня питомец спит, монеты приходят в новые сутки`() {
-        val model = model()
-        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
-        model.dismissArrival()
-        model.chooseGoal("scooter")
-        model.confirmPlan(needs = 10, wants = 0, savings = 5)
-        model.buy("food")
+    fun `после закрытия дня питомец спит, новые монеты приходят только с новым сезоном`() {
+        val model = plannedModel()
+        model.declineDay()
         val before = model.state.value.game.balance.amount
 
         model.finishPeriod()
-        // Карманные не пришли: сегодня питомец спит, подсветки нет.
-        assertEquals(before, model.state.value.game.balance.amount)
         assertTrue(model.state.value.isSleeping(today))
         assertNull(model.guide())
 
         // В те же сутки новый день не начинается.
         model.startNewDayIfDue()
-        assertEquals(before, model.state.value.game.balance.amount)
+        assertTrue(model.state.value.isSleeping(today))
+        assertNull(model.guide())
 
-        today = "2026-09-29"
+        // Вторые сутки: день второй, монет внутри сезона не приходит — окна «Пришли монеты» нет.
+        nextDay()
         model.startNewDayIfDue()
-        val state = model.state.value
-        assertEquals(before + 25, state.game.balance.amount)
+        var state = model.state.value
         assertFalse(state.isSleeping(today))
-        assertNotNull("о монетах сказано окном", state.arrival)
-        model.dismissArrival()
-        // Со второго дня выделена только доска плана, без номера шага.
-        assertEquals(GuideTarget.PLAN, model.guide()?.target)
-        assertEquals(0, model.guide()?.number)
-    }
+        assertEquals(before, state.game.balance.amount)
+        assertNull(state.arrival)
+        assertTrue(state.message!!.text.contains("День 2 из 3"))
+        // Пока не решены события второго дня, двор ничего не выделяет.
+        assertNull(model.guide())
 
-    /** Первый день прожит, наступили вторые сутки, план второго дня утверждён. */
-    private fun secondDayWithPlan(): GameViewModel {
-        val model = model()
-        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
-        model.dismissArrival()
-        model.chooseGoal("scooter")
-        model.confirmPlan(needs = 10, wants = 0, savings = 5)
-        model.buy("food")
+        model.declineDay()
         model.finishPeriod()
-        today = "2026-09-29"
+        nextDay()
         model.startNewDayIfDue()
+        model.declineDay()
+        model.finishPeriod()
+        // Третий день закрыт: итоги сезона, подсказок нет.
+        assertTrue(model.state.value.extras.seasonDone)
+        assertNull(model.guide())
+
+        // Новые сутки: итоги закрыты — пришли 50 монет нового сезона, двор зовёт к плану.
+        nextDay()
+        model.startNewDayIfDue()
+        assertNull(model.guide())
+        model.closeSeason()
+        state = model.state.value
+        assertEquals(2, state.extras.season)
+        assertEquals(before + 50, state.game.balance.amount)
+        assertNotNull("о монетах сказано окном", state.arrival)
+        assertNull(model.guide())
         model.dismissArrival()
-        model.confirmPlan(needs = 10, wants = 5, savings = 5)
-        return model
+        assertEquals(GuideTarget.PLAN, model.guide()?.target)
+        assertTrue(model.guide()!!.text.startsWith("Новый сезон"))
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `со второго дня двор напоминает о делах по порядку дня`() {
-        val model = secondDayWithPlan()
-
-        assertEquals(Reminder.NEEDS, model.guide()?.reminder)
-        assertEquals(GuideTarget.SHOP, model.guide()?.target)
-        model.buy("food")
+    fun `после событий дня двор напоминает о делах по порядку дня`() {
+        val model = secondDayEventsDone()
 
         assertEquals(Reminder.TASK, model.guide()?.reminder)
         assertEquals(GuideTarget.TASKS, model.guide()?.target)
@@ -154,44 +196,55 @@ class YardGuideTest {
         assertEquals(GuideTarget.GLOSSARY, model.guide()?.target)
         model.markTermsRead()
 
+        // Раз в сезон после дел дня — вопрос о поправке плана.
+        assertEquals(Reminder.PLAN_FIX, model.guide()?.reminder)
+        assertEquals(GuideTarget.PLAN, model.guide()?.target)
+        model.dismissReminder(Reminder.PLAN_FIX)
+
         assertEquals(Reminder.FINISH, model.guide()?.reminder)
         model.finishPeriod()
         assertNull("питомец спит — напоминаний нет", model.guide())
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `«Не сейчас» откладывает напоминание до конца игрового дня`() {
-        val model = secondDayWithPlan()
-        assertEquals(Reminder.NEEDS, model.guide()?.reminder)
+    fun `«Не сейчас» откладывает напоминание до конца игрового дня, вопрос о плане — до конца сезона`() {
+        val model = secondDayEventsDone()
+        assertEquals(Reminder.TASK, model.guide()?.reminder)
 
-        model.dismissReminder(Reminder.NEEDS)
-        assertEquals("следующее дело по порядку", Reminder.TASK, model.guide()?.reminder)
+        model.dismissReminder(Reminder.TASK)
+        assertEquals("следующее дело по порядку", Reminder.WORD, model.guide()?.reminder)
+        model.dismissReminder(Reminder.WORD)
+        assertEquals(Reminder.PLAN_FIX, model.guide()?.reminder)
+        model.dismissReminder(Reminder.PLAN_FIX)
+        assertEquals(Reminder.FINISH, model.guide()?.reminder)
 
-        // Новый игровой день — отложенное снова напоминается.
-        model.buy("ball")
+        // Новый игровой день — отложенные снова напоминаются, а о плане в этом сезоне больше не спрашивают.
         model.finishPeriod()
-        today = "2026-09-30"
+        nextDay()
         model.startNewDayIfDue()
-        model.dismissArrival()
-        model.confirmPlan(needs = 10, wants = 0, savings = 5)
-        assertEquals(Reminder.NEEDS, model.guide()?.reminder)
+        model.declineDay()
+        assertEquals(3, model.state.value.seasonDay)
+        assertEquals(Reminder.TASK, model.guide()?.reminder)
+        model.dismissReminder(Reminder.TASK)
+        assertEquals(Reminder.WORD, model.guide()?.reminder)
+        model.dismissReminder(Reminder.WORD)
+        assertEquals(Reminder.FINISH, model.guide()?.reminder)
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `про задание не напоминают, когда экранное время вышло`() {
-        val model = secondDayWithPlan()
-        model.buy("food")
+        val model = secondDayEventsDone()
+        assertEquals(Reminder.TASK, YardGuide.reminder(model.state.value, today))
         val timeUp = model.state.value.copy(usageDate = today, usageMinutes = 20)
 
         assertTrue(timeUp.isTimeUp(today))
         assertEquals(Reminder.WORD, YardGuide.reminder(timeUp, today))
+        // Взрослый снял ограничение — напоминание о задании возвращается.
+        assertEquals(Reminder.TASK, YardGuide.reminder(timeUp.copy(timeLimitEnabled = false), today))
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `слово становится новым при первой встрече и один раз`() {
+    fun `слово становится новым при первой встрече в сезоне и один раз`() {
         val model = model()
         model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
         assertTrue("до первых действий новых слов нет", model.state.value.newTerms.isEmpty())
@@ -203,19 +256,27 @@ class YardGuideTest {
         assertTrue(model.state.value.newTerms.isEmpty())
 
         // Прочитанное слово не становится новым снова; новое — только встреченное впервые.
-        model.confirmPlan(needs = 10, wants = 0, savings = 5)
+        // План сезона сразу пополняет копилку — отсюда «Накопления».
+        model.confirmPlan(needs = 20, wants = 15, savings = 15)
         assertEquals(setOf("Бюджет", "План", "Накопления"), model.state.value.newTerms)
         assertTrue("Цель" in model.state.value.knownTerms)
 
         model.solve("change_count")
         assertTrue("Сдача" in model.state.value.newTerms)
         assertTrue("Доход" in model.state.value.newTerms)
+
+        // Прожитый день приносит «Факт» — план и факт сравниваются в итогах.
+        model.markTermsRead()
+        model.declineDay()
+        model.finishPeriod()
+        assertTrue("Факт" in model.state.value.newTerms)
+        assertFalse("Цель" in model.state.value.newTerms)
     }
 
     @Test
     fun `встреченные слова есть в словарике`() {
         val terms = content.glossary().map { it.term }.toSet()
-        val model = secondDayWithPlan()
+        val model = secondDayEventsDone()
         model.buy("food")
         model.solve("change_count")
 
@@ -226,19 +287,32 @@ class YardGuideTest {
         )
     }
 
-    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
-    fun `монеты — за первые два задания дня`() {
-        val model = model()
-        model.createProfile("Финни", PetAppearance("cat", "ginger", "bow"), Difficulty.HARDER)
+    fun `монеты только за «Помоги своему питомцу», двор зовёт разложить их по банкам`() {
+        val model = plannedModel()
+        model.declineDay()
         val start = model.state.value.game.balance.amount
-        model.solve("save_rate")
-        model.solve("change_count")
-        assertEquals(start + 20, model.state.value.game.balance.amount)
 
-        // Третье задание засчитано, но без монет — и об этом сказано.
+        // Обычное задание монет не приносит — только приближает сюрприз.
         model.solve("save_rate")
-        assertEquals(start + 20, model.state.value.game.balance.amount)
-        assertTrue(model.state.value.message!!.text.contains("уже получены"))
+        assertEquals(start, model.state.value.game.balance.amount)
+        assertTrue(model.state.value.message!!.text.contains("Задание засчитано"))
+        assertEquals(0, model.state.value.freeCoins)
+
+        // «Помоги своему питомцу» — 10 монет, повтор — половина.
+        model.helpPet()
+        assertEquals(start + 10, model.state.value.game.balance.amount)
+        model.helpPet()
+        assertEquals(start + 15, model.state.value.game.balance.amount)
+
+        // Монеты вне банков — двор первым делом зовёт разложить их в «Плане».
+        assertEquals(15, model.state.value.freeCoins)
+        assertEquals(Reminder.FREE, model.guide()?.reminder)
+        assertEquals(GuideTarget.PLAN, model.guide()?.target)
+
+        val x = model.state.value.extras
+        assertTrue(model.confirmPlan(needs = x.needsJar, wants = x.wantsJar + 15, savings = 0))
+        assertEquals(0, model.state.value.freeCoins)
+        assertFalse(model.guide()?.reminder == Reminder.FREE)
     }
 }
