@@ -405,8 +405,17 @@ class SeasonTest {
         val x = SeasonExtras(plannedNeeds = 20, spentNeeds = 42, plannedWants = 15, spentWants = 0, plannedSavings = 15, deposited = 8, wantsToNeeds = 15, savingsToNeeds = 7)
         val notes = Season.borrowNotes(x)
         assertEquals("Потрачено больше плана на 22 монеты: из банка «Хочу» взято 15 монет, из копилки — 7 монет.", notes.needs)
-        assertEquals("Не потрачено на желаемое: 15 монет, из них 15 монет ушли на нужное.", notes.wants)
+        assertEquals("Из банка «Хочу» на нужное ушло 15 монет.", notes.wants)
         assertEquals("Из копилки на нужное взято 7 монет.", notes.savings)
+        // Перерасход, покрытый ещё и свободными монетами (подарок, награда): названы все источники.
+        val mixed = Season.borrowNotes(
+            SeasonExtras(plannedNeeds = 20, spentNeeds = 59, plannedWants = 15, spentWants = 12, wantsToNeeds = 13, savingsToNeeds = 6),
+        )
+        assertEquals(
+            "Потрачено больше плана на 39 монет: из банка «Хочу» взято 13 монет, из копилки — 6 монет, из свободных монет — 20 монет.",
+            mixed.needs,
+        )
+        assertEquals("Из банка «Хочу» на нужное ушло 13 монет.", mixed.wants)
         assertEquals(Season.BorrowNotes(null, null, null), Season.borrowNotes(SeasonExtras(plannedNeeds = 20, spentNeeds = 10)))
     }
 

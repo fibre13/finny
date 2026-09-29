@@ -138,17 +138,16 @@ object Season {
         val fromSavings = x.savingsToNeeds
         if (fromWants <= 0 && fromSavings <= 0) return BorrowNotes(null, null, null)
         val over = x.spentNeeds - x.plannedNeeds
+        // Перерасход покрывают банк «Хочу», копилка и свободные монеты (подарок, награда
+        // за помощь питомцу): называются все источники, сумма равна перерасходу.
+        val fromFree = (over - fromWants - fromSavings).coerceAtLeast(0)
         val sources = listOfNotNull(
             if (fromWants > 0) "из банка «Хочу» взято ${Explanations.coins(fromWants)}" else null,
             if (fromSavings > 0) "из копилки — ${Explanations.coins(fromSavings)}" else null,
+            if (fromFree > 0) "из свободных монет — ${Explanations.coins(fromFree)}" else null,
         ).joinToString(", ")
         val needs = if (over > 0) "Потрачено больше плана на ${Explanations.coinsAccusative(over)}: $sources." else null
-        val unspent = (x.plannedWants - x.spentWants).coerceAtLeast(0)
-        val wants = if (fromWants > 0) {
-            "Не потрачено на желаемое: ${Explanations.coins(unspent)}, из них ${Explanations.coins(fromWants)} ушли на нужное."
-        } else {
-            null
-        }
+        val wants = if (fromWants > 0) "Из банка «Хочу» на нужное ушло ${Explanations.coins(fromWants)}." else null
         val savings = if (fromSavings > 0) "Из копилки на нужное взято ${Explanations.coins(fromSavings)}." else null
         return BorrowNotes(needs, wants, savings)
     }
