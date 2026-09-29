@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -107,6 +109,8 @@ fun SavingsScreen(
     parts: PetPartsContent? = null,
     /** Цель уже получали: выбор цели — «новая мечта». */
     afterClaim: Boolean = false,
+    /** «Изменить» — пополнение копилки делается в плане дня, всё в одном месте. */
+    onOpenPlan: () -> Unit = {},
 ) {
     // Суммы выставляются кнопками шага, как на экране плана: печатать
     // число с клавиатуры не нужно (замечание тестировщика о вводе).
@@ -189,6 +193,25 @@ fun SavingsScreen(
                         )
                         LabeledValue("Стоимость", Explanations.coins(goal.price))
                         LabeledValue("Уже накоплено", Explanations.coins(game.savings.saved))
+                        // Пополнение — в плане дня. Ссылка — отдельной строкой под
+                        // суммой: в одной строке сумма переносилась. План меняется
+                        // только до утверждения (ТЗ 2.5.5), поэтому после — подсказка.
+                        if (game.period.isPlanConfirmed) {
+                            SupportingText(
+                                text = "Отложить ещё можно в плане завтра.",
+                                modifier = Modifier.padding(vertical = 6.dp),
+                            )
+                        } else Text(
+                            text = "Изменить →",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = FinnyTheme.colors.onPrimary,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .heightIn(min = 48.dp)
+                                .clickable(role = Role.Button, onClick = onOpenPlan)
+                                .wrapContentHeight(Alignment.CenterVertically),
+                        )
                         LabeledValue("Осталось накопить", Explanations.coins(game.savings.remaining))
                         SupportingText(
                             text = Explanations.forecast(game.goalForecast()),
@@ -197,71 +220,12 @@ fun SavingsScreen(
                     }
                 }
 
-                SectionCard(title = "Отложить монеты", tone = CardTone.Coin) {
-                    Column {
-                        LabeledValue("Можно потратить", Explanations.coins(game.balance))
-                        // Больше баланса отложить нельзя: верхняя граница — баланс.
-                        val depositMax = game.balance.amount
-                        val deposit = depositAmount.coerceAtMost(depositMax)
-                        AmountPicker(
-                            label = "Сколько отложить",
-                            value = deposit,
-                            max = depositMax,
-                            onChange = { depositAmount = it },
-                        )
-                        PrimaryButton(
-                            text = "Отложить в копилку",
-                            enabled = deposit > 0,
-                            onClick = {
-                                onDeposit(deposit)
-                                depositAmount = 0
-                            },
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                        // Причина недоступности названа текстом: по одному
-                        // виду кнопки непонятно, чего она ждёт.
-                        if (deposit == 0) {
-                            SupportingText(
-                                text = if (depositMax > 0) {
-                                    "Выбери сумму кнопками, и кнопка станет доступной."
-                                } else {
-                                    "Монет на балансе нет — откладывать пока нечего."
-                                },
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                        }
-                    }
-                }
-
-                SectionCard(title = "Взять из копилки") {
-                    Column {
-                        SupportingText("Монеты из копилки можно забрать, но цель станет дальше.")
-                        // Забрать можно не больше, чем накоплено.
-                        val withdrawMax = game.savings.saved.amount
-                        val withdraw = withdrawAmount.coerceAtMost(withdrawMax)
-                        AmountPicker(
-                            label = "Сколько забрать",
-                            value = withdraw,
-                            max = withdrawMax,
-                            onChange = { withdrawAmount = it },
-                        )
-                        SecondaryButton(
-                            text = "Посмотреть, что изменится",
-                            enabled = withdraw > 0,
-                            onClick = { previewAmount = withdraw },
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                        if (withdraw == 0) {
-                            SupportingText(
-                                text = if (withdrawMax > 0) {
-                                    "Выбери сумму кнопками, и кнопка станет доступной."
-                                } else {
-                                    "В копилке пока пусто — забирать нечего."
-                                },
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                        }
-                    }
+                // Снять можно, но только с подтверждением и показом, как изменятся сумма и срок.
+                if (game.savings.saved.amount > 0) {
+                    SecondaryButton(
+                        text = "Забрать монеты на покупки",
+                        onClick = { withdrawAmount = 0; previewAmount = 0 },
+                    )
                 }
             }
         }
@@ -270,8 +234,10 @@ fun SavingsScreen(
     previewAmount?.let { amount ->
         WithdrawalConfirmation(
             preview = onPreviewWithdrawal(amount),
+            max = game.savings.saved.amount,
+            onAmount = { previewAmount = it },
             onConfirm = {
-                onWithdraw(amount)
+                if (amount > 0) onWithdraw(amount)
                 withdrawAmount = 0
                 previewAmount = null
             },
@@ -317,13 +283,18 @@ private fun AmountPicker(
 @Composable
 private fun WithdrawalConfirmation(
     preview: WithdrawalPreview,
+    max: Int,
+    onAmount: (Int) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
     FinnyDialog(
-        title = "Забрать ${Explanations.coins(preview.amount)} из копилки?",
+        title = "Забрать из копилки?",
         onDismiss = onCancel,
         content = {
+            SupportingText("Монеты вернутся на баланс — разложишь их в «Плане». Цель станет дальше.")
+            AmountPicker(label = "Сколько забрать", value = preview.amount.amount, max = max, onChange = onAmount)
+            Spacer(modifier = Modifier.height(8.dp))
             LabeledValue("Сейчас в копилке", Explanations.coins(preview.savedBefore))
             LabeledValue("Станет", Explanations.coins(preview.savedAfter))
             Text(
@@ -341,6 +312,7 @@ private fun WithdrawalConfirmation(
             // не помещается.
             PrimaryButton(
                 text = "Забрать",
+                enabled = preview.amount.amount > 0,
                 onClick = onConfirm,
                 modifier = Modifier.padding(bottom = 8.dp),
             )

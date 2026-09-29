@@ -303,7 +303,11 @@ private fun AppNavHost(
             // Android пересоздаёт экран, обычная память композиции теряется,
             // а введённый ответ и результат восстанавливаются — без зерна
             // они относились бы уже к другому условию.
-            val seed = rememberSaveable(taskId) { Random.nextLong() }
+            // Задания с циферблатом при повторе — те же значения и тот же циферблат.
+            val seed = rememberSaveable(taskId) {
+                val time = content.task(taskId ?: "")?.topic == ru.onefortwo.finny.content.TaskTopic.TIME
+                if (time) (taskId ?: "").hashCode().toLong() else Random.nextLong()
+            }
             val task = remember(taskId, seed) {
                 taskId?.let { content.task(it)?.withNumbers(Random(seed))?.named(petName) }
             }
@@ -359,6 +363,7 @@ private fun AppNavHost(
                 profile = state.profile,
                 parts = content.petParts(),
                 afterClaim = state.achievedGoalIds.isNotEmpty(),
+                onOpenPlan = { navController.navigate(Routes.PLAN) },
             )
         }
 
@@ -394,6 +399,9 @@ private fun AppNavHost(
             }
 
             HistoryScreen(
+                profile = state.profile,
+                parts = content.petParts(),
+                onOpenTasks = { navController.navigate(Routes.TASKS) },
                 game = state.game,
                 petName = state.profile?.petName ?: "Финни",
                 balance = balance,
@@ -431,6 +439,8 @@ private fun AppNavHost(
             LaunchedEffect(Unit) { viewModel.markTermsRead() }
             GlossaryScreen(
                 entries = content.glossary().map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
+                // «План» и «Факт» ведут на экран плана: до утверждения — план, после — план и факт.
+                onOpenLink = { navController.navigate(Routes.PLAN) },
                 newTerms = fresh.toSet(),
                 onBack = { navController.popBackStack() },
             )
@@ -518,11 +528,11 @@ private fun TaskPet(state: AppState, parts: PetPartsContent, happy: Boolean) {
         stage = state.game.stage,
         care = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
         joy = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
-        size = 120.dp,
+        size = 96.dp,
         caption = false,
         plain = true,
         reaction = if (happy) PetReaction(PetReactions.PLAY, id = 1L) else null,
-        modifier = Modifier.width(120.dp),
+        modifier = Modifier.width(96.dp),
     )
 }
 

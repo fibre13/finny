@@ -95,6 +95,10 @@ fun GoalContent.dreamSize(): String = when {
 data class GlossaryEntry(
     val term: String,
     val explanation: String,
+    /** Пиксельный значок термина. */
+    val icon: String? = null,
+    /** Термин ведёт на экран: `plan` — план, `fact` — план и факт. */
+    val link: String? = null,
 )
 
 /**

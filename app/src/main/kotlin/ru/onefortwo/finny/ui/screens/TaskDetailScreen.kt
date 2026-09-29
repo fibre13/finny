@@ -56,7 +56,6 @@ import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.SelectButton
 import ru.onefortwo.finny.ui.common.SupportingText
-import ru.onefortwo.finny.ui.common.TaskResultIcon
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 import ru.onefortwo.finny.ui.state.AnsweredTask
 import ru.onefortwo.finny.ui.state.Explanations
@@ -116,19 +115,23 @@ fun TaskDetailScreen(
         eyebrow = task.topic.displayName,
         title = task.title,
         onBack = onBack,
+        // После ответа экран открывается сверху: итог и питомец видны сразу.
+        scrollKey = result != null,
     ) {
         Column {
-            // Игровое событие над условием — зачем решать задание.
-            task.context?.let {
+            // Игровое событие над условием — зачем решать задание. После
+            // ответа не показывается: итог помещается на один экран.
+            if (result == null) task.context?.let {
                 SectionCard(tone = CardTone.Coin) {
                     Text(text = it, style = MaterialTheme.typography.titleMedium)
                 }
             }
             SectionCard(tone = CardTone.Sage) {
+                // После ответа условие мельче — итог и питомец помещаются на экран.
                 Text(
                     text = task.prompt,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = if (result == null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (result == null) FontWeight.Bold else FontWeight.Normal,
                 )
             }
 
@@ -179,7 +182,7 @@ private fun ResultCard(
             // Мягче — «Почти получилось!», а не «Почти».
             title = if (check.isCorrect) "Верно!" else "Почти получилось!",
             tone = if (check.isCorrect) CardTone.Success else CardTone.Warning,
-            icon = { TaskResultIcon(correct = check.isCorrect) },
+            // Без значка: итог назван словом, экран короче.
         ) {
             Column {
                 if (check.outcome != null) {
@@ -203,39 +206,28 @@ private fun ResultCard(
             }
         }
 
-        // Питомец отвечает облачком — радуется или поддерживает.
+        // Питомец отвечает облачком — рядом, а не над ним: так ответ
+        // помещается на один экран без прокрутки. Кнопки «Готово» нет —
+        // возврат кнопкой «Назад» наверху.
         if (petFigure != null) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                verticalAlignment = Alignment.Bottom,
             ) {
-                // Облачко опущено к голове: над ней в рамке питомца пустые ряды.
+                petFigure(check.isCorrect)
+                check.petIcon?.let { icon ->
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TaskSprite(art, icon, 40.dp)
+                }
                 SpeechBubble(
                     colors = colors,
                     text = check.pet,
-                    modifier = Modifier.widthIn(max = 280.dp).offset(y = 28.dp).zIndex(1f),
+                    modifier = Modifier.weight(1f).padding(start = 8.dp, bottom = 48.dp),
                 )
-                Row(verticalAlignment = Alignment.Bottom) {
-                    petFigure(check.isCorrect)
-                    check.petIcon?.let { icon ->
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TaskSprite(art, icon, 56.dp)
-                    }
-                }
             }
         }
 
-        // После ответа — одна карточка следующего задания и выход.
-        if (nextTask != null) {
-            NextTaskCard(art = art, task = nextTask, onStart = onNextTask)
-            SecondaryButton(
-                text = "Готово",
-                onClick = onBack,
-                modifier = Modifier.padding(top = 10.dp),
-            )
-        } else {
-            PrimaryButton(text = "Готово", onClick = onBack)
-        }
+        if (nextTask != null) NextTaskCard(art = art, task = nextTask, onStart = onNextTask)
     }
 }
 
@@ -255,7 +247,7 @@ private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) 
                 }
             }
             // Кнопка под названием: рядом с ним она сжимала текст.
-            PrimaryButton(text = "Начать →", onClick = onStart, modifier = Modifier.padding(top = 12.dp))
+            PrimaryButton(text = "Начать следующее →", onClick = onStart, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

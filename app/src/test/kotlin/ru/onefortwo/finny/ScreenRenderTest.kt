@@ -290,10 +290,10 @@ class ScreenRenderTest {
         }
 
         repeat(4) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
-        // Сумма направления выводится один раз — на его карточке; общий
-        // итог — строкой «20 из 50».
+        // Сумма направления выводится один раз — на его карточке; остаток —
+        // крупной строкой.
         compose.onAllNodesWithText("20 монет").assertCountEquals(1)
-        compose.onNodeWithText("20 из 50").assertIsDisplayed()
+        compose.onNodeWithText("Осталось распределить: 30 монет").assertIsDisplayed()
 
         game = game.copy(balance = Coins.ZERO)
         compose.waitForIdle()
@@ -521,10 +521,28 @@ class ScreenRenderTest {
         compose.onNodeWithText("Нужное").assertIsDisplayed()
         compose.onNodeWithText("Хочу").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Копим на мечту").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("0 из 50").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Остаток 50 монет — можно оставить на всякий случай.")
-            .performScrollTo()
-            .assertIsDisplayed()
+        compose.onNodeWithText("Осталось распределить: 50 монет").performScrollTo().assertIsDisplayed()
+        repeat(2) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
+        compose.onNodeWithText("Остаток можно оставить на всякий случай.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `пустое направление плана требует подтверждения`() {
+        val confirmed = mutableListOf<Triple<Int, Int, Int>>()
+        compose.setContent {
+            FinnyTheme {
+                PlanScreen(game = GameState.newProfile(), onConfirm = { n, w, s -> confirmed += Triple(n, w, s) }, onBack = {})
+            }
+        }
+
+        repeat(2) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
+        compose.onNodeWithText("Утвердить план").performScrollTo().performClick()
+        compose.onNodeWithText("Ты уверен? Если не отложишь на «Хочу», ты не сможешь порадовать питомца.").assertIsDisplayed()
+        compose.onNodeWithText("Вернуться к плану").performClick()
+        assertTrue(confirmed.isEmpty())
+        compose.onNodeWithText("Утвердить план").performScrollTo().performClick()
+        compose.onNodeWithText("Да, я уверен").performClick()
+        assertEquals(listOf(Triple(10, 0, 0)), confirmed)
     }
 
     @Test
@@ -575,7 +593,7 @@ class ScreenRenderTest {
     }
 
     @Test
-    fun `в копилке сумма выставляется кнопками в пределах баланса и накопленного`() {
+    fun `копилка без блоков «Отложить» и «Взять» — пополнение в плане`() {
         val goal = content.goals().first { it.id == "scooter" }.toDomain()
         val deposits = mutableListOf<Int>()
         compose.setContent {
@@ -595,21 +613,14 @@ class ScreenRenderTest {
             }
         }
 
-        // Системного поля ввода нет: сумма выставляется кнопками шага.
+        // Пополнение — в плане дня: блока «Отложить» на экране копилки нет,
+        // есть ссылка «Изменить →» к плану.
         compose.onNode(hasSetTextAction()).assertDoesNotExist()
-        compose.onNodeWithText("Отложить в копилку").performScrollTo().assertIsNotEnabled()
-        repeat(2) {
-            compose.onNodeWithContentDescription("Сколько отложить: прибавить 5")
-                .performScrollTo().performClick()
-        }
-        compose.onNodeWithText("Отложить в копилку").performScrollTo().performClick()
-        assertEquals(listOf(10), deposits)
-
-        // Копилка пуста: забирать нечего, кнопки выключены, причина названа.
-        compose.onNodeWithContentDescription("Сколько забрать: прибавить 1")
-            .performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("В копилке пока пусто — забирать нечего.")
-            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Отложить в копилку").assertDoesNotExist()
+        compose.onNodeWithText("Изменить →").performScrollTo().assertIsDisplayed()
+        // Копилка пуста: забирать нечего — кнопки «Забрать» нет.
+        compose.onNodeWithText("Забрать монеты на покупки").assertDoesNotExist()
+        assertTrue(deposits.isEmpty())
     }
 
     @Test
@@ -681,12 +692,11 @@ class ScreenRenderTest {
         compose.onNodeWithText(task.options.first().title).performScrollTo().performClick()
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
 
-        // Одна карточка следующего задания с кнопкой «Начать →» и «Готово».
+        // Одна карточка следующего задания; кнопки «Готово» нет — возврат «Назад».
         compose.onNodeWithText(next.title).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Начать →").performScrollTo().performClick()
-        compose.onNodeWithText("Готово").assertExists()
+        compose.onNodeWithText("Начать следующее →").performScrollTo().performClick()
         assertTrue("Переход к следующему заданию не сработал", nextOpened)
-        compose.onNodeWithText("Готово").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Готово").assertDoesNotExist()
     }
 
     @Test

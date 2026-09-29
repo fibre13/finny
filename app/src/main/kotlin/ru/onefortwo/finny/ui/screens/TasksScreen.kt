@@ -79,7 +79,10 @@ fun TasksScreen(
             if (recoveryFirst) {
                 sections.recovery.forEach { TaskRow(art, colors, it, highlight = true) { onOpenTask(it.id) } }
             }
-            regular.forEach { task -> TaskRow(art, colors, task, highlight = false) { onOpenTask(task.id) } }
+            // Решённые — в конце, с кнопкой «Повтор»: числа в них будут другие.
+            regular.forEach { task ->
+                TaskRow(art, colors, task, highlight = false, repeat = task.id in completedIds) { onOpenTask(task.id) }
+            }
             if (!recoveryFirst) {
                 sections.recovery.forEach { TaskRow(art, colors, it, highlight = false) { onOpenTask(it.id) } }
             }
@@ -139,15 +142,29 @@ private fun Star(fill: Color, outline: Color) {
  * «Начать →» стоит под названием: рядом с ним слова рвались посередине.
  */
 @Composable
-private fun TaskRow(art: PixelArt, colors: YardColors, task: TaskContent, highlight: Boolean, onOpen: () -> Unit) {
+private fun TaskRow(
+    art: PixelArt,
+    colors: YardColors,
+    task: TaskContent,
+    highlight: Boolean,
+    repeat: Boolean = false,
+    onOpen: () -> Unit,
+) {
     val large = LocalDensity.current.fontScale >= LARGE_FONT
     val start: @Composable () -> Unit = {
+        // Повтор — жёлтая кнопка с тёмным текстом: светлый текст на жёлтом не читался бы.
         Text(
-            text = "Начать →",
+            text = if (repeat) "Повтор ↻" else "Начать →",
             style = MaterialTheme.typography.labelLarge,
-            color = colors.card,
+            color = if (repeat) colors.outline else colors.card,
             modifier = Modifier
-                .pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
+                .then(
+                    if (repeat) {
+                        Modifier.pixelPanel(colors.coin, colors.paper, colors.paperShadow, colors.outline, 2)
+                    } else {
+                        Modifier.pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
+                    },
+                )
                 .padding(horizontal = 10.dp, vertical = 8.dp),
         )
     }
@@ -164,7 +181,7 @@ private fun TaskRow(art: PixelArt, colors: YardColors, task: TaskContent, highli
             )
             .clickable(role = Role.Button, onClick = onOpen)
             .semantics(mergeDescendants = true) {
-                contentDescription = "${task.title}, ${task.topic.displayName}. Начать"
+                contentDescription = "${task.title}, ${task.topic.displayName}. " + if (repeat) "Повтор" else "Начать"
             }
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
