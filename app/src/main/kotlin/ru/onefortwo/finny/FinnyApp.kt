@@ -78,6 +78,7 @@ private object Routes {
     const val WARDROBE = "wardrobe"
     const val SEASON_RESULT = "season_result"
     const val GROWTH = "growth"
+    const val DREAM = "dream"
 }
 
 /** Задание восстановления после неудачного дня (ТЗ 2.5.9); есть на обоих уровнях. */
@@ -402,7 +403,12 @@ private fun AppNavHost(
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
                 onChooseGoal = viewModel::chooseGoal,
-                onClaimGoal = viewModel::claimGoal,
+                onClaimGoal = {
+                    // Мечта получена — сначала сцена, как питомец ею пользуется.
+                    val claimed = state.game.savings.goal?.id
+                    viewModel.claimGoal()
+                    if (claimed != null) navController.navigate("${Routes.DREAM}/$claimed")
+                },
                 onPreviewWithdrawal = viewModel::previewWithdrawal,
                 onWithdraw = viewModel::withdraw,
                 onBack = { navController.popBackStack() },
@@ -432,6 +438,17 @@ private fun AppNavHost(
                     viewModel.closeSeason()
                     navController.popBackStack(Routes.MAIN, inclusive = false)
                 },
+            )
+        }
+
+        composable("${Routes.DREAM}/{goalId}") { entry ->
+            val goalId = entry.arguments?.getString("goalId").orEmpty()
+            ru.onefortwo.finny.ui.screens.DreamScene(
+                state = state,
+                parts = content.petParts(),
+                goalId = goalId,
+                goalTitle = content.goals().firstOrNull { it.id == goalId }?.title ?: "Мечта",
+                onDone = { navController.popBackStack() },
             )
         }
 

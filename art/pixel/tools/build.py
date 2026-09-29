@@ -27,6 +27,9 @@ PET_W = PET_H = 48
 SCENE_W, SCENE_H = 180, 100
 GOAL_W = GOAL_H = 32
 FX_MAX = 7
+# Жесты в fx/ (рука, лапка) — не частицы: до 26 × 14.
+FX_GESTURES = ("hand_", "paw_")
+FX_GESTURE_MAX = (26, 14)
 BASELINE = 45
 OUTLINE = "#23201A"
 FUR = "FfG"
@@ -239,6 +242,9 @@ def main():
                 check_pet(path, sp)
             elif kind == "goal" and (sp["w"], sp["h"]) != (GOAL_W, GOAL_H):
                 err(path, 1, f"иллюстрация цели {sp['w']} × {sp['h']}, требуется {GOAL_W} × {GOAL_H}")
+            elif kind == "fx" and sid.startswith(FX_GESTURES):
+                if sp["w"] > FX_GESTURE_MAX[0] or sp["h"] > FX_GESTURE_MAX[1]:
+                    err(path, 1, f"жест {sp['w']} × {sp['h']}, допускается до {FX_GESTURE_MAX[0]} × {FX_GESTURE_MAX[1]}")
             elif kind == "fx" and (sp["w"] > FX_MAX or sp["h"] > FX_MAX):
                 err(path, 1, f"частица {sp['w']} × {sp['h']}, допускается до {FX_MAX} × {FX_MAX}")
             elif kind == "scene" and (sp["w"], sp["h"]) != (SCENE_W, SCENE_H) and not sid.startswith(("tent", "edge_")):

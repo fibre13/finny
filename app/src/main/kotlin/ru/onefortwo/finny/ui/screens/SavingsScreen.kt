@@ -320,7 +320,7 @@ private fun WithdrawalConfirmation(
  * надзаголовком карточки или описанием карточки выбора.
  */
 @Composable
-private fun GoalPicture(
+internal fun GoalPicture(
     goalId: String,
     modifier: Modifier = Modifier,
     size: Dp = 72.dp,

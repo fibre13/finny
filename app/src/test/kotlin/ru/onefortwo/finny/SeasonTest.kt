@@ -347,6 +347,38 @@ class SeasonTest {
     }
 
     @Test
+    fun `при мечте — сколько ещё до роста, при выборе второй цели — совет`() {
+        assertEquals(
+            "Ты накопил на «Самокат»! Осталось ещё 1 мечта, чтобы Финни стал взрослее!",
+            Growth.claimLine(GrowthStage.BABY, achievedBefore = 0, tasks = 0, petName = "Финни", goalTitle = "Самокат"),
+        )
+        assertEquals(
+            "Ты накопил на «Аквариум»! Реши ещё 4 задания — и Финни вырастет!",
+            Growth.claimLine(GrowthStage.BABY, achievedBefore = 1, tasks = 5, petName = "Финни", goalTitle = "Аквариум"),
+        )
+        assertNull(Growth.goalTip(GrowthStage.BABY, 0, "Финни"))
+        assertEquals("Совет: это твоя вторая мечта! Купи её — и Финни вырастет.", Growth.goalTip(GrowthStage.BABY, 1, "Финни"))
+        assertEquals("Совет: это твоя третья мечта! Купи её — и Финни вырастет.", Growth.goalTip(GrowthStage.TEEN, 2, "Финни"))
+    }
+
+    @Test
+    fun `в конце дня забота и радость не снижаются — меняются только от решений`() {
+        val model = model(demo = true)
+        model.confirmPlan(25, 15, 10)
+        val before = model.state.value.game.pet
+        repeat(3) {
+            if (model.pendingEvent() == null) return@repeat
+            model.answerEvent(false)
+            model.closeEventResult(false)
+        }
+        val afterEvents = model.state.value.game.pet
+        model.finishPeriod()
+        assertEquals(afterEvents, model.state.value.game.pet)
+        // Отказы в событиях показатели меняют.
+        assertTrue(afterEvents != before)
+    }
+
+    @Test
     fun `подростком — за две мечты и девять заданий`() {
         assertEquals(GrowthStage.BABY, Growth.stageFor(2, 8))
         assertEquals(GrowthStage.BABY, Growth.stageFor(1, 20))

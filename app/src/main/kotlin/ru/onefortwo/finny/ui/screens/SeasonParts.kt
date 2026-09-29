@@ -128,7 +128,6 @@ internal fun ProfilePet(
     )
 }
 
-/** Значок погоды события. */
 /**
  * Погода на картинке события: небо и частицы — капли дождя, снежинки,
  * лучи солнца, вспышка молнии. При выключенных движениях частицы стоят
@@ -201,6 +200,31 @@ private fun WeatherBackdrop(weather: String?, modifier: Modifier = Modifier, con
     ) { content() }
 }
 
+/**
+ * Рука гладит питомца: три неторопливых прохода по голове, между ними —
+ * пауза. При выключенных движениях рука лежит на голове.
+ */
+@Composable
+private fun StrokingHand(art: ru.onefortwo.finny.content.PixelArt) {
+    val motion = motionAllowed()
+    val x = if (motion) {
+        val anim = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            repeat(3) {
+                anim.animateTo(1f, tween(700))
+                anim.animateTo(0f, tween(700))
+                kotlinx.coroutines.delay(300)
+            }
+        }
+        anim.value
+    } else {
+        0.5f
+    }
+    // Ладонь лежит на макушке и проходит от лба к затылку.
+    Sprite(art, "hand_stroke", Modifier.offset(x = (22 + 26 * x).dp, y = (30 - 4 * kotlin.math.sin(x * 3.14f)).dp), cell = 3.dp)
+}
+
+/** Значок погоды события. */
 private fun weatherIcon(weather: String?): String? = when (weather) {
     "rain" -> "item_cloud_rain"
     "cold" -> "item_snowflake"
@@ -242,13 +266,18 @@ internal fun EventDialog(
                     .fillMaxWidth()
                     .semantics(mergeDescendants = true) { contentDescription = event.scene.withPetName(petName) },
             ) {
-                ProfilePet(
-                    state = state,
-                    parts = parts,
-                    size = 96.dp,
-                    happy = result?.accepted ?: (event.kind != ru.onefortwo.finny.content.EventKind.INTERNAL),
-                    reaction = if (result?.accepted == true) PetReaction(PetReactions.PLAY, id = 7L) else null,
-                )
+                val stroking = result?.accepted == true && event.id == "pet_stroke"
+                Box {
+                    ProfilePet(
+                        state = state,
+                        parts = parts,
+                        // Когда гладят — питомец крупнее, чтобы рука на голове была хорошо видна.
+                        size = if (stroking) 150.dp else 96.dp,
+                        happy = result?.accepted ?: (event.kind != ru.onefortwo.finny.content.EventKind.INTERNAL),
+                        reaction = if (result?.accepted == true && event.id != "pet_stroke") PetReaction(PetReactions.PLAY, id = 7L) else null,
+                    )
+                    if (stroking) StrokingHand(art)
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     weatherIcon(event.weather)?.let { Sprite(art, it, cell = 3.dp) }
@@ -362,6 +391,47 @@ internal fun SurpriseDialog(
             }
         },
         actions = { PrimaryButton(text = "Ура!", onClick = onDismiss) },
+    )
+}
+
+/**
+ * Экранное время на сегодня вышло. Питомец неторопливо машет лапкой и
+ * прощается до завтра; незаконченные дела дня продолжатся с того же места.
+ */
+@Composable
+internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -> Unit) {
+    val art = rememberPixelArt()
+    val colors = remember(art) { YardColors(art) }
+    val motion = motionAllowed()
+    val frame = if (motion) {
+        val wave = rememberInfiniteTransition(label = "wave")
+        val value by wave.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
+            label = "paw",
+        )
+        if (value < 0.5f) 0 else 1
+    } else {
+        0
+    }
+    FinnyDialog(
+        title = "На сегодня всё!",
+        onDismiss = onClose,
+        content = {
+            // Лапка поднята у плеча питомца и качается влево-вправо.
+            Box {
+                ProfilePet(state, parts, 140.dp)
+                Sprite(art, "paw_wave_$frame", Modifier.offset(x = 84.dp, y = 46.dp), cell = 4.dp)
+            }
+            SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(top = 8.dp))
+            Text(
+                text = "Экранное время на сегодня закончилось. Приходи завтра — продолжим с того же места.",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        },
+        actions = { PrimaryButton(text = "Пока-пока!", onClick = onClose) },
     )
 }
 

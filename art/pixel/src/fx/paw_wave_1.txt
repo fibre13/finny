@@ -1,0 +1,14 @@
+# 11 12
+# pivot 5 11
+.....K.K.K.
+....KbKbKbK
+....KnbnbnK
+....KbbbbbK
+...KbnnnbK.
+...KbbnbbK.
+....KbbbK..
+....KbbbK..
+...KbbbK...
+...KbbbK...
+...KbbbK...
+...KKKKK...

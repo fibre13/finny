@@ -704,7 +704,12 @@ class GameViewModel(
         shortage: Boolean = false,
     ) {
         val teen = game.stage != Stage.BABY
-        val raw = if (accepted) event.emotionYes else event.emotionNo ?: event.emotionYes
+        val raw = when {
+            // Котёнка гладят — он мурлычет.
+            accepted && event.id == "pet_stroke" && it_species() == "cat" -> "Мррр… Мрррр… Как приятно!"
+            accepted -> event.emotionYes
+            else -> event.emotionNo ?: event.emotionYes
+        }
         val emotion = raw?.withPetName(petName)?.let { if (teen) PetVoice.teen(it) else it }
         val hint = when {
             // Желаемое берётся только из банка «Хочу»; нужное — со всех банков и копилки.
@@ -1127,11 +1132,6 @@ class GameViewModel(
                         nextStep = "Не забудь доделать все дела, если какие-то остались.",
                     ),
                 )
-
-                limited && counted.usageMinutes == ScreenTime.DAILY_LIMIT_MINUTES -> {
-                    _speech.value = PetVoice.of(counted.game.stage, "Пока-пока! Увидимся завтра.")
-                    counted.copy(message = FeedbackMessage(text = "Экранное время на сегодня закончилось."))
-                }
 
                 else -> counted
             }

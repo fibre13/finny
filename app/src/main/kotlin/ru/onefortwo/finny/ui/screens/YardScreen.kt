@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -703,6 +704,11 @@ fun YardScreen(
                 delay(EVENT_DELAY_MS)
                 eventReady = true
             }
+        }
+        // Время на сегодня вышло — питомец машет лапкой «пока-пока»; закрыть можно в любой момент.
+        var byeClosed by rememberSaveable(today) { mutableStateOf(false) }
+        if (state.isTimeUp(today) && !byeClosed && arrival == null) {
+            TimeUpDialog(state = state, parts = parts, onClose = { byeClosed = true })
         }
         val shownEvent = resultEvent ?: pendingEvent?.takeIf { eventReady && arrival == null && !dayFinished }
         if (shownEvent != null) {
