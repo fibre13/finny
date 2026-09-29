@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.Canvas
+import androidx.core.graphics.toColorInt
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -420,7 +421,7 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
         0f
     }
     val fur = parts.colors.firstOrNull { it.id == state.profile?.appearance?.colorId }?.hex
-        ?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+        ?.let { runCatching { Color(it.toColorInt()) }.getOrNull() }
         ?: Color(0xFFE8913A)
     FinnyDialog(
         title = "На сегодня всё!",
