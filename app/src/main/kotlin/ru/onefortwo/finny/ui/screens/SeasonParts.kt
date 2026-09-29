@@ -618,7 +618,7 @@ fun SeasonResultScreen(
                     size = 110.dp,
                     reaction = if (reactionId > 0) PetReaction(PetReactions.PLAY, id = reactionId) else null,
                 )
-                saying?.let { SpeechBubble(colors, PetVoice.of(state.game.stage, it), modifier = Modifier.padding(start = 8.dp, bottom = 40.dp)) }
+                saying?.let { SpeechBubble(colors, PetVoice.of(state.game.stage, it), modifier = Modifier.padding(start = 8.dp, bottom = 40.dp), tailStart = 4.dp) }
             }
             SecondaryButton(
                 text = "Поиграть",

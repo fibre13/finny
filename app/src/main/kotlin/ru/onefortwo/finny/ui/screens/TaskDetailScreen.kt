@@ -232,6 +232,8 @@ private fun ResultCard(
                     colors = colors,
                     text = voice(check.pet),
                     modifier = Modifier.weight(1f).padding(start = 8.dp, bottom = 48.dp),
+                    // Питомец слева — уголок у левого края, к нему.
+                    tailStart = 4.dp,
                 )
             }
         }
