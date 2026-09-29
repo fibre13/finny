@@ -80,6 +80,8 @@ fun ShopScreen(
     todayPurchases: List<PurchaseRecord> = emptyList(),
     /** План дня утверждён; иначе мягко напоминается о нём. */
     planConfirmed: Boolean = true,
+    /** Сколько в банках «Нужное» и «Хочу»; `null` — не показывать. */
+    jars: Pair<Int, Int>? = null,
     message: FeedbackMessage?,
     onDismissMessage: () -> Unit,
     onBuy: (String) -> Unit,
@@ -108,7 +110,7 @@ fun ShopScreen(
                     bottomSpacing = 0.dp,
                 ) {
                     Text(
-                        text = "Сначала составь план — так проще не потратить лишнего.",
+                        text = "Сначала разложи монеты по банкам в «Плане» — так проще не потратить лишнего.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -119,6 +121,10 @@ fun ShopScreen(
             ) {
                 Column {
                     LabeledValue("Можно потратить", Explanations.coins(balance))
+                    if (jars != null) {
+                        LabeledValue("В банке «Нужное»", Explanations.coins(jars.first))
+                        LabeledValue("В банке «Хочу»", Explanations.coins(jars.second))
+                    }
                     if (todayPurchases.isNotEmpty()) {
                         LabeledValue(
                             label = "Сегодня потрачено",
@@ -243,7 +249,7 @@ private fun ShopItemRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconTile(size = 44.dp) {
-            PixelIcon(spriteOf(item.id), cell = 2.dp)
+            PixelIcon(item.icon ?: spriteOf(item.id), cell = 2.dp)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

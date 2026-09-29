@@ -12,6 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
@@ -54,6 +55,7 @@ class PetReactionTest {
 
     private fun GameViewModel.kinds() = reactions.value.map { it.kind }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `покупки, копилка и награда ставят свои реакции`() {
         val model = viewModel()
@@ -90,6 +92,7 @@ class PetReactionTest {
         assertEquals(2, model.reactions.value.size)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `переход на новую стадию ставит реакцию роста со стадией до роста`() {
         val model = viewModel()

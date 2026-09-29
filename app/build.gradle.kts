@@ -4,6 +4,8 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    // Состояние сезона хранится в профиле одной строкой JSON.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // Ключ подписи и пароли хранятся вне репозитория в keystore.properties
@@ -25,8 +27,8 @@ android {
         applicationId = "ru.onefortwo.finny"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.7.0"
+        versionCode = 17
+        versionName = "0.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -112,6 +114,7 @@ dependencies {
     implementation(project(":core-economy"))
     implementation(project(":content"))
     implementation(project(":data"))
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

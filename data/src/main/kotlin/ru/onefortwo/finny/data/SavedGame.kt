@@ -66,6 +66,9 @@ data class SavedGame(
     /** Напоминания, отложенные «Не сейчас» в игровом дне [remindersPeriod]. */
     val dismissedReminders: Set<String> = emptySet(),
     val remindersPeriod: Int = 0,
+
+    /** Состояние сезона, JSON. */
+    val extras: String = "",
 )
 
 /** Набор строк в столбце: значения через «|». */
@@ -127,6 +130,7 @@ fun SavedGame.toRecords(): GameRecords {
         knownTerms = knownTerms.joinTerms(),
         newTerms = newTerms.joinTerms(),
         dismissedReminders = encodeReminders(remindersPeriod, dismissedReminders),
+        extras = extras,
     )
 
     val purchases = game.period.purchases.map { record ->
@@ -247,6 +251,7 @@ fun GameRecords.toSavedGame(): SavedGame {
         newTerms = profile.newTerms.splitTerms(),
         dismissedReminders = dismissed,
         remindersPeriod = remindersPeriod,
+        extras = profile.extras,
     )
 }
 

@@ -83,6 +83,8 @@ object Explanations {
         IncomeSource.TASK_CORRECT -> "Награда за задание"
         IncomeSource.TASK_PARTIAL -> "Награда за старание"
         IncomeSource.RECOVERY_TASK -> "Награда за помощь питомцу"
+        IncomeSource.SEASON_MONEY -> "Монеты на новый сезон"
+        IncomeSource.GIFT -> "Подарок"
     }
 
     /**
@@ -170,6 +172,19 @@ object Explanations {
             last == 1 -> "минута"
             last in 2..4 -> "минуты"
             else -> "минут"
+        }
+        return "$count $word"
+    }
+
+    /** Склонение слова «задание» для числа. */
+    fun tasks(count: Int): String {
+        val tail = count % 100
+        val last = count % 10
+        val word = when {
+            tail in 11..14 -> "заданий"
+            last == 1 -> "задание"
+            last in 2..4 -> "задания"
+            else -> "заданий"
         }
         return "$count $word"
     }

@@ -23,5 +23,7 @@ object ContentParser {
 
     fun parseGlossary(text: String): List<GlossaryEntry> = json.decodeFromString(text)
 
+    fun parseEvents(text: String): List<EventContent> = json.decodeFromString(text)
+
     fun parseForbiddenWords(text: String): ForbiddenWords = json.decodeFromString(text)
 }

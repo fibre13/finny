@@ -38,6 +38,7 @@ import ru.onefortwo.finny.content.TaskTopic
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.rememberPixelArt
+import ru.onefortwo.finny.ui.state.Explanations
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -61,10 +62,13 @@ fun TasksScreen(
     onOpenTask: (String) -> Unit,
     onBack: (() -> Unit)? = null,
     recoveryFirst: Boolean = false,
+    /** Сколько заданий решено всего и сколько до следующего сюрприза. */
+    solved: Int? = null,
+    toSurprise: Int? = null,
 ) {
     val sections = TaskQueue.sections(tasks, completedIds)
     val regular = sections.fresh + sections.solved
-    val solved = regular.count { it.id in completedIds }
+    val solvedInRound = regular.count { it.id in completedIds }
     val art = rememberPixelArt()
     val colors = remember(art) { YardColors(art) }
 
@@ -74,7 +78,20 @@ fun TasksScreen(
         onBack = onBack,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Stars(colors = colors, solved = solved, total = regular.size)
+            Stars(colors = colors, solved = solvedInRound, total = regular.size)
+            if (solved != null) {
+                // Монет за задания нет — каждые три открывают сюрприз в лавке.
+                Text(
+                    text = "Решено заданий: $solved. " + if (toSurprise != null) {
+                        "До сюрприза в лавке — ${Explanations.tasks(toSurprise)}."
+                    } else {
+                        "Все сюрпризы открыты!"
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             if (recoveryFirst) {
                 sections.recovery.forEach { TaskRow(art, colors, it, highlight = true) { onOpenTask(it.id) } }

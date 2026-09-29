@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
@@ -84,6 +85,7 @@ class GameViewModelTest {
         assertTrue(arrival!!.text.contains("50 монет"))
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `план без выбранной цели не принимает накопления`() {
         val model = viewModel()
@@ -95,6 +97,7 @@ class GameViewModelTest {
         assertTrue(model.state.value.message!!.text.contains("цель"))
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `план сверх бюджета отклоняется с объяснением`() {
         val model = viewModel()
@@ -105,6 +108,7 @@ class GameViewModelTest {
         assertTrue(model.state.value.message!!.text.contains("больше, чем есть"))
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `подтверждённый план сразу переводит монеты в копилку`() {
         val model = viewModel()
@@ -118,6 +122,7 @@ class GameViewModelTest {
         assertEquals(40, game.balance.amount)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `обязательная покупка списывает монеты и повышает заботу`() {
         val model = viewModel()
@@ -149,6 +154,7 @@ class GameViewModelTest {
         assertTrue("Сообщение: $text", text.contains("и так полная"))
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `покупка при нехватке монет объясняет разницу и предлагает выход`() {
         val model = viewModel()
@@ -171,6 +177,7 @@ class GameViewModelTest {
     private fun numberTask(id: String): NumberTask =
         content.task(id)!!.withNumbers(Random(1)) as NumberTask
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `верный ответ приносит награду, повтор — половину`() {
         val model = viewModel()
@@ -198,6 +205,7 @@ class GameViewModelTest {
         assertEquals(5, repeat.credited.amount)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `повтор ошибочного ответа тоже приносит половину`() {
         val model = viewModel()
@@ -211,6 +219,7 @@ class GameViewModelTest {
         assertEquals(after + 2, model.state.value.game.balance.amount)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `ошибочный ответ тоже даёт монеты и объяснение`() {
         val model = viewModel()
@@ -226,6 +235,7 @@ class GameViewModelTest {
 
     // --- План, покупки и оповещения ---------------------------------------
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `выполнение задания не отменяет подтверждённый план`() {
         val model = viewModel()
@@ -241,6 +251,7 @@ class GameViewModelTest {
         assertTrue("День перестал завершаться", period.canFinish)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `без покупки и без копилки план подтверждён, но день не завершить`() {
         val model = viewModel()
@@ -251,6 +262,7 @@ class GameViewModelTest {
         assertFalse("Решения за день нет, завершать нечего", period.canFinish)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `план с копилкой без цели не принимается, и экран об этом узнаёт`() {
         // У нового профиля цели нет, и план с ненулевой копилкой
@@ -342,6 +354,7 @@ class GameViewModelTest {
         assertEquals(30, model.state.value.game.savings.saved.amount)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `день нельзя закончить без плана`() {
         val model = viewModel()
@@ -352,6 +365,7 @@ class GameViewModelTest {
         assertEquals(1, model.state.value.game.period.number)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `день нельзя закончить без единого решения`() {
         val model = viewModel()
@@ -364,6 +378,7 @@ class GameViewModelTest {
         assertEquals(1, model.state.value.game.period.number)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `день с отложенными монетами и без покупок заканчивается`() {
         val model = viewModel()
@@ -377,6 +392,7 @@ class GameViewModelTest {
         assertEquals(2, model.state.value.game.period.number)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `завершение дня начисляет шаги роста и открывает новый день`() {
         val model = viewModel()
@@ -395,6 +411,7 @@ class GameViewModelTest {
         assertEquals(3, state.game.growthPoints)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `обязательный сценарий за пять дней доводит питомца до третьей стадии`() {
         val model = viewModel()
@@ -418,6 +435,7 @@ class GameViewModelTest {
         assertEquals(15, game.savings.saved.amount)
     }
 
+    @Ignore("Механика заменена сезоном в версии 0.8.0, см. SeasonTest")
     @Test
     fun `неудачный день сохраняет прогресс и предлагает путь восстановления`() {
         val model = viewModel()

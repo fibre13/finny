@@ -115,7 +115,7 @@ fun TaskDetailScreen(
         eyebrow = task.topic.displayName,
         title = task.title,
         onBack = onBack,
-        // После ответа экран открывается сверху: итог и питомец видны сразу.
+        // После ответа — к началу экрана, чтобы итог и питомец были видны сразу.
         scrollKey = result != null,
     ) {
         Column {
@@ -182,7 +182,7 @@ private fun ResultCard(
             // Мягче — «Почти получилось!», а не «Почти».
             title = if (check.isCorrect) "Верно!" else "Почти получилось!",
             tone = if (check.isCorrect) CardTone.Success else CardTone.Warning,
-            // Без значка: итог назван словом, экран короче.
+            // Без значка — итог назван словом, экран короче.
         ) {
             Column {
                 if (check.outcome != null) {
@@ -194,11 +194,16 @@ private fun ResultCard(
                 }
                 Text(text = check.explanation, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = Explanations.reward(
-                        source = check.reward,
-                        amount = answered.credited,
-                        repeat = answered.isRepeat,
-                    ),
+                    // Монет за задания нет — они приближают сюрприз в лавке.
+                    text = if (answered.credited.amount == 0) {
+                        "Засчитано — сюрприз в лавке ближе!"
+                    } else {
+                        Explanations.reward(
+                            source = check.reward,
+                            amount = answered.credited,
+                            repeat = answered.isRepeat,
+                        )
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = FinnyTheme.colors.onSurfaceMuted,
                     modifier = Modifier.padding(top = 8.dp),
@@ -207,7 +212,7 @@ private fun ResultCard(
         }
 
         // Питомец отвечает облачком — рядом, а не над ним: так ответ
-        // помещается на один экран без прокрутки. Кнопки «Готово» нет —
+        // помещается на один экран без прокрутки. «Готово» нет —
         // возврат кнопкой «Назад» наверху.
         if (petFigure != null) {
             Row(
@@ -246,7 +251,7 @@ private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) 
                     SupportingText(task.topic.displayName)
                 }
             }
-            // Кнопка под названием: рядом с ним она сжимала текст.
+            // Кнопка компактная — итог задания помещается на один экран.
             PrimaryButton(text = "Начать следующее →", onClick = onStart, modifier = Modifier.padding(top = 6.dp))
         }
     }

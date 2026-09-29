@@ -182,6 +182,13 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+/** Версия 9 → 10: состояние сезона — банки, события дня, сюрпризы — одной строкой JSON. */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `profile` ADD COLUMN `extras` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 /** Все переходы, известные приложению. Порядок не важен. */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2,
@@ -192,4 +199,5 @@ val ALL_MIGRATIONS = arrayOf(
     MIGRATION_6_7,
     MIGRATION_7_8,
     MIGRATION_8_9,
+    MIGRATION_9_10,
 )

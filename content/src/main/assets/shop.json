@@ -6,7 +6,8 @@
     "price": 10,
     "stat": "care",
     "stat_delta": 30,
-    "effect": "{name} будет сытым"
+    "effect": "{name} будет сытым",
+    "icon": "item_food"
   },
   {
     "id": "water",
@@ -15,7 +16,8 @@
     "price": 5,
     "stat": "care",
     "stat_delta": 15,
-    "effect": "{name} не будет хотеть пить"
+    "effect": "{name} не будет хотеть пить",
+    "icon": "item_water"
   },
   {
     "id": "vitamins",
@@ -24,7 +26,8 @@
     "price": 8,
     "stat": "care",
     "stat_delta": 20,
-    "effect": "{name} будет бодрым"
+    "effect": "{name} будет бодрым",
+    "icon": "item_vitamins"
   },
   {
     "id": "brush",
@@ -33,7 +36,8 @@
     "price": 7,
     "stat": "care",
     "stat_delta": 15,
-    "effect": "{name} будет чистым и пушистым"
+    "effect": "{name} будет чистым и пушистым",
+    "icon": "item_brush"
   },
   {
     "id": "ball",
@@ -42,7 +46,8 @@
     "price": 12,
     "stat": "joy",
     "stat_delta": 15,
-    "effect": "{name} будет весело играть"
+    "effect": "{name} будет весело играть",
+    "icon": "item_ball"
   },
   {
     "id": "bow",
@@ -52,7 +57,8 @@
     "stat": "joy",
     "stat_delta": 8,
     "effect": "{name} будет нарядным",
-    "unlocks_accessory": "bow"
+    "unlocks_accessory": "bow",
+    "icon": "item_bow"
   },
   {
     "id": "tent",
@@ -62,7 +68,8 @@
     "stat": "joy",
     "stat_delta": 30,
     "effect": "{name} получит своё укрытие",
-    "unlocks_scenery": "house"
+    "unlocks_scenery": "house",
+    "icon": "item_tent"
   },
   {
     "id": "stickers",
@@ -72,7 +79,8 @@
     "stat": "joy",
     "stat_delta": 5,
     "effect": "{name} украсит домик",
-    "unlocks_scenery": "stickers"
+    "unlocks_scenery": "stickers",
+    "icon": "item_stickers"
   },
   {
     "id": "scarf",
@@ -82,7 +90,8 @@
     "stat": "joy",
     "stat_delta": 10,
     "effect": "{name} будет тёплым и нарядным",
-    "unlocks_accessory": "scarf"
+    "unlocks_accessory": "scarf",
+    "icon": "item_scarf"
   },
   {
     "id": "hat",
@@ -92,6 +101,84 @@
     "stat": "joy",
     "stat_delta": 10,
     "effect": "{name} будет в тёплой шапочке",
-    "unlocks_accessory": "hat"
+    "unlocks_accessory": "hat",
+    "icon": "item_hat"
+  },
+  {
+    "id": "pants",
+    "title": "Штанишки",
+    "category": "wants",
+    "price": 7,
+    "stat": "joy",
+    "stat_delta": 8,
+    "effect": "{name} будет в новых штанишках",
+    "unlock_after": 3,
+    "icon": "item_pants"
+  },
+  {
+    "id": "paints",
+    "title": "Краски и кисти",
+    "category": "wants",
+    "price": 8,
+    "stat": "joy",
+    "stat_delta": 9,
+    "effect": "{name} будет рисовать картины",
+    "unlock_after": 6,
+    "icon": "item_paints"
+  },
+  {
+    "id": "jacket",
+    "title": "Куртка",
+    "category": "wants",
+    "price": 12,
+    "stat": "joy",
+    "stat_delta": 13,
+    "effect": "{name} будет в тёплой куртке",
+    "unlock_after": 9,
+    "icon": "item_coat"
+  },
+  {
+    "id": "football",
+    "title": "Футбольный мяч",
+    "category": "wants",
+    "price": 10,
+    "stat": "joy",
+    "stat_delta": 11,
+    "effect": "{name} будет гонять мяч с друзьями",
+    "unlock_after": 12,
+    "icon": "item_football"
+  },
+  {
+    "id": "glasses",
+    "title": "Очки",
+    "category": "wants",
+    "price": 9,
+    "stat": "joy",
+    "stat_delta": 10,
+    "effect": "{name} будет в модных очках",
+    "unlock_after": 15,
+    "icon": "item_glasses"
+  },
+  {
+    "id": "umbrella_toy",
+    "title": "Зонтик",
+    "category": "wants",
+    "price": 8,
+    "stat": "joy",
+    "stat_delta": 9,
+    "effect": "{name} будет гулять под зонтиком",
+    "unlock_after": 18,
+    "icon": "item_umbrella"
+  },
+  {
+    "id": "superhero",
+    "title": "Костюм супергероя",
+    "category": "wants",
+    "price": 15,
+    "stat": "joy",
+    "stat_delta": 15,
+    "effect": "{name} будет настоящим супергероем",
+    "unlock_after": 21,
+    "icon": "item_superhero"
   }
 ]

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -17,32 +18,32 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import ru.onefortwo.finny.content.Accessories
 import ru.onefortwo.finny.content.PetPartsContent
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.GrowthStage
-import ru.onefortwo.finny.economy.StatLevel
 import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.LabeledValue
-import ru.onefortwo.finny.ui.common.PetFigure
 import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SectionCard
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.rememberPixelArt
+import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.Explanations
-import ru.onefortwo.finny.ui.state.Profile
+import ru.onefortwo.finny.ui.state.Growth
+import ru.onefortwo.finny.ui.state.Season
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
- * История и учебный прогресс (ТЗ 2.5.11): ступень роста питомца — цепочкой
- * стадий и тем, сколько шагов роста осталось до следующей; прогресс по
- * текущей цели; полученные цели; сколько заданий решено.
+ * Мой прогресс (ТЗ 2.5.11). Ступень роста — цепочка стадий и
+ * условие следующей: мечты и задания; прогресс по мечте; сколько заданий
+ * решено и сколько до сюрприза. Список прошедших дней и «шаги роста» убраны.
  *
  * @param onBack возврат; `null`, когда экран открыт вкладкой.
  */
@@ -57,14 +58,16 @@ fun HistoryScreen(
     onBack: (() -> Unit)? = null,
     petName: String = "Финни",
     balance: Coins? = null,
-    /** Питомец ребёнка для цепочки стадий; без него цепочка не рисуется. */
-    profile: Profile? = null,
+    state: AppState? = null,
     parts: PetPartsContent? = null,
+    toSurprise: Int? = null,
     onOpenTasks: () -> Unit = {},
 ) {
     val colors = FinnyTheme.colors
     val stage = game.stage
-    val next = GrowthStage.entries.firstOrNull { it.requiredPoints > game.growthPoints }
+    val dreams = achievedGoalTitles.size
+    val solved = state?.extras?.tasksSolved ?: completedIds.size
+    val next = Growth.nextNeeds(stage)
 
     ScreenScaffold(
         title = "Мой прогресс",
@@ -72,30 +75,29 @@ fun HistoryScreen(
         onBack = onBack,
     ) {
         Column {
-            SectionCard(
-                eyebrow = "Ступень роста",
-                title = "$petName — ${stage.displayName.lowercase()}",
-                tone = CardTone.Sage,
-            ) {
+            SectionCard(eyebrow = "Ступень роста", title = "$petName — ${stage.displayName.lowercase()}", tone = CardTone.Sage) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (profile != null && parts != null) StageChain(profile, parts, stage)
+                    if (state != null && parts != null) StageChain(state, parts, stage)
                     LabeledValue("Прожито дней", "${game.history.size}")
+                    LabeledValue("Сезонов", "${Season.seasonOf(game.period.number)}")
                     if (next != null) {
-                        val left = next.requiredPoints - game.growthPoints
-                        val who = if (next == GrowthStage.TEEN) "подростком" else "взрослым"
-                        Text(
-                            text = "Ещё ${steps(left)} — и $petName станет $who.",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        ProgressBar(
-                            fraction = game.growthPoints.toFloat() / next.requiredPoints,
-                            color = colors.successText,
-                            height = 8.dp,
-                        )
-                        SupportingText(
-                            "Шаг роста дают за день, в котором ты купил нужное, уложился в план " +
-                                "или пополнил копилку — до трёх шагов за день.",
-                        )
+                        val (needDreams, needTasks) = next
+                        val who = if (stage == GrowthStage.BABY) "подростком" else "взрослым"
+                        if (dreams == needDreams - 1 && stage == GrowthStage.BABY) {
+                            Text(
+                                text = "Ты накопил на первую мечту! Ещё одна мечта — и $petName станет $who, и с ним будет интереснее играть.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        } else {
+                            Text(
+                                text = "Накопи на ${needDreams} мечты и реши ${Explanations.tasks(needTasks)} — $petName станет $who, " +
+                                    "и с ним будет ещё интереснее играть.",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                        ProgressLine("Мечты: ${dreams.coerceAtMost(needDreams)} из $needDreams", dreams, needDreams)
+                        ProgressLine("Задания: ${solved.coerceAtMost(needTasks)} из $needTasks", solved, needTasks)
                     } else {
                         SupportingText("$petName совсем взрослый!")
                     }
@@ -104,22 +106,15 @@ fun HistoryScreen(
 
             val goal = game.savings.goal
             if (goal == null) {
-                SectionCard(title = "Цель", tone = CardTone.Primary) {
-                    Text("Цель пока не выбрана.", style = MaterialTheme.typography.bodyMedium)
+                SectionCard(title = "Копим на мечту", tone = CardTone.Primary) {
+                    Text("Мечта пока не выбрана.", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                val percent = (game.savings.saved.amount * 100 / goal.price.amount.coerceAtLeast(1))
-                    .coerceIn(0, 100)
+                val percent = (game.savings.saved.amount * 100 / goal.price.amount.coerceAtLeast(1)).coerceIn(0, 100)
                 SectionCard(
                     title = "Копим на: ${goalTitle ?: "цель"}",
                     tone = CardTone.Primary,
-                    trailing = {
-                        Text(
-                            text = "$percent%",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.coin,
-                        )
-                    },
+                    trailing = { Text(text = "$percent%", style = MaterialTheme.typography.titleMedium, color = colors.coin) },
                 ) {
                     Column {
                         ProgressBar(
@@ -130,52 +125,57 @@ fun HistoryScreen(
                         )
                         LabeledValue("Накоплено", Explanations.coins(game.savings.saved))
                         LabeledValue("Осталось", Explanations.coins(game.savings.remaining))
-                        SupportingText(
-                            text = Explanations.forecast(game.goalForecast()),
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
+                        SupportingText(text = Explanations.forecast(game.goalForecast()), modifier = Modifier.padding(top = 8.dp))
+                        if (next != null && dreams == next.first - 1) {
+                            Text(
+                                text = "Это твоя вторая мечта! Накопи на неё — и $petName вырастет.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
                     }
                 }
             }
 
             if (achievedGoalTitles.isNotEmpty()) {
                 SectionCard(title = "Накоплено и получено", tone = CardTone.Coin) {
-                    Column {
-                        achievedGoalTitles.forEach { title ->
-                            Text("✓ $title", style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
+                    Column { achievedGoalTitles.forEach { title -> Text("✓ $title", style = MaterialTheme.typography.bodyLarge) } }
                 }
             }
 
-            val solved = tasks.count { it.id in completedIds }
-            SectionCard(title = "Задания: ты решил уже $solved из ${tasks.size}") {
-                PrimaryButton(text = "К заданиям →", onClick = onOpenTasks)
+            SectionCard(title = "Задания: ты выполнил уже ${Explanations.tasks(solved)}") {
+                Column {
+                    SupportingText(
+                        if (toSurprise != null) "До сюрприза в лавке — ${Explanations.tasks(toSurprise)}." else "Все сюрпризы в лавке открыты!",
+                    )
+                    PrimaryButton(text = "К заданиям →", onClick = onOpenTasks, modifier = Modifier.padding(top = 10.dp))
+                }
             }
         }
     }
 }
 
-/** Склонение слова «шаг» для числа. */
-private fun steps(count: Int): String {
-    val tail = count % 100
-    val last = count % 10
-    val word = when {
-        tail in 11..14 -> "шагов"
-        last == 1 -> "шаг"
-        last in 2..4 -> "шага"
-        else -> "шагов"
+/** Подпись и полоса прогресса к стадии. */
+@Composable
+private fun ProgressLine(label: String, value: Int, total: Int) {
+    val colors = FinnyTheme.colors
+    Column {
+        Text(label, style = MaterialTheme.typography.titleSmall)
+        ProgressBar(
+            fraction = value.toFloat() / total.coerceAtLeast(1),
+            color = colors.successText,
+            height = 8.dp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
-    return "$count $word"
 }
 
-/** Цепочка стадий: пройденные — с галочкой, текущая — в рамке, будущие — бледно. */
+/** Цепочка стадий: пройденные — с галочкой, текущая — ярко, будущие — бледно. */
 @Composable
-private fun StageChain(profile: Profile, parts: PetPartsContent, current: GrowthStage) {
+private fun StageChain(state: AppState, parts: PetPartsContent, current: GrowthStage) {
     val art = rememberPixelArt()
     val yard = remember(art) { YardColors(art) }
-    val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
-    val color = parts.colors.firstOrNull { it.id == profile.appearance.colorId }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,21 +197,7 @@ private fun StageChain(profile: Profile, parts: PetPartsContent, current: Growth
                         Modifier.padding(4.dp)
                     },
                 ) {
-                    PetFigure(
-                        petName = profile.petName,
-                        speciesId = profile.appearance.speciesId,
-                        speciesTitle = species?.title ?: "Питомец",
-                        accessoryId = profile.appearance.accessoryId,
-                        accessoryTitle = Accessories.title(parts, profile.appearance.accessoryId),
-                        colorHex = color?.hex ?: "#CCCCCC",
-                        stage = s,
-                        care = StatLevel.HIGH,
-                        joy = StatLevel.HIGH,
-                        size = 72.dp,
-                        caption = false,
-                        plain = true,
-                        modifier = Modifier.width(72.dp),
-                    )
+                    ProfilePet(state, parts, size = 72.dp, stage = s)
                 }
                 Text(
                     text = (if (s < current) "✓ " else "") + s.displayName,
@@ -219,6 +205,7 @@ private fun StageChain(profile: Profile, parts: PetPartsContent, current: Growth
                     textAlign = TextAlign.Center,
                 )
             }
+            if (s != GrowthStage.ADULT) Spacer(modifier = Modifier.width(4.dp))
         }
     }
 }

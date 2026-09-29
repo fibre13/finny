@@ -32,9 +32,13 @@ enum class Reminder(
     val action: String?,
 ) {
     NEEDS("needs", GuideTarget.SHOP, "Я проголодался. Купишь нужное в лавке?", "В лавку"),
-    TASK("task", GuideTarget.TASKS, "Стало скучно. Разгадаешь загадку?", "К заданию"),
+    /** Есть монеты вне банков — подарок или снятое из копилки. */
+    FREE("free", GuideTarget.PLAN, "Есть свободные монеты. Разложи их по банкам!", "В план"),
+    TASK("task", GuideTarget.TASKS, "Реши задание — до сюрприза в лавке ближе!", "К заданию"),
     WORD("word", GuideTarget.GLOSSARY, "Есть новое слово. Загляни в словарик!", "В словарик"),
-    FINISH("finish", GuideTarget.FINISH, "Все дела готовы. Можно заканчивать день!", null),
+    /** Раз в сезон после дел дня. */
+    PLAN_FIX("plan_fix", GuideTarget.PLAN, "Хочешь скорректировать план?", "В план"),
+    FINISH("finish", GuideTarget.FINISH, "Все дела сделаны! Поиграй со мной или уложи спать.", null),
 }
 
 /**
@@ -64,32 +68,15 @@ object YardGuide {
      */
     fun step(state: AppState, today: String): GuideStep? {
         val game = state.game
-        if (state.profile == null || state.arrival != null || state.isSleeping(today)) return null
-        val period = game.period
-
-        val firstDay = period.number == 1 && game.history.isEmpty()
-        if (!firstDay) {
-            return if (!period.isPlanConfirmed) {
-                GuideStep(0, GuideTarget.PLAN, "Новый день: раздели монеты в «Плане»")
-            } else {
-                reminder(state, today)?.let { GuideStep(0, it.target, it.text, it) }
-            }
-        }
-
+        if (state.profile == null || state.arrival != null || state.isSleeping(today) || state.extras.seasonDone) return null
+        // Мечта → план сезона → события дня → напоминания.
         return when {
             game.savings.goal == null ->
-                GuideStep(1, GuideTarget.SAVINGS, "Выбери мечту — на что будем копить?")
-            !period.isPlanConfirmed ->
-                GuideStep(2, GuideTarget.PLAN, "Раздели монеты: на нужное, на радость и в копилку")
-            period.purchases.none { it.category == BudgetCategory.NEEDS } ->
-                GuideStep(3, GuideTarget.SHOP, "Пора покормить питомца: купи корм в лавке")
-            state.completedTaskIds.isEmpty() ->
-                GuideStep(4, GuideTarget.TASKS, "Реши задание — заработаешь монеты")
-            period.purchases.none { it.category == BudgetCategory.WANTS } ->
-                GuideStep(5, GuideTarget.SHOP, "Купи что-нибудь для радости")
-            period.canFinish ->
-                GuideStep(6, GuideTarget.FINISH, "Всё сделано! Нажми «Закончить день»")
-            else -> null
+                GuideStep(0, GuideTarget.SAVINGS, "Выбери мечту — на что будем копить?")
+            !state.extras.planned ->
+                GuideStep(0, GuideTarget.PLAN, "Новый сезон: разложи ${Explanations.coins(game.balance)} по банкам")
+            !state.dayEventsDone -> null
+            else -> reminder(state, today)?.let { GuideStep(0, it.target, it.text, it) }
         }
     }
 
@@ -99,13 +86,15 @@ object YardGuide {
      * подталкивает продолжать сверх предела.
      */
     fun reminder(state: AppState, today: String): Reminder? {
-        val period = state.game.period
+        val x = state.extras
         return Reminder.entries.firstOrNull { reminder ->
             !state.isReminderDismissed(reminder) && when (reminder) {
-                Reminder.NEEDS -> period.purchases.none { it.category == BudgetCategory.NEEDS }
-                Reminder.TASK -> state.paidTasksToday == 0 && !state.isTimeUp(today)
+                Reminder.NEEDS -> false
+                Reminder.FREE -> state.freeCoins > 0
+                Reminder.TASK -> (x.tasksDay != state.game.period.number || x.tasksToday == 0) && !state.isTimeUp(today)
                 Reminder.WORD -> state.newTerms.isNotEmpty()
-                Reminder.FINISH -> period.canFinish
+                Reminder.PLAN_FIX -> !x.correctionAsked && state.dayEventsDone
+                Reminder.FINISH -> state.dayEventsDone
             }
         }
     }

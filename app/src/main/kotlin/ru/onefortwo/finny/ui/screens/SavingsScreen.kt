@@ -109,7 +109,7 @@ fun SavingsScreen(
     parts: PetPartsContent? = null,
     /** Цель уже получали: выбор цели — «новая мечта». */
     afterClaim: Boolean = false,
-    /** «Изменить» — пополнение копилки делается в плане дня, всё в одном месте. */
+    /** «Изменить» — пополнение копилки делается в плане. */
     onOpenPlan: () -> Unit = {},
 ) {
     // Суммы выставляются кнопками шага, как на экране плана: печатать
@@ -193,15 +193,9 @@ fun SavingsScreen(
                         )
                         LabeledValue("Стоимость", Explanations.coins(goal.price))
                         LabeledValue("Уже накоплено", Explanations.coins(game.savings.saved))
-                        // Пополнение — в плане дня. Ссылка — отдельной строкой под
-                        // суммой: в одной строке сумма переносилась. План меняется
-                        // только до утверждения (ТЗ 2.5.5), поэтому после — подсказка.
-                        if (game.period.isPlanConfirmed) {
-                            SupportingText(
-                                text = "Отложить ещё можно в плане завтра.",
-                                modifier = Modifier.padding(vertical = 6.dp),
-                            )
-                        } else Text(
+                        // Пополнение — в плане, всё в одном месте. Ссылка —
+                        // отдельной строкой под суммой: в одной строке сумма переносилась.
+                        Text(
                             text = "Изменить →",
                             style = MaterialTheme.typography.labelLarge,
                             color = FinnyTheme.colors.onPrimary,

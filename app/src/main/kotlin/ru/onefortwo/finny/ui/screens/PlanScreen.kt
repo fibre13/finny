@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import ru.onefortwo.finny.ui.common.FinnyDialog
 import ru.onefortwo.finny.ui.common.SecondaryButton
 import ru.onefortwo.finny.ui.common.motionAllowed
+import ru.onefortwo.finny.ui.state.SEASON_DAYS
+import ru.onefortwo.finny.ui.state.Season
+import ru.onefortwo.finny.ui.state.SeasonExtras
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,17 +68,13 @@ import ru.onefortwo.finny.ui.theme.LocalBudgetColors
 import ru.onefortwo.finny.ui.theme.PillShape
 
 /**
- * План личного бюджета (ТЗ 2.5.5).
+ * План сезона по банкам «Нужное», «Хочу», «Копим на мечту».
  *
- * До подтверждения план свободно изменяется, приложение контролирует, чтобы
- * сумма не превышала доступный бюджет, и постоянно показывает остаток.
- * После подтверждения экран показывает сравнение плана с фактом.
- *
- * Если подтвердить план не удалось, причина показывается на этом же экране,
- * а введённые суммы остаются: экран закрывается только принятым планом.
- *
- * На телефоне 360 × 800 dp при обычном шрифте редактор помещается целиком,
- * вместе с кнопкой «Утвердить план»; при крупном шрифте экран прокручивается.
+ * Раскладываются все свободные монеты и то, что лежит в банках: распределить
+ * больше, чем есть, нельзя — «+» перестаёт работать, когда остаток равен
+ * нулю, — а утвердить план можно, только когда разложено всё. Пустая банка
+ * требует подтверждения. После утверждения экран показывает план и факт
+ * сезона и кнопку «Изменить план»: план можно поправить в любой момент.
  */
 @Composable
 fun PlanScreen(
@@ -88,22 +87,28 @@ fun PlanScreen(
     balance: Coins? = null,
     /** Название выбранной цели: куда уйдут монеты копилки. */
     goalTitle: String? = null,
+    extras: SeasonExtras = SeasonExtras(),
+    free: Int = game.balance.amount,
 ) {
+    var editing by rememberSaveable { mutableStateOf(false) }
+    val showEditor = !extras.planned || editing
     ScreenScaffold(
-        eyebrow = "План на день ${game.period.number}",
+        eyebrow = "Сезон ${extras.season} · план на $SEASON_DAYS дня",
         title = "План бюджета",
         balance = balance,
-        onBack = onBack,
+        onBack = if (editing && extras.planned) ({ editing = false }) else onBack,
         message = message,
         onDismissMessage = onDismissMessage,
         bottomPadding = 16.dp,
         singleLineTitle = true,
     ) {
-        val plan = game.period.plan
-
-        if (plan == null) {
+        if (showEditor) {
             PlanEditor(
-                available = game.balance.amount,
+                available = free + extras.needsJar + extras.wantsJar,
+                startNeeds = extras.needsJar,
+                startWants = extras.wantsJar,
+                correction = extras.planned,
+                saved = game.savings.saved.amount,
                 hasGoal = game.savings.goal != null,
                 goalTitle = goalTitle,
                 onConfirm = onConfirm,
@@ -111,49 +116,43 @@ fun PlanScreen(
             )
         } else {
             val palette = LocalBudgetColors.current
-
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SupportingText("План составлен. Видно, как расходы сходятся с планом.")
-
                 SectionCard(
-                    title = "План и факт",
+                    title = "План и факт сезона",
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                     bottomSpacing = 0.dp,
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        PlanFactRow(
-                            category = BudgetCategory.NEEDS,
-                            planned = plan.needs.amount,
-                            actual = game.period.spent(BudgetCategory.NEEDS).amount,
-                            color = palette.needs,
-                        )
-                        PlanFactRow(
-                            category = BudgetCategory.WANTS,
-                            planned = plan.wants.amount,
-                            actual = game.period.spent(BudgetCategory.WANTS).amount,
-                            color = palette.wants,
-                        )
-                        PlanFactRow(
-                            category = BudgetCategory.SAVINGS,
-                            planned = plan.savings.amount,
-                            actual = game.period.depositedToSavings.amount,
-                            color = palette.savings,
-                        )
+                        val (needsNote, wantsNote) = Season.borrowNotes(extras)
+                        PlanFactRow(BudgetCategory.NEEDS, extras.plannedNeeds, extras.spentNeeds, palette.needs, needsNote)
+                        PlanFactRow(BudgetCategory.WANTS, extras.plannedWants, extras.spentWants, palette.wants, wantsNote)
+                        PlanFactRow(BudgetCategory.SAVINGS, extras.plannedSavings, extras.deposited, palette.savings)
                     }
                 }
-
                 SectionCard(
+                    title = "Сейчас в банках",
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                     bottomSpacing = 0.dp,
                 ) {
-                    LabeledValue("Можно потратить", Explanations.coins(game.balance))
+                    Column {
+                        LabeledValue(BudgetCategory.NEEDS.displayName, Explanations.coins(extras.needsJar))
+                        LabeledValue(BudgetCategory.WANTS.displayName, Explanations.coins(extras.wantsJar))
+                        LabeledValue("В копилке", Explanations.coins(game.savings.saved))
+                        if (free > 0) {
+                            SupportingText(
+                                "Свободных монет: ${Explanations.coins(free)}. Разложи их по банкам.",
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                    }
                 }
+                PrimaryButton(text = "Изменить план", onClick = { editing = true })
             }
         }
     }
 }
 
-/** Пустое направление, про которое спрашивают перед утверждением плана. */
+/** Пустая банка, про которую спрашивают перед утверждением плана. */
 private enum class EmptyJar(val text: String) {
     NEEDS("Ты уверен? Если не отложишь на нужное, ты не сможешь купить корм. Питомец останется голодным."),
     WANTS("Ты уверен? Если не отложишь на «Хочу», ты не сможешь порадовать питомца."),
@@ -161,35 +160,28 @@ private enum class EmptyJar(val text: String) {
 }
 
 /**
- * Редактор плана: три направления и остаток крупной строкой.
- *
- * Распределить больше, чем есть, нельзя: «+» перестаёт работать, когда
- * остаток равен нулю (ТЗ 2.5.5 — сумма не превышает бюджет). Остаток можно
- * не раскладывать — это запас «на всякий случай». Пустое направление
- * требует подтверждения: так ребёнок видит последствие до утверждения.
- *
- * Откладывать в копилку можно только на выбранную цель. Без цели план с
- * ненулевой копилкой не принимается, поэтому об этом сказано заранее, на
- * карточке копилки, с переходом к выбору цели: копилка открывается поверх
- * плана, и введённые суммы при возврате сохраняются.
+ * Редактор плана: три банка и остаток крупной строкой. Полосы
+ * распределения и цветовой подсказки нет — остаток назван числом.
  */
 @Composable
 private fun PlanEditor(
     available: Int,
+    startNeeds: Int,
+    startWants: Int,
+    correction: Boolean,
+    saved: Int,
     hasGoal: Boolean,
     goalTitle: String?,
     onConfirm: (Int, Int, Int) -> Unit,
     onChooseGoal: () -> Unit,
 ) {
-    var needs by rememberSaveable { mutableIntStateOf(0) }
-    var wants by rememberSaveable { mutableIntStateOf(0) }
+    var needs by rememberSaveable { mutableIntStateOf(startNeeds) }
+    var wants by rememberSaveable { mutableIntStateOf(startWants) }
     var savings by rememberSaveable { mutableIntStateOf(0) }
-    // Пустые направления, про которые ребёнок уже сказал «Да, я уверен».
+    // Пустые банки, про которые ребёнок уже сказал «Да, я уверен».
     var acknowledged by rememberSaveable { mutableStateOf(listOf<String>()) }
     var asking by rememberSaveable { mutableStateOf<String?>(null) }
 
-    // Бюджет может уменьшиться, пока экран плана лежит в стеке под копилкой.
-    // Суммы, превышающие новый бюджет, урезаются до него сразу.
     LaunchedEffect(available) {
         if (needs + wants + savings > available) {
             needs = needs.coerceAtMost(available)
@@ -200,13 +192,14 @@ private fun PlanEditor(
 
     val remainder = (available - needs - wants - savings).coerceAtLeast(0)
     val needsGoal = savings > 0 && !hasGoal
+    val valid = remainder == 0 && !needsGoal
     val colors = FinnyTheme.colors
 
     fun tryConfirm() {
         val empty = buildList {
             if (needs == 0) add(EmptyJar.NEEDS)
             if (wants == 0) add(EmptyJar.WANTS)
-            if (savings == 0 && hasGoal) add(EmptyJar.SAVINGS)
+            if (savings == 0 && !correction && hasGoal) add(EmptyJar.SAVINGS)
         }.firstOrNull { it.name !in acknowledged }
         if (empty != null) asking = empty.name else onConfirm(needs, wants, savings)
     }
@@ -219,31 +212,21 @@ private fun PlanEditor(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Распредели ${Explanations.coins(available)}.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = if (correction) "Поправь план: ${Explanations.coins(available)} в банках." else "Распредели ${Explanations.coins(available)} по банкам.",
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.semantics { heading() },
                 )
-                // Причина, по которой кнопка «Утвердить план» неактивна, названа
-                // словами (ТЗ 3.6).
                 Text(
                     text = when {
-                        needsGoal -> "Чтобы отложить в копилку, сначала выбери цель. Суммы сохранятся."
-                        remainder == 0 -> "Всё распределено!"
-                        else -> "Осталось распределить: ${Explanations.coins(remainder)}"
+                        remainder > 0 -> "Осталось распределить: ${Explanations.coins(remainder)}"
+                        needsGoal -> "Чтобы отложить в копилку, сначала выбери цель."
+                        else -> "Всё распределено!"
                     },
-                    // В одну строку: экран плана помещается целиком на 360 × 800 dp.
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = colors.coin,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
-                if (remainder > 0 && !needsGoal && needs + wants + savings > 0) {
-                    Text(
-                        text = "Остаток можно оставить на всякий случай.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onPrimary.copy(alpha = 0.9f),
-                    )
-                }
             }
         }
 
@@ -253,13 +236,19 @@ private fun PlanEditor(
         DirectionCard(BudgetCategory.WANTS, CardTone.Coin, wants, wants + remainder, { wants = it }) {
             SupportingText("Игрушки и украшения.")
         }
-        DirectionCard(BudgetCategory.SAVINGS, CardTone.Surface, savings, savings + remainder, { savings = it }) {
+        DirectionCard(
+            BudgetCategory.SAVINGS, CardTone.Surface, savings, savings + remainder, { savings = it },
+            title = if (correction) "Добавить в копилку" else BudgetCategory.SAVINGS.displayName,
+        ) {
             if (hasGoal) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PixelIcon("ui_flag", cell = 1.5.dp)
                     Spacer(modifier = Modifier.width(6.dp))
                     SupportingText(
-                        if (goalTitle != null) "На «$goalTitle»" else "Сразу уйдут в копилку на цель.",
+                        buildString {
+                            append(if (goalTitle != null) "На «$goalTitle»" else "Сразу уйдут в копилку на цель.")
+                            if (saved > 0) append(" Уже в копилке: ${Explanations.coins(saved)}.")
+                        },
                     )
                 }
             } else {
@@ -267,26 +256,19 @@ private fun PlanEditor(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    SupportingText(
-                        text = "Цель не выбрана.",
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                    )
+                    SupportingText(text = "Цель не выбрана.", modifier = Modifier.align(Alignment.CenterVertically))
                     ChooseGoalButton(onClick = onChooseGoal)
                 }
             }
         }
 
-        PrimaryButton(
-            text = "Утвердить план",
-            enabled = !needsGoal,
-            onClick = { tryConfirm() },
-        )
+        PrimaryButton(text = "Утвердить план", enabled = valid, onClick = { tryConfirm() })
     }
 
     asking?.let { name ->
         val jar = EmptyJar.valueOf(name)
         FinnyDialog(
-            title = "Пусто в направлении",
+            title = "Банка пустая",
             onDismiss = { asking = null },
             content = { Text(jar.text, style = MaterialTheme.typography.bodyLarge) },
             actions = {
@@ -306,12 +288,8 @@ private fun PlanEditor(
 }
 
 /**
- * Карточка направления: значок, название и сумма в одной строке, под ними
- * подсказка и кнопки шага. Когда в направление кладут монеты, в него
- * запрыгивает монетка.
- *
- * Сумма объявляется программой чтения с экрана при каждом изменении:
- * кнопки шага меняют число, которое видно рядом с названием.
+ * Карточка банка: значок, название и сумма в одной строке, под ними
+ * подсказка и кнопки шага. Когда в банк кладут монеты, значок подпрыгивает.
  */
 @Composable
 private fun DirectionCard(
@@ -320,6 +298,7 @@ private fun DirectionCard(
     value: Int,
     max: Int,
     onChange: (Int) -> Unit,
+    title: String = category.displayName,
     hint: @Composable () -> Unit,
 ) {
     val jump = remember { Animatable(0f) }
@@ -346,6 +325,7 @@ private fun DirectionCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box {
                         BudgetDirectionIcon(category)
+                        // Монетка прыгает в банк.
                         if (jump.value > 0f) {
                             PixelIcon(
                                 "coin_0",
@@ -359,7 +339,7 @@ private fun DirectionCard(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = category.displayName,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.semantics { heading() },
                     )
@@ -379,7 +359,7 @@ private fun DirectionCard(
             }
             hint()
             CoinStepper(
-                label = category.displayName,
+                label = title,
                 value = value,
                 max = max,
                 onChange = onChange,
@@ -419,11 +399,13 @@ private fun ChooseGoalButton(onClick: () -> Unit) {
  * и фразой.
  */
 @Composable
-private fun PlanFactRow(
+internal fun PlanFactRow(
     category: BudgetCategory,
     planned: Int,
     actual: Int,
     color: Color,
+    /** Пояснение вместо стандартного вывода — например, куда ушли монеты банка. */
+    note: String? = null,
 ) {
     val title = category.displayName
 
@@ -448,7 +430,7 @@ private fun PlanFactRow(
             height = 8.dp,
         )
         SupportingText(
-            when {
+            note ?: when {
                 // Для копилки «больше плана» — хорошо: отложено больше.
                 category == BudgetCategory.SAVINGS && actual > planned ->
                     "Отложено больше плана на ${Explanations.coinsAccusative(actual - planned)}. Отлично!"

@@ -48,6 +48,15 @@ import ru.onefortwo.finny.economy.earn
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
 import ru.onefortwo.finny.economy.withdraw
+import ru.onefortwo.finny.content.EventContent
+import ru.onefortwo.finny.content.PetStat
+import ru.onefortwo.finny.content.withPetName
+import ru.onefortwo.finny.economy.BudgetCategory
+import ru.onefortwo.finny.economy.GrowthStage as Stage
+import ru.onefortwo.finny.economy.PetStatKind
+import ru.onefortwo.finny.economy.ShopItem
+import ru.onefortwo.finny.economy.PeriodState
+import java.time.temporal.ChronoUnit
 
 /**
  * Связывает экраны с правилами экономики и учебным контентом.
@@ -288,9 +297,10 @@ class GameViewModel(
             // Украшение, выбранное при создании питомца, доступно в гардеробе
             // без покупки: иначе его нельзя было бы вернуть, сняв однажды.
             ownedAccessories = Accessories.list(appearance.accessoryId).toSet(),
+            extras = SeasonExtras(season = 1, seasonStart = dates.today()),
             arrival = FeedbackMessage(
                 text = "Тебе дали ${Explanations.coins(IncomeSource.START_BUDGET.amount)}.",
-                nextStep = "На них ты будешь заботиться о питомце: кормить, радовать и копить на мечту.",
+                nextStep = "Это монеты на весь сезон — на три дня. Разложи их по банкам: «Нужное», «Хочу» и «Копим на мечту».",
             ),
         )
     }
@@ -311,6 +321,10 @@ class GameViewModel(
 
     /** «Не сейчас»: напоминание не показывается до конца игрового дня. */
     fun dismissReminder(reminder: Reminder) {
+        if (reminder == Reminder.PLAN_FIX) {
+            _state.update { it.copy(extras = it.extras.copy(correctionAsked = true)) }
+            return
+        }
         _state.update {
             val day = it.game.period.number
             val already = if (it.remindersPeriod == day) it.dismissedReminders else emptySet()
@@ -326,17 +340,108 @@ class GameViewModel(
      */
     fun startNewDayIfDue() {
         val current = _state.value
-        val finished = current.lastFinishedDate ?: return
-        if (current.isDemo || !current.hasProfile || finished >= dates.today()) return
-        val (game, event) = current.game.startNewDay()
-        _state.value = current.copy(
+        if (!current.hasProfile) return
+        expireSeasonIfDue()
+        val now = _state.value
+        val finished = now.lastFinishedDate
+        if (finished != null && !now.isDemo && finished < dates.today() && !now.extras.seasonDone) {
+            _state.value = beginDay(now.copy(lastFinishedDate = null))
+        }
+        ensureDayEvents()
+    }
+
+    /**
+     * Начало игрового дня. Если начинается новый сезон — приходят
+     * 50 монет, банки высыпаются в свободные монеты и план составляется
+     * заново. Итоги прошлого сезона к этому времени уже показаны.
+     */
+    private fun beginDay(state: AppState): AppState {
+        val period = state.game.period.number
+        val season = Season.seasonOf(period)
+        if (season == state.extras.season) {
+            return state.copy(
+                arrival = if (state.isDemo) null else FeedbackMessage(
+                    text = "Новый день! День ${Season.dayOf(period)} из $SEASON_DAYS в сезоне.",
+                    nextStep = "${state.profile?.petName ?: "Питомец"} проснулся. Посмотрим, что сегодня случится.",
+                ),
+            )
+        }
+        val (game, event) = state.game.earn(IncomeSource.SEASON_MONEY)
+        val x = state.extras
+        return state.copy(
             game = game,
-            lastFinishedDate = null,
+            extras = SeasonExtras(
+                season = season,
+                seasonStart = dates.today(),
+                tasksSolved = x.tasksSolved,
+                tasksDay = x.tasksDay,
+                tasksToday = x.tasksToday,
+                rewarded = x.rewarded,
+                unlocked = x.unlocked,
+                surprise = x.surprise,
+                growthShown = x.growthShown,
+                playedDay = x.playedDay,
+                missed = x.missed,
+            ),
             arrival = FeedbackMessage(
-                text = "Новый день! Карманные: +${Explanations.coins(event.amount)}.",
-                nextStep = "Теперь у тебя ${Explanations.coins(event.balanceAfter)}. Раздели их в «Плане».",
+                text = "Новый сезон! Пришли ${Explanations.coins(event.amount)}.",
+                nextStep = "Теперь у тебя ${Explanations.coins(event.balanceAfter)}. " +
+                    "Разложи их по банкам в «Плане» — это монеты на три дня.",
             ),
         )
+    }
+
+    /**
+     * Сезон, который не закончили за шесть календарных дней,
+     * закрывается сам. Новый сезон начинается с монетами: без них ребёнку
+     * нечем кормить питомца, а ошибка должна оставаться безопасной (ТЗ 2.2).
+     */
+    private fun expireSeasonIfDue() {
+        val current = _state.value
+        val start = current.extras.seasonStart ?: return
+        if (current.isDemo || current.extras.seasonDone) return
+        val days = runCatching {
+            ChronoUnit.DAYS.between(LocalDate.parse(start), LocalDate.parse(dates.today()))
+        }.getOrDefault(0L)
+        if (days < SEASON_EXPIRES_DAYS) return
+        val next = Season.firstPeriodOf(current.extras.season + 1)
+        val moved = current.copy(
+            game = current.game.copy(period = PeriodState(number = next)),
+            lastFinishedDate = null,
+            extras = current.extras.copy(missed = true),
+        )
+        _state.value = beginDay(moved)
+    }
+
+    /** События на сегодня выбираются один раз, в начале дня, после плана. */
+    fun ensureDayEvents() {
+        _state.update { current ->
+            val x = current.extras
+            val period = current.game.period.number
+            if (!current.hasProfile || !x.planned || x.eventsDay == period ||
+                current.isDayFinished(dates.today()) || x.seasonDone
+            ) {
+                current
+            } else {
+                val picked = Season.pickDay(
+                    events = content.events(),
+                    period = period,
+                    used = x.usedEvents,
+                    refused = x.refused,
+                    scenery = current.ownedScenery,
+                    achievedGoals = current.achievedGoalIds,
+                )
+                current.copy(extras = x.copy(eventsDay = period, dayEvents = picked, answered = 0))
+            }
+        }
+    }
+
+    /** Событие, которое ждёт решения, или `null`. */
+    fun pendingEvent(state: AppState = _state.value): EventContent? {
+        val x = state.extras
+        if (!x.planned || x.eventsDay != state.game.period.number || state.eventResult != null) return null
+        val id = x.dayEvents.getOrNull(x.answered) ?: return null
+        return content.events().firstOrNull { it.id == id }
     }
 
     /** Питомец спит — разделы дня откроются завтра. */
@@ -361,60 +466,91 @@ class GameViewModel(
      * пропадали бы вместе с экраном и их пришлось бы набирать заново.
      */
     fun confirmPlan(needs: Int, wants: Int, savings: Int): Boolean {
-        val plan = BudgetPlan(Coins(needs), Coins(wants), Coins(savings))
-
-        return when (val result = _state.value.game.confirmPlan(plan)) {
-            is PlanConfirmation.Success -> {
-                if (result.movedToSavings.amount > 0) react(PetReactions.SAVE)
-                _state.update {
-                    val moved = result.movedToSavings
-                    it.copy(
-                        game = result.state,
-                        message = FeedbackMessage(
-                            text = if (moved.amount > 0) {
-                                "План на день готов. ${Explanations.coins(moved)} сразу ушли в копилку."
-                            } else {
-                                "План на день готов."
-                            },
-                            nextStep = "Теперь купи нужное — $petName ждёт.",
-                        ),
-                    )
-                }
-                true
-            }
-
-            is PlanConfirmation.ExceedsBudget -> {
-                showProblem(
-                    "Ты распределил больше, чем есть: лишние ${Explanations.coins(result.excess)}.",
-                    "Уменьши одно из направлений.",
-                )
-                false
-            }
-
-            PlanConfirmation.AlreadyConfirmed -> {
-                showProblem(
-                    "План на этот день уже составлен.",
-                    "Новый план составляется на следующий день.",
-                )
-                false
-            }
-
-            PlanConfirmation.NoGoalSelected -> {
-                showProblem(
-                    "Чтобы откладывать в копилку, нужно выбрать цель.",
-                    "Нажми «Выбрать цель» — введённые суммы сохранятся.",
-                )
-                false
-            }
+        val current = _state.value
+        val x = current.extras
+        // Раскладываются все свободные монеты и то, что лежит в банках.
+        val available = current.freeCoins + x.needsJar + x.wantsJar
+        if (needs < 0 || wants < 0 || savings < 0 || needs + wants + savings != available) {
+            showProblem(
+                "Разложи все монеты по банкам: осталось ${Explanations.coins(available - needs - wants - savings)}.",
+                null,
+            )
+            return false
         }
+        if (savings > 0 && current.game.savings.goal == null) {
+            showProblem(
+                "Чтобы откладывать в копилку, нужно выбрать цель.",
+                "Нажми «Выбрать цель» — введённые суммы сохранятся.",
+            )
+            return false
+        }
+        var game = current.game
+        if (savings > 0) {
+            val result = game.deposit(Coins(savings)) as? DepositResult.Success ?: return false
+            game = result.state
+            react(PetReactions.SAVE)
+        }
+        val first = !x.planned
+        _state.update {
+            it.copy(
+                game = game,
+                extras = x.copy(
+                    planned = true,
+                    needsJar = needs,
+                    wantsJar = wants,
+                    plannedNeeds = x.spentNeeds + needs,
+                    plannedWants = x.spentWants + wants,
+                    plannedSavings = x.plannedSavings + savings,
+                    deposited = x.deposited + savings,
+                    correctionAsked = x.correctionAsked || !first,
+                ),
+                message = FeedbackMessage(
+                    text = if (first) "План на сезон готов!" else "План поправлен.",
+                    nextStep = if (savings > 0) "${Explanations.coins(savings)} сразу ушли в копилку." else null,
+                ),
+            )
+        }
+        ensureDayEvents()
+        return true
     }
 
     // --- Покупки ---------------------------------------------------------
 
     fun buy(itemId: String) {
-        val itemContent = content.shopItems().firstOrNull { it.id == itemId } ?: return
+        val item = content.shopItems().firstOrNull { it.id == itemId } ?: return
+        val current = _state.value
+        val payment = Season.payment(
+            item.price,
+            item.category,
+            current.game.balance.amount,
+            current.game.savings.saved.amount,
+            current.extras,
+        )
+        when {
+            payment.impossible -> if (item.category == ItemCategory.WANTS) {
+                showProblem(
+                    "В банке «Хочу» не хватает монет на «${item.title}».",
+                    "Желаемое покупают из банка «Хочу». Можно поправить план.",
+                )
+            } else {
+                showProblem(
+                    "Не хватает монет на «${item.title}» даже вместе с копилкой.",
+                    "Давай в следующем сезоне спланируем лучше?",
+                )
+            }
 
-        when (val result = _state.value.game.buy(itemContent.toDomain())) {
+            payment.needsSavings -> _state.update {
+                it.copy(savingsAsk = SavingsAsk(null, itemId, payment, it.game.previewWithdrawal(Coins(payment.fromSavings))))
+            }
+
+            else -> completeShopPurchase(itemId, payment)
+        }
+    }
+
+    private fun completeShopPurchase(itemId: String, payment: Payment) {
+        val itemContent = content.shopItems().firstOrNull { it.id == itemId } ?: return
+        val withdrawn = withdrawFor(payment) ?: return
+        when (val result = withdrawn.game.buy(itemContent.toDomain())) {
             is PurchaseResult.Success -> {
                 react(if (itemContent.category == ItemCategory.NEEDS) PetReactions.EAT else PetReactions.PLAY)
                 _state.update {
@@ -422,18 +558,10 @@ class GameViewModel(
                     val scenery = itemContent.unlocksScenery
                     it.copy(
                         game = result.state,
-                        ownedAccessories = if (unlocked != null) {
-                            it.ownedAccessories + unlocked
-                        } else {
-                            it.ownedAccessories
-                        },
-                        // Обстановка остаётся навсегда: покупка вещи, которая
-                        // видна на фоне, не отменяется сменой дня.
-                        ownedScenery = if (scenery != null) {
-                            it.ownedScenery + scenery
-                        } else {
-                            it.ownedScenery
-                        },
+                        extras = spend(withdrawn.extras, payment, itemContent.category),
+                        savingsAsk = null,
+                        ownedAccessories = if (unlocked != null) it.ownedAccessories + unlocked else it.ownedAccessories,
+                        ownedScenery = if (scenery != null) it.ownedScenery + scenery else it.ownedScenery,
                         message = Explanations.purchase(
                             petName = petName,
                             result = result,
@@ -445,9 +573,243 @@ class GameViewModel(
             }
 
             is PurchaseResult.NotEnoughCoins -> _state.update {
-                it.copy(message = Explanations.notEnoughCoins(result, itemContent.title))
+                it.copy(savingsAsk = null, message = Explanations.notEnoughCoins(result, itemContent.title))
             }
         }
+    }
+
+    /** Снимает из копилки недостающее по [payment]; `null` — снять не удалось. */
+    private fun withdrawFor(payment: Payment): AppState? {
+        val current = _state.value
+        if (payment.fromSavings <= 0) return current
+        val result = current.game.withdraw(Coins(payment.fromSavings)) as? WithdrawalResult.Success ?: return null
+        val x = current.extras
+        return current.copy(game = result.state, extras = x.copy(deposited = (x.deposited - payment.fromSavings).coerceAtLeast(0)))
+    }
+
+    /** Банки и факт сезона после траты по [payment]. */
+    private fun spend(x: SeasonExtras, payment: Payment, category: ItemCategory): SeasonExtras = x.copy(
+        needsJar = (x.needsJar - payment.fromNeeds).coerceAtLeast(0),
+        wantsJar = (x.wantsJar - payment.fromWants).coerceAtLeast(0),
+        spentNeeds = x.spentNeeds + if (category == ItemCategory.NEEDS) payment.price else 0,
+        spentWants = x.spentWants + if (category == ItemCategory.WANTS) payment.price else 0,
+        wantsToNeeds = x.wantsToNeeds + if (category == ItemCategory.NEEDS) payment.fromWants else 0,
+    )
+
+    /** «Взять из копилки» подтверждено: покупка или событие завершаются. */
+    fun confirmSavingsAsk() {
+        val ask = _state.value.savingsAsk ?: return
+        when {
+            ask.itemId != null -> completeShopPurchase(ask.itemId, ask.payment)
+            ask.eventId != null -> acceptCostEvent(ask.eventId, ask.payment)
+        }
+    }
+
+    /** «Не брать» — окно закрывается, решение по событию ещё впереди. */
+    fun cancelSavingsAsk() {
+        _state.update { it.copy(savingsAsk = null) }
+    }
+
+    // --- События сезона ----------------------------------------
+
+    /** Ответ на событие дня: [accept] — первая кнопка («Купить», «Поиграть»). */
+    fun answerEvent(accept: Boolean) {
+        val current = _state.value
+        val event = pendingEvent(current) ?: return
+        if (event.cost && accept) {
+            val category = event.category ?: ItemCategory.NEEDS
+            val payment = Season.payment(
+                event.price,
+                category,
+                current.game.balance.amount,
+                current.game.savings.saved.amount,
+                current.extras,
+            )
+            when {
+                payment.impossible -> decline(event, shortage = true)
+                payment.needsSavings -> _state.update {
+                    it.copy(savingsAsk = SavingsAsk(event.id, null, payment, it.game.previewWithdrawal(Coins(payment.fromSavings))))
+                }
+                else -> acceptCostEvent(event.id, payment)
+            }
+            return
+        }
+        if (accept) {
+            var game = current.game
+            if (event.coins > 0) game = game.earn(IncomeSource.GIFT, Coins(event.coins)).first
+            val stat = event.stat
+            if (stat != null && event.statDelta > 0) game = game.copy(pet = game.pet.changed(stat.toKind(), event.statDelta))
+            react(PetReactions.PLAY)
+            finishEvent(event, accepted = true, game = game, extras = current.extras)
+        } else {
+            decline(event, shortage = false)
+        }
+    }
+
+    private fun acceptCostEvent(eventId: String, payment: Payment) {
+        val event = content.events().firstOrNull { it.id == eventId } ?: return
+        val withdrawn = withdrawFor(payment) ?: return
+        val category = event.category ?: ItemCategory.NEEDS
+        val needs = category == ItemCategory.NEEDS
+        val stat = (event.stat ?: if (needs) PetStat.CARE else PetStat.JOY).toKind()
+        val item = ShopItem(
+            id = "event:${event.id}",
+            price = Coins(event.price),
+            category = if (needs) BudgetCategory.NEEDS else BudgetCategory.WANTS,
+            stat = stat,
+            statDelta = event.statDelta.coerceAtLeast(1),
+        )
+        val result = withdrawn.game.buy(item) as? PurchaseResult.Success
+        if (result == null) {
+            decline(event, shortage = true)
+            return
+        }
+        react(if (needs) PetReactions.EAT else PetReactions.PLAY)
+        event.unlocksAccessory?.let { acc -> _state.update { it.copy(ownedAccessories = it.ownedAccessories + acc) } }
+        finishEvent(event, accepted = true, game = result.state, extras = spend(withdrawn.extras, payment, category))
+    }
+
+    private fun decline(event: EventContent, shortage: Boolean) {
+        val current = _state.value
+        var game = current.game
+        val stat = event.declineStat
+        if (stat != null && event.declineDelta != 0) game = game.copy(pet = game.pet.changed(stat.toKind(), event.declineDelta))
+        finishEvent(event, accepted = false, game = game, extras = current.extras, shortage = shortage)
+    }
+
+    private fun finishEvent(
+        event: EventContent,
+        accepted: Boolean,
+        game: GameState,
+        extras: SeasonExtras,
+        shortage: Boolean = false,
+    ) {
+        val teen = game.stage != Stage.BABY
+        val raw = if (accepted) event.emotionYes else event.emotionNo ?: event.emotionYes
+        val emotion = raw?.withPetName(petName)?.let { if (teen) PetVoice.teen(it) else it }
+        val hint = when {
+            // Желаемое берётся только из банка «Хочу»; нужное — со всех банков и копилки.
+            shortage && event.category == ItemCategory.WANTS ->
+                "В банке «Хочу» не хватает монет. Желаемое можно отложить — или поправить план."
+            shortage -> "Монет не хватило даже вместе с копилкой. Ты не успел накопить. " +
+                "Давай в следующем сезоне спланируем лучше?"
+            !event.cost -> null
+            accepted -> event.hintYes
+            else -> event.hintNo
+        }?.withPetName(petName)
+        // Отказ от желаемого — можно не просто не тратить, а отложить эти монеты.
+        val transfer = if (!accepted && !shortage && event.cost && event.category == ItemCategory.WANTS &&
+            game.savings.goal != null && extras.wantsJar >= event.price && event.price > 0
+        ) {
+            event.price
+        } else {
+            0
+        }
+        _state.update {
+            it.copy(
+                game = game,
+                savingsAsk = null,
+                extras = extras.copy(
+                    answered = extras.answered + 1,
+                    usedEvents = extras.usedEvents + event.id,
+                    refused = if (accepted) null else event.id,
+                ),
+                eventResult = EventResult(event.id, accepted, emotion, hint, transfer, shortage),
+            )
+        }
+    }
+
+    /** Окно события закрыто; [transfer] — перевести предложенные монеты в копилку. */
+    fun closeEventResult(transfer: Boolean) {
+        val current = _state.value
+        val result = current.eventResult ?: return
+        if (transfer && result.transfer > 0) {
+            val deposit = current.game.deposit(Coins(result.transfer)) as? DepositResult.Success
+            if (deposit != null) {
+                react(PetReactions.SAVE)
+                val x = current.extras
+                _state.update {
+                    it.copy(
+                        game = deposit.state,
+                        eventResult = null,
+                        extras = x.copy(
+                            wantsJar = x.wantsJar - result.transfer,
+                            deposited = x.deposited + result.transfer,
+                            plannedWants = x.plannedWants - result.transfer,
+                            plannedSavings = x.plannedSavings + result.transfer,
+                        ),
+                        message = FeedbackMessage(text = "${Explanations.coins(result.transfer)} ушли в копилку. Мечта стала ближе!"),
+                    )
+                }
+                return
+            }
+        }
+        _state.update { it.copy(eventResult = null) }
+    }
+
+    /** Поиграть с питомцем после дел дня — радость растёт раз в день. */
+    fun play() {
+        val current = _state.value
+        val day = current.game.period.number
+        if (current.extras.playedDay == day) return
+        react(PetReactions.PLAY)
+        _state.update {
+            it.copy(
+                game = it.game.copy(pet = it.game.pet.changed(PetStatKind.JOY, PLAY_JOY)),
+                extras = it.extras.copy(playedDay = day),
+            )
+        }
+    }
+
+    /** Остаток в банках в конце сезона — в копилку. */
+    fun transferLeftover() {
+        val current = _state.value
+        val amount = current.extras.needsJar + current.extras.wantsJar + current.freeCoins
+        if (amount <= 0 || current.game.savings.goal == null) return
+        val deposit = current.game.deposit(Coins(amount)) as? DepositResult.Success ?: return
+        react(PetReactions.SAVE)
+        _state.update {
+            it.copy(
+                game = deposit.state,
+                extras = it.extras.copy(needsJar = 0, wantsJar = 0, deposited = it.extras.deposited + amount),
+            )
+        }
+    }
+
+    /** Итоги сезона закрыты — новый сезон начинается сейчас (демо) или завтра. */
+    fun closeSeason() {
+        val current = _state.value
+        val closed = current.copy(extras = current.extras.copy(seasonDone = false))
+        val finished = current.lastFinishedDate
+        _state.value = when {
+            current.isDemo -> beginDay(closed)
+            // Итоги закрыли уже на следующий день — новый сезон начинается сразу.
+            finished != null && finished < dates.today() -> beginDay(closed.copy(lastFinishedDate = null))
+            else -> closed
+        }
+        ensureDayEvents()
+    }
+
+    /** О сюрпризе сказали. */
+    fun dismissSurprise() {
+        _state.update { it.copy(extras = it.extras.copy(surprise = null)) }
+    }
+
+    /** Праздник роста показан. */
+    fun growthCelebrated() {
+        _state.update { it.copy(extras = it.extras.copy(growthShown = it.game.stage)) }
+    }
+
+    /** Приветствие после пропущенного сезона показано. */
+    fun missedShown() {
+        _state.update { it.copy(extras = it.extras.copy(missed = false)) }
+    }
+
+    /** Стадия по мечтам и заданиям; очки роста ядра выставляются под неё. */
+    private fun AppState.withGrowth(): AppState {
+        val stage = Growth.stageFor(achievedGoalIds.size, extras.tasksSolved)
+        val best = maxOf(stage, game.stage)
+        return if (game.growthPoints == best.requiredPoints) this else copy(game = game.copy(growthPoints = best.requiredPoints))
     }
 
     // --- Накопления и цель -----------------------------------------------
@@ -460,7 +822,7 @@ class GameViewModel(
                 game = it.game.chooseGoal(goal.toDomain()),
                 message = FeedbackMessage(
                     text = "Цель выбрана: ${goal.title} за ${Explanations.coins(goal.price)}.",
-                    nextStep = "Откладывай понемногу каждый день — так цель станет ближе.",
+                    nextStep = "Откладывай в копилку, когда составляешь план, — так мечта станет ближе.",
                 ),
             )
         }
@@ -483,7 +845,7 @@ class GameViewModel(
                 game = game,
                 achievedGoalIds = it.achievedGoalIds + goal.id,
                 message = null,
-            )
+            ).withGrowth()
         }
     }
 
@@ -526,8 +888,9 @@ class GameViewModel(
             is WithdrawalResult.Success -> _state.update {
                 it.copy(
                     game = result.state,
+                    extras = it.extras.copy(deposited = (it.extras.deposited - amount).coerceAtLeast(0)),
                     message = FeedbackMessage(
-                        text = "Ты забрал ${Explanations.coins(amount)} из копилки. " +
+                        text = "Ты забрал ${Explanations.coins(amount)} из копилки — разложи их в «Плане». " +
                             "Осталось ${Explanations.coins(result.savedAfter)}. " +
                             Explanations.forecast(result.state.goalForecast()),
                     ),
@@ -578,8 +941,10 @@ class GameViewModel(
         val repeat = taskId in solvedBefore
         // Монеты — за первые TaskPay.PER_DAY заданий дня, считая и
         // повторы; «Помоги своему питомцу» — путь восстановления, оплачивается всегда.
+        // Монеты — только за «Помоги своему питомцу»; остальные
+        // задания открывают сюрпризы в лавке.
         val counted = check.reward != IncomeSource.RECOVERY_TASK
-        val overLimit = counted && current.paidTasksToday >= TaskPay.PER_DAY
+        val overLimit = counted
         val reward = when {
             overLimit -> Coins.ZERO
             repeat -> check.reward.amount.half()
@@ -590,18 +955,44 @@ class GameViewModel(
         if (event.amount.amount > 0) react(PetReactions.REWARD)
         val paid = counted && !overLimit
         _state.update {
+            val day = it.game.period.number
+            val x = it.extras
+            val counted3 = x.copy(
+                tasksSolved = x.tasksSolved + 1,
+                tasksDay = day,
+                tasksToday = if (x.tasksDay == day) x.tasksToday + 1 else 1,
+            )
+            val surprise = Season.pendingSurprise(content.shopItems(), counted3)
+            val withSurprise = if (surprise == null) {
+                counted3
+            } else {
+                counted3.copy(
+                    rewarded = counted3.rewarded + surprise.unlockAfter!!,
+                    unlocked = counted3.unlocked + surprise.id,
+                    surprise = surprise.id,
+                )
+            }
+            val next = Season.tasksToNextSurprise(content.shopItems(), withSurprise)
             it.copy(
                 game = game,
                 completedTaskIds = solvedBefore + taskId,
                 paidTasksPeriod = if (paid) it.game.period.number else it.paidTasksPeriod,
                 paidTasksCount = if (paid) it.paidTasksToday + 1 else it.paidTasksCount,
-                message = Explanations.income(
-                    source = event.source,
-                    amount = event.amount,
-                    balanceAfter = event.balanceAfter,
-                    repeat = repeat,
-                ),
-            )
+                extras = withSurprise,
+                message = if (event.amount.amount > 0) {
+                    Explanations.income(
+                        source = event.source,
+                        amount = event.amount,
+                        balanceAfter = event.balanceAfter,
+                        repeat = repeat,
+                    )
+                } else {
+                    FeedbackMessage(
+                        text = "Задание засчитано. Решено заданий: ${withSurprise.tasksSolved}.",
+                        nextStep = next?.let { n -> "До сюрприза в лавке — ${Explanations.tasks(n)}." },
+                    )
+                },
+            ).withGrowth()
         }
 
         return AnsweredTask(check = check, credited = event.amount, isRepeat = repeat)
@@ -610,32 +1001,37 @@ class GameViewModel(
     // --- Игровой период --------------------------------------------------
 
     fun finishPeriod() {
-        // В обычном режиме карманные на новый день приходят завтра,
-        // при первом входе; в демонстрационном — сразу (ТЗ 2.5.13).
-        when (val result = _state.value.game.finishPeriod(payIncome = _state.value.isDemo)) {
+        val current = _state.value
+        if (!current.dayEventsDone) {
+            showProblem("Сначала реши все события дня.", "Питомец ждёт тебя на дворе.")
+            return
+        }
+        val lastDay = current.seasonDay == SEASON_DAYS
+        when (val result = current.game.finishPeriod(payIncome = false, force = true)) {
             is PeriodCompletion.Success -> {
-                if (result.outcome.stageAdvanced) react(PetReactions.GROW, result.outcome.stageBefore)
                 _state.update {
-                    it.copy(
+                    val finished = it.copy(
                         game = result.state,
                         lastOutcome = result.outcome,
-                        // Дата нужна, чтобы второй игровой день не начинался
-                        // в те же сутки. В демонстрационном режиме не пишется.
                         lastFinishedDate = if (it.isDemo) it.lastFinishedDate else dates.today(),
-                        message = Explanations.periodSummary(petName, result.outcome),
-                    )
+                        extras = it.extras.copy(seasonDone = lastDay),
+                        message = when {
+                            lastDay -> null
+                            // В демонстрационном режиме следующий день начинается сразу.
+                            it.isDemo -> FeedbackMessage(
+                                text = "$petName выспался. Начался день ${Season.dayOf(result.state.period.number)} из $SEASON_DAYS.",
+                            )
+                            else -> FeedbackMessage(text = "$petName спит. Пока-пока! Приходи завтра.")
+                        },
+                    ).withGrowth()
+                    // В демонстрационном режиме следующий день начинается сразу;
+                    // после третьего — когда закрыты итоги сезона.
+                    if (it.isDemo && !lastDay) beginDay(finished) else finished
                 }
+                ensureDayEvents()
             }
 
-            PeriodCompletion.PlanNotConfirmed -> showProblem(
-                "Сначала составь план на день.",
-                "Открой раздел «План».",
-            )
-
-            PeriodCompletion.NoDecision -> showProblem(
-                "За день ещё нет ни одного решения.",
-                "Купи что-нибудь в «Покупках» или отложи монеты в копилку.",
-            )
+            else -> showProblem("День пока не закончить.", null)
         }
     }
 
@@ -730,6 +1126,8 @@ class GameViewModel(
         }
     }
 
+    private fun PetStat.toKind(): PetStatKind = if (this == PetStat.CARE) PetStatKind.CARE else PetStatKind.JOY
+
     /** Фабрика: репозиторий контента читает assets, репозиторий игры — базу. */
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -747,5 +1145,8 @@ class GameViewModel(
         const val DEMO_GOAL_ID = "scooter"
         const val MINUTE_MILLIS = 60_000L
         const val GREET_AFTER_MS = 60_000L
+
+        /** Радость от игры с питомцем. */
+        const val PLAY_JOY = 10
     }
 }
