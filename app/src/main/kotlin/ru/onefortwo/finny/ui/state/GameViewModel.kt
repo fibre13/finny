@@ -412,6 +412,11 @@ class GameViewModel(
                 growthShown = x.growthShown,
                 playedDay = x.playedDay,
                 missed = x.missed,
+                // Словарик переходит в новый сезон: открытые слова и счёт игровых дней сохраняются.
+                wordDay = x.wordDay,
+                wordDays = x.wordDays,
+                wordsOpened = x.wordsOpened,
+                wordVisit = x.wordVisit,
             ),
             arrival = FeedbackMessage(
                 text = "Тебе пришло ${Explanations.coins(event.amount)}",
@@ -855,6 +860,10 @@ class GameViewModel(
     fun leaveTasks() {
         _state.update { if (it.extras.sessionSolved == 0) it else it.copy(extras = it.extras.copy(sessionSolved = 0)) }
     }
+
+    /** Все ступени лестницы новых покупок открыты. */
+    fun surprisesExhausted(state: AppState = _state.value): Boolean =
+        Season.nextSurpriseGroup(content.shopItems(), state.extras, state.profile?.appearance?.speciesId).isEmpty()
 
     /** Сколько заданий за этот заход до новой покупки; `null` — сегодня уже открыта или покупки кончились. */
     fun tasksToSurprise(state: AppState = _state.value): Int? {

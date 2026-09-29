@@ -65,6 +65,8 @@ fun TasksScreen(
     /** Сколько заданий решено всего и сколько до следующего сюрприза. */
     solved: Int? = null,
     toSurprise: Int? = null,
+    /** Все новые покупки уже открыты: строка о «завтра» не выводится. */
+    surprisesExhausted: Boolean = false,
 ) {
     val sections = TaskQueue.sections(tasks, completedIds)
     val regular = sections.fresh + sections.solved
@@ -85,6 +87,8 @@ fun TasksScreen(
                 Text(
                     text = "Решено заданий: $solved\n" + if (toSurprise != null) {
                         "Реши ещё ${Explanations.tasks(toSurprise)} — и в лавке появится новая покупка"
+                    } else if (surprisesExhausted) {
+                        "Все новые покупки уже открыты"
                     } else {
                         "Новая покупка на сегодня открыта — заходи завтра"
                     },

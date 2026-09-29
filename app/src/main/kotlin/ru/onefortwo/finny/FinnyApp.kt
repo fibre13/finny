@@ -345,6 +345,7 @@ private fun AppNavHost(
                 recoveryFirst = true,
                 solved = state.extras.tasksSolved,
                 toSurprise = viewModel.tasksToSurprise(state),
+                surprisesExhausted = viewModel.surprisesExhausted(state),
             )
             state.extras.surprise?.let { id ->
                 content.shopItems().firstOrNull { it.id == id }?.let { item ->
