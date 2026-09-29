@@ -142,13 +142,13 @@ object Season {
         // за помощь питомцу): называются все источники, сумма равна перерасходу.
         val fromFree = (over - fromWants - fromSavings).coerceAtLeast(0)
         val sources = listOfNotNull(
-            if (fromWants > 0) "из банка «Хочу» взято ${Explanations.coins(fromWants)}" else null,
+            if (fromWants > 0) "взято из «Хочу» ${Explanations.coins(fromWants)}" else null,
             if (fromSavings > 0) "из копилки — ${Explanations.coins(fromSavings)}" else null,
             if (fromFree > 0) "из свободных монет — ${Explanations.coins(fromFree)}" else null,
         ).joinToString(", ")
         val needs = if (over > 0) "Потрачено больше плана на ${Explanations.coinsAccusative(over)}: $sources." else null
-        val wants = if (fromWants > 0) "Из банка «Хочу» на нужное ушло ${Explanations.coins(fromWants)}." else null
-        val savings = if (fromSavings > 0) "Из копилки на нужное взято ${Explanations.coins(fromSavings)}." else null
+        val wants = if (fromWants > 0) "Из «Хочу» на нужное ушло ${Explanations.coins(fromWants)}" else null
+        val savings = if (fromSavings > 0) "Из копилки на нужное взято ${Explanations.coins(fromSavings)}" else null
         return BorrowNotes(needs, wants, savings)
     }
 
@@ -165,27 +165,27 @@ object Season {
     fun free(balance: Int, x: SeasonExtras): Int = (balance - x.needsJar - x.wantsJar).coerceAtLeast(0)
 
     /**
-     * Откуда взять [price] монет. Нужное: свободные → «Надо» → «Хочу» →
-     * копилка (только с подтверждением). Желаемое: свободные → «Хочу»;
-     * из «Надо» и копилки на желаемое не берётся.
+     * Откуда взять [price] монет. «Нужное» и «Хочу» — то, что запланировано
+     * на сезон, — берутся суммарно: сначала свободные, потом «свой» банк
+     * покупки (для нужного — «Нужное», для желаемого — «Хочу»), потом другой.
+     * Копилка — в последнюю очередь и только с подтверждением ребёнка.
      */
     fun payment(price: Int, category: ItemCategory, balance: Int, saved: Int, x: SeasonExtras): Payment {
         var left = price
         val free = free(balance, x).coerceAtMost(balance)
         val fromFree = minOf(left, free).also { left -= it }
-        return when (category) {
-            ItemCategory.NEEDS -> {
-                val fromNeeds = minOf(left, x.needsJar).also { left -= it }
-                val fromWants = minOf(left, x.wantsJar).also { left -= it }
-                val fromSavings = minOf(left, saved).also { left -= it }
-                Payment(price, fromFree, fromNeeds, fromWants, fromSavings, impossible = left > 0)
-            }
-
-            ItemCategory.WANTS -> {
-                val fromWants = minOf(left, x.wantsJar).also { left -= it }
-                Payment(price, fromFree, 0, fromWants, 0, impossible = left > 0)
-            }
+        val needsFirst = category == ItemCategory.NEEDS
+        var fromNeeds = 0
+        var fromWants = 0
+        if (needsFirst) {
+            fromNeeds = minOf(left, x.needsJar).also { left -= it }
+            fromWants = minOf(left, x.wantsJar).also { left -= it }
+        } else {
+            fromWants = minOf(left, x.wantsJar).also { left -= it }
+            fromNeeds = minOf(left, x.needsJar).also { left -= it }
         }
+        val fromSavings = minOf(left, saved).also { left -= it }
+        return Payment(price, fromFree, fromNeeds, fromWants, fromSavings, impossible = left > 0)
     }
 
     /**

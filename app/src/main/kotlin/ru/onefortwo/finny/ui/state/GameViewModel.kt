@@ -85,6 +85,10 @@ data class AnsweredTask(
     val isRepeat: Boolean,
 )
 
+/** Что делать, когда монет не хватает даже с копилкой: ждать сезона и поиграть с питомцем. */
+private const val SHORTAGE_NEXT = "Дождись начала следующего сезона — тебе начислят новые монеты. " +
+    "А чтобы ожидание не было скучным — поиграй с питомцем"
+
 class GameViewModel(
     val content: ContentRepository,
     private val repository: GameRepository?,
@@ -299,8 +303,9 @@ class GameViewModel(
             ownedAccessories = Accessories.list(appearance.accessoryId).toSet(),
             extras = SeasonExtras(season = 1, seasonStart = dates.today()),
             arrival = FeedbackMessage(
-                text = "Тебе дали ${Explanations.coins(IncomeSource.START_BUDGET.amount)}.",
-                nextStep = "Это монеты на весь сезон — на три дня. Разложи их по банкам: «Нужное», «Хочу» и «Копим на мечту».",
+                text = "Тебе пришло ${Explanations.coins(IncomeSource.START_BUDGET.amount)}",
+                nextStep = "Каждый сезон ты будешь получать новые монеты. Разложи их на: «Нужное», «Хочу» и «Копим на мечту». " +
+                    "У тебя есть 3 дня, чтобы тратить и копить. После начнётся новый сезон и придут новые монеты.",
             ),
         )
     }
@@ -388,9 +393,8 @@ class GameViewModel(
                 missed = x.missed,
             ),
             arrival = FeedbackMessage(
-                text = "Новый сезон! Пришли ${Explanations.coins(event.amount)}.",
-                nextStep = "Теперь у тебя ${Explanations.coins(event.balanceAfter)}. " +
-                    "Разложи их по банкам в «Плане» — это монеты на три дня.",
+                text = "Тебе пришло ${Explanations.coins(event.amount)}",
+                nextStep = "Трать и копи 3 дня. После тебе придут новые монеты.",
             ),
         )
     }
@@ -483,9 +487,9 @@ class GameViewModel(
             val left = available - needs - wants - savings
             showProblem(
                 if (left >= 0) {
-                    "Разложи все монеты по банкам: осталось ${Explanations.coins(left)}."
+                    "Разложи все монеты: осталось ${Explanations.coins(left)}"
                 } else {
-                    "Разложи все монеты по банкам: в плане на ${Explanations.coinsAccusative(-left)} больше, чем есть."
+                    "Разложи все монеты: в плане на ${Explanations.coinsAccusative(-left)} больше, чем есть"
                 },
                 null,
             )
@@ -541,17 +545,11 @@ class GameViewModel(
             current.extras,
         )
         when {
-            payment.impossible -> if (item.category == ItemCategory.WANTS) {
-                showProblem(
-                    "В банке «Хочу» не хватает монет на «${item.title}».",
-                    "Желаемое покупают из банка «Хочу». Можно поправить план.",
-                )
-            } else {
-                showProblem(
-                    "Не хватает монет на «${item.title}» даже вместе с копилкой.",
-                    "Давай в следующем сезоне спланируем лучше?",
-                )
-            }
+            payment.impossible -> showProblem(
+                "Не хватает монет. У тебя всего ${Explanations.coins(current.game.balance.amount + current.game.savings.saved.amount)}, " +
+                    "а «${item.title}» стоит ${item.price}",
+                SHORTAGE_NEXT,
+            )
 
             payment.needsSavings -> _state.update {
                 it.copy(savingsAsk = SavingsAsk(null, itemId, payment, it.game.previewWithdrawal(Coins(payment.fromSavings))))
@@ -717,11 +715,9 @@ class GameViewModel(
         }
         val emotion = raw?.withPetName(petName)?.let { if (teen) PetVoice.teen(it) else it }
         val hint = when {
-            // Желаемое берётся только из банка «Хочу»; нужное — со всех банков и копилки.
-            shortage && event.category == ItemCategory.WANTS ->
-                "В банке «Хочу» не хватает монет. Желаемое можно отложить — или поправить план."
-            shortage -> "Монет не хватило даже вместе с копилкой. Ты не успел накопить. " +
-                "Давай в следующем сезоне спланируем лучше?"
+            // Монет не хватило даже вместе с копилкой.
+            shortage -> "Не хватает монет. У тебя всего ${Explanations.coins(game.balance.amount + game.savings.saved.amount)}, " +
+                "а это стоит ${Explanations.coins(event.price)}. $SHORTAGE_NEXT"
             !event.cost -> null
             accepted -> event.hintYes
             else -> event.hintNo
@@ -1036,7 +1032,7 @@ class GameViewModel(
                 } else {
                     FeedbackMessage(
                         text = "Задание засчитано. Решено заданий: ${withSurprise.tasksSolved}.",
-                        nextStep = next?.let { n -> "До сюрприза в лавке — ${Explanations.tasks(n)}." },
+                        nextStep = next?.let { n -> "До новых товаров в лавке — ${Explanations.tasks(n)}." },
                     )
                 },
             ).withGrowth()

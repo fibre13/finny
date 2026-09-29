@@ -204,8 +204,6 @@ fun GiftScreen(onOpen: () -> Unit) {
                     Sprite(art, "yard_balloon_blue", Modifier.align(Alignment.TopStart).offset(x = 44.dp, y = 8.dp), cell = 3.dp)
                     Sprite(art, "yard_balloon_yellow", Modifier.align(Alignment.TopEnd).offset(x = (-44).dp, y = 16.dp), cell = 3.dp)
                     Sprite(art, "yard_balloon_green", Modifier.align(Alignment.TopEnd).offset(x = (-6).dp, y = 56.dp), cell = 3.dp)
-                    // Торт со свечами — это день рождения.
-                    Sprite(art, "item_cake", Modifier.align(Alignment.BottomStart).offset(x = 18.dp, y = (-6).dp), cell = 3.dp)
                     Sprite(
                         art, "yard_gift",
                         modifier = Modifier

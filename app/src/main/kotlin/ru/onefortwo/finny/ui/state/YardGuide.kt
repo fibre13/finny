@@ -33,12 +33,12 @@ enum class Reminder(
 ) {
     NEEDS("needs", GuideTarget.SHOP, "Я проголодался. Купишь нужное в лавке?", "В лавку"),
     /** Есть монеты вне банков — подарок или снятое из копилки. */
-    FREE("free", GuideTarget.PLAN, "Есть свободные монеты. Разложи их по банкам!", "В план"),
-    TASK("task", GuideTarget.TASKS, "Реши задание — до сюрприза в лавке ближе!", "К заданию"),
-    WORD("word", GuideTarget.GLOSSARY, "Есть новое слово. Загляни в словарик!", "В словарик"),
+    FREE("free", GuideTarget.PLAN, "Есть свободные монеты. Разложи их в плане!", "В план"),
+    TASK("task", GuideTarget.TASKS, "Реши задание — и в лавке появится что-то новое!", null),
+    WORD("word", GuideTarget.GLOSSARY, "Я услышал новое слово! Загляни в словарик!", "В словарик"),
     /** Раз в сезон после дел дня. */
     PLAN_FIX("plan_fix", GuideTarget.PLAN, "Хочешь скорректировать план?", "В план"),
-    FINISH("finish", GuideTarget.FINISH, "Все дела сделаны! Поиграй со мной или уложи спать.", null),
+    FINISH("finish", GuideTarget.FINISH, "Все дела сделаны! Поиграй со мной или уложи спать", null),
 }
 
 /**
@@ -74,7 +74,7 @@ object YardGuide {
             game.savings.goal == null ->
                 GuideStep(0, GuideTarget.SAVINGS, "Выбери мечту — на что будем копить?")
             !state.extras.planned ->
-                GuideStep(0, GuideTarget.PLAN, "Новый сезон: разложи ${Explanations.coins(game.balance)} по банкам")
+                GuideStep(0, GuideTarget.PLAN, "Новый сезон: разложи ${Explanations.coins(game.balance)}")
             !state.dayEventsDone -> null
             else -> reminder(state, today)?.let { GuideStep(0, it.target, it.text, it) }
         }

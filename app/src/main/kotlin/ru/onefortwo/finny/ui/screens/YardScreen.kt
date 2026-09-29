@@ -8,6 +8,7 @@ import ru.onefortwo.finny.ui.state.SEASON_DAYS
 import androidx.compose.foundation.layout.wrapContentHeight
 import ru.onefortwo.finny.content.Accessories
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -388,12 +389,14 @@ fun YardScreen(
     val dayFinished = state.isDayFinished(today)
     // День закрывается после событий дня.
     val reason = when {
-        dayFinished -> "Уложить спать можно завтра."
-        state.game.savings.goal == null && !state.extras.planned -> "Сначала выбери мечту и составь план."
-        !state.extras.planned -> "Сначала разложи монеты по банкам в «Плане»."
-        !state.dayEventsDone -> "Сначала реши события дня."
+        dayFinished -> "Уложить спать можно завтра"
+        state.game.savings.goal == null && !state.extras.planned -> "Сначала выбери мечту и составь план"
+        !state.extras.planned -> "Сначала разложи монеты в «Плане»"
+        !state.dayEventsDone -> "Сначала реши события дня"
         else -> null
     }
+    // «Уложить спать» — подтверждение, чтобы не нажать случайно.
+    var askSleep by remember { mutableStateOf(false) }
 
     fun finishDay() {
         if (busy) return
@@ -492,7 +495,7 @@ fun YardScreen(
                         art, colors, "yard_tasks", "Задания",
                         description = "Задания. На доске: $board",
                         onPlaced = { places["tasks"] = it.center; bounds[GuideTarget.TASKS] = it },
-                        onClick = { if (dayFinished) onSleepingTap() else runTo(places["tasks"], onOpenTasks) },
+                        onClick = { runTo(places["tasks"], onOpenTasks) },
                         overlay = {
                             Text(
                                 text = board,
@@ -584,10 +587,11 @@ fun YardScreen(
                 if (dayFinished) {
                     SleepPlate(colors = colors, petName = profile.petName)
                 } else {
-                    // После дел дня — «Поиграть» или «Уложить спать».
+                    // После дел дня — «Играть» или «Уложить спать». До этого кнопок нет:
+                    // что делать дальше, говорит облачко подсказки.
                     if (reason == null && state.extras.playedDay != game.period.number) {
                         Text(
-                            text = "Поиграть",
+                            text = "Играть",
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.outline,
                             textAlign = TextAlign.Center,
@@ -600,14 +604,16 @@ fun YardScreen(
                                 .wrapContentHeight(Alignment.CenterVertically),
                         )
                     }
-                    FinishDayButton(
-                        colors = colors,
-                        reason = reason,
-                        // Кнопка пульсирует, только когда до неё дошла очередь.
-                        highlight = guide == null || guide.target == GuideTarget.FINISH,
-                        onClick = { finishDay() },
-                        onPlaced = { bounds[GuideTarget.FINISH] = it },
-                    )
+                    if (reason == null) {
+                        FinishDayButton(
+                            colors = colors,
+                            reason = null,
+                            // Кнопка пульсирует, только когда до неё дошла очередь.
+                            highlight = guide == null || guide.target == GuideTarget.FINISH,
+                            onClick = { askSleep = true },
+                            onPlaced = { bounds[GuideTarget.FINISH] = it },
+                        )
+                    }
                 }
             }
         }
@@ -685,14 +691,25 @@ fun YardScreen(
                     GuideTarget.GLOSSARY -> ({ runTo(places["glossary"], onOpenGlossary) })
                     GuideTarget.FINISH -> null
                 },
-                onDismiss = guide.reminder?.let { reminder -> { onDismissReminder(reminder) } },
+                onDismiss = guide.reminder?.takeIf { it != Reminder.TASK && it != Reminder.FINISH }?.let { reminder -> { onDismissReminder(reminder) } },
+            )
+        }
+
+        if (askSleep) {
+            SleepConfirmDialog(
+                petName = profile.petName,
+                onConfirm = {
+                    askSleep = false
+                    finishDay()
+                },
+                onCancel = { askSleep = false },
             )
         }
 
         // Пришли монеты — отдельным окном: это первое, что видит ребёнок.
         val arrival = state.arrival
         if (arrival != null) {
-            ArrivalDialog(art = art, message = arrival, onDismiss = onArrivalShown)
+            ArrivalDialog(art = art, message = arrival, firstSeason = state.extras.season == 1, onDismiss = onArrivalShown)
         }
 
         // Событие дня — окном поверх двора, чуть погодя после
@@ -701,7 +718,7 @@ fun YardScreen(
         LaunchedEffect(pendingEvent?.id, arrival == null) {
             eventReady = false
             if (pendingEvent != null && arrival == null) {
-                delay(EVENT_DELAY_MS)
+                delay(if (state.extras.answered == 0) EVENT_DELAY_MS else EVENT_PAUSE_MS)
                 eventReady = true
             }
         }
@@ -745,8 +762,14 @@ fun YardScreen(
     }
 }
 
-/** Пауза перед окном события — сначала виден двор. */
+/** Пауза перед первым событием дня — сначала виден двор. */
 private const val EVENT_DELAY_MS = 1200L
+
+/**
+ * Пауза между событиями дня: ребёнок успевает осознать решение, заглянуть
+ * в лавку, словарик или задания. Не дольше полуминуты — темп не затягивается.
+ */
+private const val EVENT_PAUSE_MS = 20_000L
 
 /** Желание питомца в облачке: сначала еда, потом игра; довольному — ничего. */
 private fun desireOf(care: StatLevel, joy: StatLevel): String? = when {
@@ -1466,20 +1489,84 @@ private fun SleepPlate(colors: YardColors, petName: String) {
 
 /** Окно «Пришли монеты» — стартовые или карманные на новый день. */
 @Composable
-private fun ArrivalDialog(art: PixelArt, message: FeedbackMessage, onDismiss: () -> Unit) {
+private fun ArrivalDialog(art: PixelArt, message: FeedbackMessage, firstSeason: Boolean, onDismiss: () -> Unit) {
     FinnyDialog(
-        title = "Пришли монеты",
+        title = message.text,
         onDismiss = onDismiss,
         content = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Sprite(art, "coin_0", cell = 4.dp)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(text = message.text, style = MaterialTheme.typography.titleMedium)
-            }
+            CoinPile(art, Modifier.fillMaxWidth().height(120.dp))
             message.nextStep?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 10.dp))
+                Text(text = it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 10.dp))
             }
         },
-        actions = { PrimaryButton(text = "Дальше", onClick = onDismiss) },
+        // Первый сезон — «Начать сезон», дальше — «Начать новый сезон».
+        actions = { PrimaryButton(text = if (firstSeason) "Начать сезон" else "Начать новый сезон", onClick = onDismiss) },
+    )
+}
+
+/**
+ * Гора монет: сверху падают монеты и собираются в кучку, которая растёт, —
+ * «пришло много монет». При выключенных движениях — сразу готовая кучка.
+ */
+@Composable
+private fun CoinPile(art: PixelArt, modifier: Modifier = Modifier) {
+    val motion = motionAllowed()
+    val fall = remember { Animatable(if (motion) 0f else 1f) }
+    LaunchedEffect(Unit) { if (motion) fall.animateTo(1f, tween(1800, easing = LinearEasing)) }
+    val gold = Color(art.colors[art.indexOf('Y')])
+    val shade = Color(art.colors[art.indexOf('O')])
+    val outline = Color(art.colors[art.indexOf('K')])
+    // Ряды кучки снизу вверх: 7, 6, 5, 4, 3, 2, 1 монет — всего 28.
+    val rows = listOf(7, 6, 5, 4, 3, 2, 1)
+    val total = rows.sum()
+    Canvas(modifier = modifier.clearAndSetSemantics { }) {
+        val r = size.height / 16f
+        val step = r * 2.1f
+        val landed = (fall.value * total).toInt()
+        var n = 0
+        fun coin(center: Offset) {
+            drawCircle(outline, radius = r, center = center)
+            drawCircle(gold, radius = r * 0.78f, center = center)
+            drawCircle(shade, radius = r * 0.36f, center = center + Offset(r * 0.18f, r * 0.18f))
+        }
+        rows.forEachIndexed { level, count ->
+            val y = size.height - r - level * r * 1.55f
+            val x0 = size.width / 2 - (count - 1) * step / 2
+            for (i in 0 until count) {
+                if (n < landed) coin(Offset(x0 + i * step, y))
+                n++
+            }
+        }
+        // Падающие монеты — над кучкой, пока она растёт.
+        if (fall.value < 1f) {
+            for (k in 0 until 4) {
+                val p = (fall.value * 6f + k * 0.25f) % 1f
+                coin(Offset(size.width / 2 + (k - 1.5f) * step * 1.3f, -r + p * (size.height - 4 * r)))
+            }
+        }
+    }
+}
+
+/** Подтверждение «Уложить спать»: после сна поиграть с питомцем сегодня не получится. */
+@Composable
+private fun SleepConfirmDialog(petName: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    FinnyDialog(
+        title = "Уложить $petName спать?",
+        onDismiss = onCancel,
+        content = {
+            Text(
+                text = "Если $petName ляжет спать — поиграть с ним сегодня уже не получится.",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = "План, словарик и задания останутся доступны.",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        },
+        actions = {
+            PrimaryButton(text = "Да, уложить спать", onClick = onConfirm)
+            ru.onefortwo.finny.ui.common.SecondaryButton(text = "Не сейчас", onClick = onCancel)
+        },
     )
 }

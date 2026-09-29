@@ -200,7 +200,7 @@ private fun ResultCard(
                 Text(
                     // Монет за задания нет — они приближают сюрприз в лавке.
                     text = if (answered.credited.amount == 0) {
-                        "Засчитано — сюрприз в лавке ближе!"
+                        "Засчитано — скоро в лавке появится что-то новое!"
                     } else {
                         Explanations.reward(
                             source = check.reward,
@@ -215,26 +215,24 @@ private fun ResultCard(
             }
         }
 
-        // Питомец отвечает облачком — рядом, а не над ним: так ответ
-        // помещается на один экран без прокрутки. «Готово» нет —
-        // возврат кнопкой «Назад» наверху.
+        // Питомец отвечает облачком над собой, уголок вниз — к нему.
+        // «Готово» нет — возврат кнопкой «Назад» наверху.
         if (petFigure != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                petFigure(check.isCorrect)
-                check.petIcon?.let { icon ->
-                    Spacer(modifier = Modifier.width(4.dp))
-                    TaskSprite(art, icon, 40.dp)
-                }
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                 SpeechBubble(
                     colors = colors,
                     text = voice(check.pet),
-                    modifier = Modifier.weight(1f).padding(start = 8.dp, bottom = 48.dp),
-                    // Питомец слева — уголок у левого края, к нему.
-                    tailStart = 4.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                    // Питомец шириной 96 dp стоит слева — уголок над его серединой.
+                    tailStart = 40.dp,
                 )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    petFigure(check.isCorrect)
+                    check.petIcon?.let { icon ->
+                        Spacer(modifier = Modifier.width(4.dp))
+                        TaskSprite(art, icon, 40.dp)
+                    }
+                }
             }
         }
 
@@ -258,7 +256,7 @@ private fun NextTaskCard(art: PixelArt, task: TaskContent, onStart: () -> Unit) 
                 }
             }
             // Кнопка компактная — итог задания помещается на один экран.
-            PrimaryButton(text = "Начать следующее →", onClick = onStart, modifier = Modifier.padding(top = 6.dp))
+            PrimaryButton(text = "Начать →", onClick = onStart, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }
@@ -297,11 +295,12 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
         TaskAmount(planLabel(PlanCategory.WANTS), wants, wants + left) { wants = it }
         TaskAmount(planLabel(PlanCategory.SAVINGS), savings, savings + left) { savings = it }
 
+        // Остаток над кнопкой и есть подсказка — отдельная под кнопкой её дублировала.
         SupportingText(
             text = if (left == 0) {
-                "Все монеты распределены."
+                "Все монеты распределены"
             } else {
-                "Осталось распределить ${Explanations.coinsAccusative(left)}."
+                "Осталось распределить ${Explanations.coinsAccusative(left)}"
             },
             modifier = Modifier.padding(vertical = 12.dp),
         )
@@ -311,7 +310,6 @@ private fun AllocateForm(task: AllocateTask, onSubmit: (TaskAnswer) -> Unit) {
             enabled = left == 0,
             onClick = { onSubmit(TaskAnswer.Allocation(needs, wants, savings)) },
         )
-        if (left > 0) TaskHint(task.hint)
     }
 }
 
@@ -565,8 +563,7 @@ private val AnsweredTaskSaver: Saver<AnsweredTask?, Any> = listSaver(
     },
 )
 
-/** Направление плана в задании на распределение. */
-/** Подпись направления плана в задании: как в плане дня. */
+/** Подпись направления плана в задании: как в плане сезона. */
 private fun planLabel(category: PlanCategory): String = when (category) {
     PlanCategory.NEEDS -> BudgetCategory.NEEDS.displayName
     PlanCategory.WANTS -> BudgetCategory.WANTS.displayName

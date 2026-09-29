@@ -1,6 +1,7 @@
 package ru.onefortwo.finny.ui.screens
 
 import ru.onefortwo.finny.content.Accessories
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -64,6 +65,9 @@ import androidx.compose.ui.unit.dp
 import ru.onefortwo.finny.content.GoalContent
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GameState
+import ru.onefortwo.finny.economy.GoalForecast
+import ru.onefortwo.finny.content.PixelArt
+import kotlin.math.ceil
 import ru.onefortwo.finny.economy.WithdrawalPreview
 import ru.onefortwo.finny.ui.common.ButtonTone
 import ru.onefortwo.finny.ui.common.CardTone
@@ -124,6 +128,20 @@ fun SavingsScreen(
     val goalTitle = goalContent?.title
     val reached = goal != null && game.savings.saved >= goal.price
 
+    // «Изменить цель»: выбор другой цели поверх экрана копилки. Состояние
+    // внутреннее — отдельного маршрута не нужно, «Назад» возвращает к карточке.
+    var changeRequested by rememberSaveable { mutableStateOf(false) }
+    var pendingGoal by rememberSaveable { mutableStateOf<String?>(null) }
+    val changing = changeRequested && goal != null && !reached
+    BackHandler(enabled = changing) { changeRequested = false }
+
+    // Цель видна в карточке, поэтому отклик «Цель выбрана: …» внизу не нужен.
+    val choose: (String) -> Unit = { id ->
+        onChooseGoal(id)
+        onDismissMessage()
+        changeRequested = false
+    }
+
     val pet: PetSlot = { size, reaction, onEnd ->
         if (profile != null && parts != null) {
             val species = parts.species.firstOrNull { it.id == profile.appearance.speciesId }
@@ -153,9 +171,10 @@ fun SavingsScreen(
         eyebrow = if (goal == null && afterClaim) "Новая мечта" else "Моя цель",
         title = "Копилка",
         balance = balance,
-        onBack = onBack,
+        onBack = if (changing) ({ changeRequested = false }) else onBack,
         message = message,
         onDismissMessage = onDismissMessage,
+        scrollKey = changing,
     ) {
         Column {
             if (goal == null) {
@@ -164,7 +183,7 @@ fun SavingsScreen(
                     saved = game.savings.saved,
                     afterClaim = afterClaim,
                     pet = pet,
-                    onChoose = onChooseGoal,
+                    onChoose = choose,
                     tip = goalTip,
                 )
             } else if (reached) {
@@ -178,52 +197,49 @@ fun SavingsScreen(
                     onClaim = onClaimGoal,
                     growthLine = growthLine,
                 )
+            } else if (changing) {
+                GoalChooser(
+                    goals = goals,
+                    saved = game.savings.saved,
+                    afterClaim = afterClaim,
+                    pet = pet,
+                    onChoose = { id ->
+                        when {
+                            id == goal.id -> changeRequested = false
+                            // Накоплений нет — терять нечего, подтверждение не нужно.
+                            game.savings.saved.amount == 0 -> choose(id)
+                            else -> pendingGoal = id
+                        }
+                    },
+                    currentGoalId = goal.id,
+                    currentTitle = goalTitle,
+                    onKeep = { changeRequested = false },
+                )
             } else {
-                SectionCard(
-                    eyebrow = goalTitle ?: "Моя цель",
-                    title = "${game.savings.saved.amount} из ${Explanations.coins(goal.price)}",
-                    tone = CardTone.Primary,
-                    trailing = { GoalPicture(goal.id) },
-                ) {
-                    Column {
-                        ProgressBar(
-                            fraction = game.savings.saved.amount.toFloat() / goal.price.amount,
-                            color = FinnyTheme.colors.coin,
-                            trackColor = FinnyTheme.colors.onPrimary.copy(alpha = 0.22f),
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                        LabeledValue("Стоимость", Explanations.coins(goal.price))
-                        LabeledValue("Уже накоплено", Explanations.coins(game.savings.saved))
-                        // Пополнение — в плане, всё в одном месте. Ссылка —
-                        // отдельной строкой под суммой: в одной строке сумма переносилась.
-                        Text(
-                            text = "Изменить →",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = FinnyTheme.colors.onPrimary,
-                            textDecoration = TextDecoration.Underline,
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .heightIn(min = 48.dp)
-                                .clickable(role = Role.Button, onClick = onOpenPlan)
-                                .wrapContentHeight(Alignment.CenterVertically),
-                        )
-                        LabeledValue("Осталось накопить", Explanations.coins(game.savings.remaining))
-                        SupportingText(
-                            text = Explanations.forecast(game.goalForecast()),
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
-                }
-
-                // Снять можно, но только с подтверждением и показом, как изменятся сумма и срок.
-                if (game.savings.saved.amount > 0) {
-                    SecondaryButton(
-                        text = "Забрать монеты на покупки",
-                        onClick = { previewAmount = 0 },
-                    )
-                }
+                GoalProgress(
+                    goalId = goal.id,
+                    title = goalTitle ?: "Моя цель",
+                    price = goal.price,
+                    saved = game.savings.saved,
+                    remaining = game.savings.remaining,
+                    forecast = game.goalForecast(),
+                    onOpenPlan = onOpenPlan,
+                    onChangeGoal = { changeRequested = true },
+                    onWithdraw = { previewAmount = 0 },
+                )
             }
         }
+    }
+
+    pendingGoal?.let { id ->
+        ChangeGoalConfirmation(
+            saved = game.savings.saved.amount,
+            onConfirm = {
+                pendingGoal = null
+                choose(id)
+            },
+            onCancel = { pendingGoal = null },
+        )
     }
 
     previewAmount?.let { amount ->
@@ -311,6 +327,198 @@ private fun WithdrawalConfirmation(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             SecondaryButton(text = "Оставить в копилке", onClick = onCancel)
+        },
+    )
+}
+
+/**
+ * Выбранная цель: карточка с картинкой, названием, полосой «X / N» и тремя
+ * суммами; под ней крупная банка-копилка, строка о накоплениях и кнопки.
+ * Пополнение — в плане сезона; снятие — второстепенной кнопкой внизу.
+ */
+@Composable
+private fun GoalProgress(
+    goalId: String,
+    title: String,
+    price: Coins,
+    saved: Coins,
+    remaining: Coins,
+    forecast: GoalForecast,
+    onOpenPlan: () -> Unit,
+    onChangeGoal: () -> Unit,
+    onWithdraw: () -> Unit,
+) {
+    val colors = FinnyTheme.colors
+    val empty = saved.amount == 0
+
+    SectionCard(
+        title = title,
+        tone = CardTone.Primary,
+        trailing = { GoalPicture(goalId) },
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .padding(bottom = 10.dp)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "Накоплено ${saved.amount} из ${Explanations.coins(price)}"
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ProgressBar(
+                    fraction = saved.amount.toFloat() / price.amount,
+                    color = colors.coin,
+                    trackColor = colors.onPrimary.copy(alpha = 0.22f),
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "${saved.amount} / ${price.amount}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onPrimary,
+                )
+            }
+            LabeledValue("Стоимость", Explanations.coins(price))
+            LabeledValue("Накоплено", Explanations.coins(saved))
+            LabeledValue("Осталось", Explanations.coins(remaining))
+        }
+    }
+
+    SavingsJar(
+        fraction = saved.amount.toFloat() / price.amount,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+    )
+    Text(
+        text = if (empty) "Копилка пока пустая" else "Осталось накопить ${Explanations.coinsAccusative(remaining.amount)}",
+        style = MaterialTheme.typography.headlineSmall,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    )
+    // Срок — одной строкой, только когда его есть из чего посчитать.
+    if (!empty && forecast is GoalForecast.Periods) {
+        SupportingText(
+            text = Explanations.forecast(forecast),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+                .wrapContentHeight(),
+        )
+    }
+    PrimaryButton(
+        text = if (empty) "Распределить монеты" else "Отложить ещё",
+        onClick = onOpenPlan,
+        modifier = Modifier.padding(top = 16.dp),
+    )
+    SecondaryButton(
+        text = "Изменить цель",
+        onClick = onChangeGoal,
+        modifier = Modifier.padding(top = 10.dp),
+    )
+    // Снять можно, но только с подтверждением и показом, как изменятся сумма и срок.
+    if (!empty) {
+        Text(
+            text = "Забрать монеты на покупки",
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.onSurfaceMuted,
+            textDecoration = TextDecoration.Underline,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .heightIn(min = MinTouchTarget)
+                .clickable(role = Role.Button, onClick = onWithdraw)
+                .wrapContentHeight(Alignment.CenterVertically),
+        )
+    }
+}
+
+/**
+ * Банка-копилка крупно: пустое стекло или монеты слоями до уровня
+ * накоплений. Декоративная: сколько накоплено, говорит строка под ней.
+ */
+@Composable
+private fun SavingsJar(fraction: Float, modifier: Modifier = Modifier) {
+    val art = rememberPixelArt()
+    // Уровень в строках стекла: даже одна монета видна слоем, почти
+    // полная банка не выглядит собранной.
+    val rows = if (fraction <= 0f) 0 else ceil(fraction * JAR_ROWS).toInt().coerceIn(3, JAR_ROWS - 1)
+    val image = remember(art, rows) { pixelImage(jarPixels(art, rows), JAR[0].length) }
+    PixelImage(image = image, modifier = modifier.clearAndSetSemantics { })
+}
+
+/** Банка 22 × 26: крышка с прорезью, горлышко и стекло (`a`). */
+private val JAR = listOf(
+    "....KKKKKKKKKKKKKK....",
+    "....KmmmmmKKmmmmmK....",
+    "....KmmmmmmmmmmmmK....",
+    "....KKKKKKKKKKKKKK....",
+    ".....KaaaaaaaaaaK.....",
+    "...KKaaaaaaaaaaaaKK...",
+    "..KaaaaaaaaaaaaaaaaK..",
+) + List(17) { ".KaaaaaaaaaaaaaaaaaaK." } + listOf(
+    "..KaaaaaaaaaaaaaaaaK..",
+    "...KKKKKKKKKKKKKKKK...",
+)
+
+/** Строки стекла, которые заполняются монетами, — снизу до горлышка. */
+private const val JAR_ROWS = 19
+
+/**
+ * Пиксели банки: нижние [rows] строк стекла — монеты (слой светлый,
+ * край тёмный, редкие блики), остальное стекло с бликом слева.
+ */
+private fun jarPixels(art: PixelArt, rows: Int): IntArray {
+    fun color(char: Char): Int = art.indexOf(char).let { if (it >= 0) art.colors[it] else 0 }
+    val width = JAR[0].length
+    val bottom = JAR.size - 2
+    val pixels = IntArray(width * JAR.size)
+    JAR.forEachIndexed { y, line ->
+        line.forEachIndexed { x, char ->
+            val level = bottom - y
+            val cell = when {
+                char != 'a' -> char
+                level < rows -> when {
+                    // Верхний слой неровный: монеты лежат горкой.
+                    level == rows - 1 && (x + rows) % 3 == 0 -> 'a'
+                    level % 3 == 0 -> 'O'
+                    (x + level * 2) % 6 == 0 -> 'O'
+                    (x * 3 + level) % 7 == 0 -> 'y'
+                    else -> 'Y'
+                }
+                // Блик на стекле.
+                x == 3 && y in 8..14 || x == 4 && y in 8..9 -> 'c'
+                else -> 'a'
+            }
+            pixels[y * width + x] = if (cell == '.') 0 else color(cell)
+        }
+    }
+    return pixels
+}
+
+/** Подтверждение смены цели: накопленное остаётся в копилке. */
+@Composable
+private fun ChangeGoalConfirmation(saved: Int, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    val one = saved % 10 == 1 && saved % 100 != 11
+    val text = if (one) {
+        "Накопленная ${Explanations.coins(saved)} останется в копилке. Её можно потратить на новую мечту."
+    } else {
+        "Накопленные ${Explanations.coins(saved)} останутся в копилке. Их можно потратить на новую мечту."
+    }
+    FinnyDialog(
+        title = "Ты уверен?",
+        onDismiss = onCancel,
+        content = { SupportingText(text) },
+        actions = {
+            PrimaryButton(
+                text = "Да, выбрать",
+                onClick = onConfirm,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            SecondaryButton(text = "Отмена", onClick = onCancel)
         },
     )
 }
@@ -514,6 +722,9 @@ private val SPARKLES = listOf(
  * Выбор цели — «новая мечта» после полученной цели. Остаток копилки
  * назван плашкой, у каждой цели — картинка, размер мечты, цена и
  * сколько осталось накопить с учётом остатка.
+ *
+ * С [currentGoalId] — смена цели («Изменить цель»): текущая цель помечена,
+ * внизу вместо совета кнопка [onKeep] «Не менять цель».
  */
 @Composable
 private fun GoalChooser(
@@ -523,10 +734,14 @@ private fun GoalChooser(
     pet: PetSlot,
     onChoose: (String) -> Unit,
     tip: String? = null,
+    currentGoalId: String? = null,
+    currentTitle: String? = null,
+    onKeep: () -> Unit = {},
 ) {
     val colors = FinnyTheme.colors
+    val changing = currentGoalId != null
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (saved.amount > 0) {
+        if (saved.amount > 0 && !changing) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -552,32 +767,44 @@ private fun GoalChooser(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (afterClaim) "Выбери новую цель" else "Выбери цель",
+                    text = when {
+                        changing -> "Изменить цель"
+                        afterClaim -> "Выбери новую цель"
+                        else -> "Выбери цель"
+                    },
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.semantics { heading() },
                 )
                 Text(
-                    text = "На что будем копить?",
+                    text = if (changing) {
+                        "Ты сейчас копишь на «${currentTitle ?: "мечту"}». Хочешь выбрать что-то другое?"
+                    } else {
+                        "На что будем копить?"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceMuted,
                 )
             }
             pet(96.dp, null) {}
         }
-        goals.forEach { GoalOption(goal = it, saved = saved, onChoose = onChoose) }
-        Text(
-            text = tip ?: "Совет: начни с маленькой мечты — её достичь быстрее.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.onSurfaceMuted,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        goals.forEach { GoalOption(goal = it, saved = saved, onChoose = onChoose, current = it.id == currentGoalId) }
+        if (changing) {
+            SecondaryButton(text = "Не менять цель", onClick = onKeep)
+        } else {
+            Text(
+                text = tip ?: "Совет: начни с маленькой мечты — её достичь быстрее.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
 /** Карточка цели: нажимается целиком. */
 @Composable
-private fun GoalOption(goal: GoalContent, saved: Coins, onChoose: (String) -> Unit) {
+private fun GoalOption(goal: GoalContent, saved: Coins, onChoose: (String) -> Unit, current: Boolean = false) {
     val colors = FinnyTheme.colors
     val shape = RoundedCornerShape(20.dp)
     val left = (goal.price - saved.amount).coerceAtLeast(0)
@@ -588,8 +815,16 @@ private fun GoalOption(goal: GoalContent, saved: Coins, onChoose: (String) -> Un
         goal.price <= 100 -> colors.warningContainer to colors.warningText
         else -> colors.errorContainer to colors.attentionText
     }
-    val leftText = if (left > 0) "осталось $left" else "уже накоплено ✓"
-    val leftSpoken = if (left > 0) "осталось накопить ${Explanations.coins(left)}" else "уже накоплено"
+    val leftText = when {
+        current -> "копишь сейчас"
+        left > 0 -> "осталось $left"
+        else -> "уже накоплено ✓"
+    }
+    val leftSpoken = when {
+        current -> "копишь сейчас"
+        left > 0 -> "осталось накопить ${Explanations.coins(left)}"
+        else -> "уже накоплено"
+    }
 
     Row(
         modifier = Modifier

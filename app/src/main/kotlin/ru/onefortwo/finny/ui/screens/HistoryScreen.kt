@@ -147,7 +147,7 @@ fun HistoryScreen(
             SectionCard(title = "Задания: ты выполнил уже ${Explanations.tasks(solved)}") {
                 Column {
                     SupportingText(
-                        if (toSurprise != null) "До сюрприза в лавке — ${Explanations.tasks(toSurprise)}." else "Все сюрпризы в лавке открыты!",
+                        if (toSurprise != null) "До новых товаров в лавке — ${Explanations.tasks(toSurprise)}." else "Все сюрпризы в лавке открыты!",
                     )
                     PrimaryButton(text = "К заданиям →", onClick = onOpenTasks, modifier = Modifier.padding(top = 10.dp))
                 }

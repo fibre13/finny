@@ -482,8 +482,8 @@ private fun PreviewRow(
 }
 
 /**
- * Финал знакомства: питомец выпрыгивает на лугу и говорит «Привет!»,
- * под ним крупно имя, ниже «Начать игру». Имя не повторяется дважды.
+ * Финал знакомства — встреча: питомец выпрыгивает на лугу и представляется
+ * в облачке над собой по имени, ниже — «Давай играть».
  */
 @Composable
 private fun ReadyStep(
@@ -522,27 +522,12 @@ private fun ReadyStep(
             // для прыжка. Рисуется поверх питомца.
             SpeechBubble(
                 colors = colors,
-                text = PetSpeech.HELLO,
+                text = "Привет-привет! Я — $name! Рад видеть тебя",
                 modifier = Modifier.offset(y = 52.dp).zIndex(1f),
             )
             figure(192.dp, reaction) { round++ }
-            Spacer(modifier = Modifier.height(20.dp))
-            Column(
-                modifier = Modifier
-                    .widthIn(min = 240.dp, max = 360.dp)
-                    .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.headlineLarge,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { heading() },
-                )
-            }
             Spacer(modifier = Modifier.height(40.dp))
-            PixelButton(text = "Начать игру", onClick = onStart, pulse = true, modifier = Modifier.widthIn(max = 480.dp))
+            PixelButton(text = "Давай играть", onClick = onStart, pulse = true, modifier = Modifier.widthIn(max = 480.dp))
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

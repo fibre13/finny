@@ -81,9 +81,10 @@ fun TasksScreen(
             Stars(colors = colors, solved = solvedInRound, total = regular.size)
             if (solved != null) {
                 // Монет за задания нет — каждые три открывают сюрприз в лавке.
+                // Две короткие строки без точек в конце.
                 Text(
-                    text = "Решено заданий: $solved. " + if (toSurprise != null) {
-                        "До сюрприза в лавке — ${Explanations.tasks(toSurprise)}."
+                    text = "Решено заданий: $solved\n" + if (toSurprise != null) {
+                        "До новых товаров в лавке — ${Explanations.tasks(toSurprise)}"
                     } else {
                         "Все сюрпризы открыты!"
                     },

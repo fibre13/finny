@@ -110,7 +110,7 @@ fun ShopScreen(
                     bottomSpacing = 0.dp,
                 ) {
                     Text(
-                        text = "Сначала разложи монеты по банкам в «Плане» — так проще не потратить лишнего.",
+                        text = "Сначала разложи монеты в «Плане» — так проще не потратить лишнего",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -122,8 +122,8 @@ fun ShopScreen(
                 Column {
                     LabeledValue("Можно потратить", Explanations.coins(balance))
                     if (jars != null) {
-                        LabeledValue("В банке «Нужное»", Explanations.coins(jars.first))
-                        LabeledValue("В банке «Хочу»", Explanations.coins(jars.second))
+                        LabeledValue("На нужное", Explanations.coins(jars.first))
+                        LabeledValue("На «Хочу»", Explanations.coins(jars.second))
                     }
                     if (todayPurchases.isNotEmpty()) {
                         LabeledValue(

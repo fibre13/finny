@@ -257,6 +257,16 @@ internal fun EventDialog(
     val period = state.game.period.number
     val title = Season.titleOf(event, period).withPetName(petName)
     val stroking = result?.accepted == true && event.id == "pet_stroke"
+    // Друг в гостях или на дне рождения — рядом второй зверёнок; двигаются оба.
+    val friend = event.id in FRIEND_EVENTS
+    val motion = motionAllowed()
+    var hop by remember { mutableLongStateOf(1L) }
+    LaunchedEffect(friend, motion) {
+        if (friend && motion) while (true) {
+            kotlinx.coroutines.delay(1600)
+            hop++
+        }
+    }
     FinnyDialog(
         title = if (result == null) title else if (result.accepted) "Готово!" else "Решение принято",
         onDismiss = { if (result != null) onClose(false) },
@@ -264,6 +274,10 @@ internal fun EventDialog(
             if (result != null) {
                 Text(title, style = MaterialTheme.typography.bodyMedium, color = FinnyTheme.colors.onSurfaceMuted)
                 Spacer(modifier = Modifier.height(8.dp))
+                // Реплика питомца — над ним, уголок вниз к питомцу (он слева).
+                result.emotion?.let {
+                    SpeechBubble(colors, it, modifier = Modifier.padding(bottom = 2.dp), tailStart = if (stroking) 60.dp else 32.dp)
+                }
             }
             WeatherBackdrop(event.weather, Modifier.fillMaxWidth()) { Row(
                 verticalAlignment = Alignment.Bottom,
@@ -279,9 +293,17 @@ internal fun EventDialog(
                         size = if (stroking) 150.dp else 96.dp,
                         // До ответа питомец радуется гостям и играм, но не дождю и холоду.
                         happy = result?.accepted ?: (event.kind != ru.onefortwo.finny.content.EventKind.INTERNAL && event.weather == null),
-                        reaction = if (result?.accepted == true && event.id != "pet_stroke") PetReaction(PetReactions.PLAY, id = 7L) else null,
+                        reaction = when {
+                            friend && motion -> PetReaction(PetReactions.PLAY, id = hop * 2)
+                            result?.accepted == true && event.id != "pet_stroke" -> PetReaction(PetReactions.PLAY, id = 7L)
+                            else -> null
+                        },
                     )
                     if (stroking) StrokingHand(art)
+                }
+                if (friend) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    FriendPet(state, parts, if (motion) PetReaction(PetReactions.PLAY, id = hop * 2 + 1) else null)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -291,17 +313,13 @@ internal fun EventDialog(
             } }
             if (result == null) {
                 if (event.cost) {
-                    val jar = if (event.category == ItemCategory.WANTS) BudgetCategory.WANTS.displayName else BudgetCategory.NEEDS.displayName
                     Text(
-                        text = "Стоит ${Explanations.coins(event.price)}. Монеты берутся из банка «$jar».",
+                        text = "Стоит ${Explanations.coins(event.price)}",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 10.dp),
                     )
                 }
             } else {
-                result.emotion?.let {
-                    SpeechBubble(colors, it, modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = if (stroking) 60.dp else 32.dp)
-                }
                 result.hint?.let {
                     Text(
                         text = it,
@@ -314,7 +332,7 @@ internal fun EventDialog(
                 }
                 if (result.transfer > 0) {
                     Text(
-                        text = "Хочешь перевести ${Explanations.coinsAccusative(result.transfer)} из банка «Хочу» в копилку? Тогда мечта станет ближе!",
+                        text = "Хочешь перевести ${Explanations.coinsAccusative(result.transfer)} из «Хочу» в копилку? Тогда мечта станет ближе!",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 10.dp),
@@ -342,27 +360,67 @@ internal fun EventDialog(
 
 /** В банках не хватает: взять недостающее из копилки — с показом, как изменятся сумма и срок (ТЗ 2.5.7). */
 @Composable
-internal fun SavingsAskDialog(ask: SavingsAsk, onConfirm: () -> Unit, onCancel: () -> Unit) {
+internal fun SavingsAskDialog(
+    ask: SavingsAsk,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    /** Что покупают — «корм»; `null` — без названия. */
+    what: String? = null,
+    /** Мечта, на которую копят, — «самокат». */
+    dream: String? = null,
+) {
     val p = ask.preview
     FinnyDialog(
-        title = "Взять из копилки?",
+        title = "Не хватает монет",
         onDismiss = onCancel,
         content = {
             Text(
-                text = "В банках не хватает ${Explanations.coins(ask.payment.fromSavings)}. " +
-                    "Копилку лучше не трогать, но на нужное можно.",
+                text = (if (what != null) "Чтобы купить $what, тебе" else "Тебе") +
+                    " не хватает ${Explanations.coins(ask.payment.fromSavings)}.",
                 style = MaterialTheme.typography.bodyLarge,
             )
+            Text(
+                text = "Можно взять их из копилки — но тогда " +
+                    (if (dream != null) "на $dream останется меньше." else "мечта станет чуть дальше."),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 6.dp),
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            LabeledValue("Сейчас в копилке", Explanations.coins(p.savedBefore))
+            LabeledValue("В копилке сейчас", Explanations.coins(p.savedBefore))
             LabeledValue("Станет", Explanations.coins(p.savedAfter))
-            SupportingText(Explanations.forecast(p.forecastAfter), modifier = Modifier.padding(top = 6.dp))
         },
         actions = {
-            PrimaryButton(text = "Взять из копилки", onClick = onConfirm)
+            PrimaryButton(text = "Да, взять из копилки", onClick = onConfirm)
             Spacer(modifier = Modifier.height(8.dp))
-            SecondaryButton(text = "Не брать", onClick = onCancel)
+            SecondaryButton(text = "Не покупать", onClick = onCancel)
         },
+    )
+}
+
+/** События, где рядом с питомцем стоит друг. */
+private val FRIEND_EVENTS = setOf("friend_visit", "friend_birthday")
+
+/** Друг питомца — зверёнок другого вида и окраса; радуется вместе с ним. */
+@Composable
+private fun FriendPet(state: AppState, parts: PetPartsContent, reaction: PetReaction?) {
+    val mine = state.profile?.appearance?.speciesId
+    val species = parts.species.firstOrNull { it.id != mine } ?: return
+    val color = parts.colors.firstOrNull { it.id != state.profile?.appearance?.colorId } ?: parts.colors.first()
+    PetFigure(
+        petName = species.title,
+        speciesId = species.id,
+        speciesTitle = species.title,
+        accessoryId = "none",
+        accessoryTitle = "",
+        colorHex = color.hex,
+        stage = GrowthStage.BABY,
+        care = ru.onefortwo.finny.economy.StatLevel.HIGH,
+        joy = ru.onefortwo.finny.economy.StatLevel.HIGH,
+        size = 80.dp,
+        caption = false,
+        plain = true,
+        reaction = reaction,
+        modifier = Modifier.width(80.dp),
     )
 }
 
@@ -407,33 +465,13 @@ internal fun SurpriseDialog(
 internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -> Unit) {
     val art = rememberPixelArt()
     val colors = remember(art) { YardColors(art) }
-    val motion = motionAllowed()
-    // Лапка машет: два кадра наклона, неторопливо.
-    val frame = if (motion) {
-        val wave = rememberInfiniteTransition(label = "wave")
-        val value by wave.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart),
-            label = "paw",
-        )
-        if (value < 0.5f) 0 else 1
-    } else {
-        0
-    }
-    val fur = parts.colors.firstOrNull { it.id == state.profile?.appearance?.colorId }?.hex
-        ?.let { runCatching { Color(it.toColorInt()) }.getOrNull() }
-        ?: Color(0xFFE8913A)
     FinnyDialog(
         title = "На сегодня всё!",
         onDismiss = onClose,
         content = {
-            // Поднятая лапка окраса питомца — у плеча со стороны без хвоста; размер — по стадии роста.
-            Box {
-                ProfilePet(state, parts, 140.dp)
-                WavingPaw(art, state, fur, frame, Modifier.size(140.dp))
-            }
-            SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = 56.dp)
+            // Реплика — над питомцем, уголок вниз к нему.
+            SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(bottom = 2.dp), tailStart = 56.dp)
+            ProfilePet(state, parts, 140.dp)
             Text(
                 text = "Экранное время на сегодня закончилось. Приходи завтра — продолжим с того же места.",
                 style = MaterialTheme.typography.bodyLarge,
@@ -442,58 +480,6 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
         },
         actions = { PrimaryButton(text = "Пока-пока!", onClick = onClose) },
     )
-}
-
-/**
- * Поднятая лапка «пока-пока» поверх фигуры питомца того же размера. Спрайт
- * `paw_wave_0/1`: основа перекрашивается в окрас питомца, подушечки и
- * контур — из палитры. Низ лапки ставится у левого плеча: точка шеи из якорей
- * фигуры (`scarf`) минус половина ширины туловища. Подросток и взрослый
- * крупнее малыша — лапка у них тоже крупнее.
- */
-@Composable
-private fun WavingPaw(art: ru.onefortwo.finny.content.PixelArt, state: AppState, fur: Color, frame: Int, modifier: Modifier) {
-    val sprite = art.sprite("paw_wave_$frame") ?: return
-    val species = state.profile?.appearance?.speciesId ?: return
-    val stage = state.game.stage
-    val neck = art.anchors["${species}_${stage.name.lowercase()}"]?.getOrNull(0)?.get("scarf") ?: return
-    val scale = when (stage) {
-        GrowthStage.BABY -> 1f
-        GrowthStage.TEEN -> 1.2f
-        GrowthStage.ADULT -> 1.35f
-    }
-    val furChar = art.indexOf('b')
-    Canvas(modifier = modifier.clearAndSetSemantics { }) {
-        val cell = size.width / art.petSize
-        val px = cell * scale
-        // Основание лапки — на груди у левого края туловища, чуть ниже шеи: лапа
-        // выходит из тела и поднимается рядом с головой. Край туловища берётся
-        // из самой фигуры: первая непрозрачная клетка строки под шеей.
-        val body = art.sprite("${species}_${stage.name.lowercase()}_0")
-        val row = (neck.y + 2).coerceIn(0, (body?.height ?: 1) - 1)
-        val edge = body?.let { sprite ->
-            (0 until sprite.width).firstOrNull { x -> sprite.pixels[row * sprite.width + x] >= 0 }
-        } ?: (neck.x - 10)
-        val baseX = (edge + 1) * cell
-        val baseY = (neck.y + 3) * cell
-        // Лапа отведена наружу сдвигом рядов: чем выше ряд, тем левее — кисть
-        // оказывается рядом с головой, а не перед мордочкой; во втором кадре
-        // наклон меньше — взмах. Сдвиг по клеткам, чтобы пиксели не размывались.
-        val lean = if (frame == 0) 2.5f else 4f
-        for (y in 0 until sprite.height) {
-            val shift = ((sprite.height - 1 - y) / lean).toInt() * px
-            for (x in 0 until sprite.width) {
-                val index = sprite.pixels[y * sprite.width + x]
-                if (index < 0) continue
-                val color = if (index == furChar) fur else Color(art.colors[index])
-                drawRect(
-                    color,
-                    Offset(baseX + (x - sprite.pivotX) * px - shift, baseY + (y - sprite.pivotY) * px),
-                    Size(px + 0.5f, px + 0.5f),
-                )
-            }
-        }
-    }
 }
 
 /** Что говорит питомец, когда ребёнок вернулся после пропущенного сезона. */
@@ -514,10 +500,10 @@ internal fun MissedDialog(state: AppState, parts: PetPartsContent, onDismiss: ()
         title = "С возвращением!",
         onDismiss = onDismiss,
         content = {
-            ProfilePet(state, parts, 96.dp)
             // Питомец не говорит о монетах: только о том, что ждал (разные слова от сезона к сезону).
             val missed = MISSED_PHRASES[(state.extras.season - 1).mod(MISSED_PHRASES.size)]
-            SpeechBubble(colors, "$missed Давай начнём новый сезон?", modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = 32.dp)
+            SpeechBubble(colors, "$missed Давай начнём новый сезон?", modifier = Modifier.padding(bottom = 2.dp), tailStart = 32.dp)
+            ProfilePet(state, parts, 96.dp)
             // О монетах — отдельной строкой, а не словами питомца.
             Text(
                 text = "Пока тебя не было, новые сезоны не начинались и монеты не приходили. " +
@@ -616,17 +602,17 @@ fun SeasonResultScreen(
         bottomPadding = 16.dp,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // План и факт — цветными полосами, без текстовых пояснений: полосы читаются сразу.
             SectionCard(
-                title = "План и факт",
+                title = "Мой бюджет",
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                 bottomSpacing = 0.dp,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    val notes = Season.borrowNotes(x)
-                    PlanFactRow(BudgetCategory.NEEDS, x.plannedNeeds, x.spentNeeds, palette.needs, notes.needs)
-                    PlanFactRow(BudgetCategory.WANTS, x.plannedWants, x.spentWants, palette.wants, notes.wants)
-                    PlanFactRow(BudgetCategory.SAVINGS, x.plannedSavings, x.deposited, palette.savings, notes.savings)
-                }
+                BudgetBars(
+                    plannedNeeds = x.plannedNeeds, spentNeeds = x.spentNeeds,
+                    plannedWants = x.plannedWants, spentWants = x.spentWants,
+                    plannedSavings = x.plannedSavings, deposited = x.deposited,
+                )
             }
             SectionCard(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -635,7 +621,7 @@ fun SeasonResultScreen(
                 Column {
                     LabeledValue("Осталось монет всего", Explanations.coins(state.game.balance))
                     LabeledValue("Накоплено за сезон", Explanations.coins(x.deposited))
-                    LabeledValue("Осталось в банках", Explanations.coins(leftover))
+                    LabeledValue("Осталось на нужное и «Хочу»", Explanations.coins(leftover))
                 }
             }
 
@@ -671,15 +657,14 @@ fun SeasonResultScreen(
                 }
             }
 
-            Row(verticalAlignment = Alignment.Bottom) {
-                ProfilePet(
-                    state = state,
-                    parts = parts,
-                    size = 110.dp,
-                    reaction = if (reactionId > 0) PetReaction(PetReactions.PLAY, id = reactionId) else null,
-                )
-                saying?.let { SpeechBubble(colors, PetVoice.of(state.game.stage, it), modifier = Modifier.padding(start = 8.dp, bottom = 40.dp), tailStart = 4.dp) }
-            }
+            // Реплика — над питомцем, уголок вниз к нему.
+            saying?.let { SpeechBubble(colors, PetVoice.of(state.game.stage, it), modifier = Modifier.padding(bottom = 2.dp), tailStart = 40.dp) }
+            ProfilePet(
+                state = state,
+                parts = parts,
+                size = 110.dp,
+                reaction = if (reactionId > 0) PetReaction(PetReactions.PLAY, id = reactionId) else null,
+            )
             SecondaryButton(
                 text = "Поиграть",
                 onClick = {
