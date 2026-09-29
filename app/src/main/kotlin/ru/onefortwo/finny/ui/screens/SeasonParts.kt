@@ -273,7 +273,8 @@ internal fun EventDialog(
                         parts = parts,
                         // Когда гладят — питомец крупнее, чтобы рука на голове была хорошо видна.
                         size = if (stroking) 150.dp else 96.dp,
-                        happy = result?.accepted ?: (event.kind != ru.onefortwo.finny.content.EventKind.INTERNAL),
+                        // До ответа питомец радуется гостям и играм, но не дождю и холоду.
+                        happy = result?.accepted ?: (event.kind != ru.onefortwo.finny.content.EventKind.INTERNAL && event.weather == null),
                         reaction = if (result?.accepted == true && event.id != "pet_stroke") PetReaction(PetReactions.PLAY, id = 7L) else null,
                     )
                     if (stroking) StrokingHand(art)
