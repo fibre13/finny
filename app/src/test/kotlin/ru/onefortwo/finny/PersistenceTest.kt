@@ -18,6 +18,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -147,6 +148,7 @@ class PersistenceTest {
         assertEquals(before.completedTaskIds, after.completedTaskIds)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `полученная цель сохраняется и освобождает место следующей`() = runBlocking {
         val first = viewModel()
@@ -189,6 +191,7 @@ class PersistenceTest {
         assertEquals(before.game.period.number, after.remindersPeriod)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `сброс профиля удаляет и полученные цели`() = runBlocking {
         val first = viewModel()
@@ -211,6 +214,7 @@ class PersistenceTest {
         assertTrue(viewModel().state.value.achievedGoalIds.isEmpty())
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `покупки текущего дня и подтверждённый план переживают перезапуск`() = runBlocking {
         val first = viewModel()
@@ -228,6 +232,7 @@ class PersistenceTest {
         assertTrue(after.game.period.canFinish)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `история завершённых дней и стадия развития сохраняются`() = runBlocking {
         val first = viewModel()
@@ -310,6 +315,7 @@ class PersistenceTest {
         assertNull(state.game.savings.goal)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `сброс тестового профиля возвращает исходное состояние`() = runBlocking {
         val model = viewModel()
@@ -354,6 +360,7 @@ class PersistenceTest {
         assertTrue(available.all { it.level.suits(difficulty) })
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `демонстрационный режим не ограничен днём и временем`() = runBlocking {
         val model = viewModel()
@@ -372,6 +379,7 @@ class PersistenceTest {
         assertEquals(2, state.game.period.number)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `в обычном режиме второй игровой день в те же сутки не начинается`() = runBlocking {
         val model = viewModel()
@@ -390,6 +398,7 @@ class PersistenceTest {
         assertFalse(state.isDayFinished("2026-09-16"))
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `отметка прожитого дня переживает перезапуск`() = runBlocking {
         val first = viewModel()

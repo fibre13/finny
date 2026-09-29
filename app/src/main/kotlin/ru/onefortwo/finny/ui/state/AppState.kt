@@ -6,6 +6,7 @@ import ru.onefortwo.finny.data.SavedGame
 import ru.onefortwo.finny.economy.GameState
 import ru.onefortwo.finny.economy.PeriodOutcome
 import ru.onefortwo.finny.economy.Difficulty
+import ru.onefortwo.finny.economy.WithdrawalPreview
 
 /** Профиль игрока: игровое имя питомца и его внешность. */
 data class Profile(
@@ -109,7 +110,25 @@ data class AppState(
     /** Напоминания двора, отложенные «Не сейчас» в игровом дне [remindersPeriod]. */
     val dismissedReminders: Set<String> = emptySet(),
     val remindersPeriod: Int = 0,
+
+    /** ТЕСТ 3: сезон, банки, события дня, сюрпризы, рост. */
+    val extras: SeasonExtras = SeasonExtras(),
+
+    /** ТЕСТ 3: итог решения по событию — показывается в окне события. Не сохраняется. */
+    val eventResult: EventResult? = null,
+
+    /** ТЕСТ 3: в банках не хватает — спросить, взять ли из копилки. Не сохраняется. */
+    val savingsAsk: SavingsAsk? = null,
 ) {
+    /** ТЕСТ 3: свободные монеты — не разложены по банкам. */
+    val freeCoins: Int get() = Season.free(game.balance.amount, extras)
+
+    /** ТЕСТ 3: день сезона — 1, 2 или 3. */
+    val seasonDay: Int get() = Season.dayOf(game.period.number)
+
+    /** ТЕСТ 3: события сегодняшнего дня решены. */
+    val dayEventsDone: Boolean
+        get() = extras.eventsDay == game.period.number && extras.answered >= extras.dayEvents.size
     /** Напоминание отложено до конца текущего игрового дня. */
     fun isReminderDismissed(reminder: Reminder): Boolean =
         remindersPeriod == game.period.number && reminder.id in dismissedReminders
@@ -192,6 +211,7 @@ fun SavedGame.toAppState(): AppState = AppState(
     newTerms = newTerms,
     dismissedReminders = dismissedReminders,
     remindersPeriod = remindersPeriod,
+    extras = SeasonExtras.decode(extras),
 )
 
 /** Переводит состояние приложения в сохраняемый вид; null, если профиля нет. */
@@ -220,5 +240,29 @@ fun AppState.toSavedGame(): SavedGame? {
         newTerms = newTerms,
         dismissedReminders = dismissedReminders,
         remindersPeriod = remindersPeriod,
+        extras = extras.encode(),
     )
 }
+
+/**
+ * ТЕСТ 3: итог решения по событию. [transfer] — сколько монет можно
+ * перевести в копилку вместо отказа от желаемого; 0 — не предлагать.
+ */
+data class EventResult(
+    val eventId: String,
+    val accepted: Boolean,
+    val emotion: String?,
+    val hint: String?,
+    val transfer: Int = 0,
+    /** Монет не хватило даже с копилкой. */
+    val shortage: Boolean = false,
+)
+
+/** ТЕСТ 3: покупка ждёт решения — взять ли недостающее из копилки. */
+data class SavingsAsk(
+    /** `event` — событие дня, иначе код товара лавки. */
+    val eventId: String?,
+    val itemId: String?,
+    val payment: Payment,
+    val preview: WithdrawalPreview,
+)

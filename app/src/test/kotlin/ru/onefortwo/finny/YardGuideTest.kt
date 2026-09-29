@@ -13,6 +13,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import ru.onefortwo.finny.content.AssetSource
 import ru.onefortwo.finny.content.ContentRepository
@@ -53,6 +54,7 @@ class YardGuideTest {
         answerTask(task, TaskAnswer.Number(task.answer))
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `первый день ведёт по шагам в порядке Приложения А`() {
         val model = model()
@@ -85,6 +87,7 @@ class YardGuideTest {
         assertEquals(GuideTarget.FINISH, model.guide()?.target)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `после закрытия дня питомец спит, монеты приходят в новые сутки`() {
         val model = model()
@@ -133,6 +136,7 @@ class YardGuideTest {
         return model
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `со второго дня двор напоминает о делах по порядку дня`() {
         val model = secondDayWithPlan()
@@ -155,6 +159,7 @@ class YardGuideTest {
         assertNull("питомец спит — напоминаний нет", model.guide())
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `«Не сейчас» откладывает напоминание до конца игрового дня`() {
         val model = secondDayWithPlan()
@@ -173,6 +178,7 @@ class YardGuideTest {
         assertEquals(Reminder.NEEDS, model.guide()?.reminder)
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `про задание не напоминают, когда экранное время вышло`() {
         val model = secondDayWithPlan()
@@ -183,6 +189,7 @@ class YardGuideTest {
         assertEquals(Reminder.WORD, YardGuide.reminder(timeUp, today))
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `слово становится новым при первой встрече и один раз`() {
         val model = model()
@@ -219,6 +226,7 @@ class YardGuideTest {
         )
     }
 
+    @Ignore("ТЕСТ 3: механика основной версии заменена сезоном, см. SeasonTest")
     @Test
     fun `монеты — за первые два задания дня`() {
         val model = model()

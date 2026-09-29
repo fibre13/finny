@@ -1,36 +1,49 @@
 package ru.onefortwo.finny.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import ru.onefortwo.finny.content.PetPartsContent
 import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.GameState
+import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.ui.common.CardTone
 import ru.onefortwo.finny.ui.common.LabeledValue
+import ru.onefortwo.finny.ui.common.PrimaryButton
 import ru.onefortwo.finny.ui.common.ProgressBar
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SectionCard
-import ru.onefortwo.finny.ui.common.StatusPill
 import ru.onefortwo.finny.ui.common.SupportingText
+import ru.onefortwo.finny.ui.common.rememberPixelArt
+import ru.onefortwo.finny.ui.state.AppState
 import ru.onefortwo.finny.ui.state.Explanations
+import ru.onefortwo.finny.ui.state.Growth
+import ru.onefortwo.finny.ui.state.Season
 import ru.onefortwo.finny.ui.theme.FinnyTheme
 
 /**
- * История и учебный прогресс (ТЗ 2.5.11): завершённые задания,
- * прогресс по текущей цели и итоги последних игровых дней.
- * Открывается вкладкой «Прогресс».
+ * Мой прогресс (ТЗ 2.5.11). ТЕСТ 3: ступень роста — цепочка стадий и
+ * условие следующей: мечты и задания; прогресс по мечте; сколько заданий
+ * решено и сколько до сюрприза. Список прошедших дней и «шаги роста» убраны.
  *
  * @param onBack возврат; `null`, когда экран открыт вкладкой.
  */
@@ -45,49 +58,63 @@ fun HistoryScreen(
     onBack: (() -> Unit)? = null,
     petName: String = "Финни",
     balance: Coins? = null,
+    state: AppState? = null,
+    parts: PetPartsContent? = null,
+    toSurprise: Int? = null,
+    onOpenTasks: () -> Unit = {},
 ) {
     val colors = FinnyTheme.colors
-    val daysLived = game.period.number - 1
+    val stage = game.stage
+    val dreams = achievedGoalTitles.size
+    val solved = state?.extras?.tasksSolved ?: completedIds.size
+    val next = Growth.nextNeeds(stage)
 
     ScreenScaffold(
-        eyebrow = "$petName растёт вместе с тобой",
         title = "Мой прогресс",
         balance = balance,
         onBack = onBack,
     ) {
         Column {
-            SectionCard(
-                eyebrow = "Ступень роста",
-                title = game.stage.displayName,
-                tone = CardTone.Sage,
-                trailing = {
-                    StatusPill(
-                        text = "Прожито дней: $daysLived",
-                        container = colors.surface,
-                    )
-                },
-            ) {
-                LabeledValue("Шагов роста", game.growthPoints.toString())
+            SectionCard(eyebrow = "Ступень роста", title = "$petName — ${stage.displayName.lowercase()}", tone = CardTone.Sage) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (state != null && parts != null) StageChain(state, parts, stage)
+                    LabeledValue("Прожито дней", "${game.history.size}")
+                    LabeledValue("Сезонов", "${Season.seasonOf(game.period.number)}")
+                    if (next != null) {
+                        val (needDreams, needTasks) = next
+                        val who = if (stage == GrowthStage.BABY) "подростком" else "взрослым"
+                        if (dreams == needDreams - 1 && stage == GrowthStage.BABY) {
+                            Text(
+                                text = "Ты накопил на первую мечту! Ещё одна мечта — и $petName станет $who, и с ним будет интереснее играть.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        } else {
+                            Text(
+                                text = "Накопи на ${needDreams} мечты и реши ${Explanations.tasks(needTasks)} — $petName станет $who, " +
+                                    "и с ним будет ещё интереснее играть.",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                        ProgressLine("Мечты: ${dreams.coerceAtMost(needDreams)} из $needDreams", dreams, needDreams)
+                        ProgressLine("Задания: ${solved.coerceAtMost(needTasks)} из $needTasks", solved, needTasks)
+                    } else {
+                        SupportingText("$petName совсем взрослый!")
+                    }
+                }
             }
 
             val goal = game.savings.goal
             if (goal == null) {
-                SectionCard(title = "Цель", tone = CardTone.Primary) {
-                    Text("Цель пока не выбрана.", style = MaterialTheme.typography.bodyMedium)
+                SectionCard(title = "Копим на мечту", tone = CardTone.Primary) {
+                    Text("Мечта пока не выбрана.", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                val percent = (game.savings.saved.amount * 100 / goal.price.amount.coerceAtLeast(1))
-                    .coerceIn(0, 100)
+                val percent = (game.savings.saved.amount * 100 / goal.price.amount.coerceAtLeast(1)).coerceIn(0, 100)
                 SectionCard(
                     title = "Копим на: ${goalTitle ?: "цель"}",
                     tone = CardTone.Primary,
-                    trailing = {
-                        Text(
-                            text = "$percent%",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.coin,
-                        )
-                    },
+                    trailing = { Text(text = "$percent%", style = MaterialTheme.typography.titleMedium, color = colors.coin) },
                 ) {
                     Column {
                         ProgressBar(
@@ -98,92 +125,87 @@ fun HistoryScreen(
                         )
                         LabeledValue("Накоплено", Explanations.coins(game.savings.saved))
                         LabeledValue("Осталось", Explanations.coins(game.savings.remaining))
-                        SupportingText(
-                            text = Explanations.forecast(game.goalForecast()),
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
+                        SupportingText(text = Explanations.forecast(game.goalForecast()), modifier = Modifier.padding(top = 8.dp))
+                        if (next != null && dreams == next.first - 1) {
+                            Text(
+                                text = "Это твоя вторая мечта! Накопи на неё — и $petName вырастет.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
                     }
                 }
             }
 
             if (achievedGoalTitles.isNotEmpty()) {
                 SectionCard(title = "Накоплено и получено", tone = CardTone.Coin) {
-                    Column {
-                        achievedGoalTitles.forEach { title ->
-                            MarkedRow(done = true, text = title)
-                        }
-                    }
+                    Column { achievedGoalTitles.forEach { title -> Text("✓ $title", style = MaterialTheme.typography.bodyLarge) } }
                 }
             }
 
-            SectionCard(title = "Задания: ${completedIds.size} из ${tasks.size}") {
+            SectionCard(title = "Задания: ты выполнил уже ${Explanations.tasks(solved)}") {
                 Column {
-                    tasks.forEach { task ->
-                        val done = task.id in completedIds
-                        MarkedRow(
-                            done = done,
-                            text = if (done) {
-                                "Уже решал — ${task.title}"
-                            } else {
-                                "Ещё впереди — ${task.title}"
-                            },
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = "Прошедшие дни",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .padding(top = 8.dp, bottom = 12.dp)
-                    .semantics { heading() },
-            )
-
-            if (game.history.isEmpty()) {
-                SupportingText("Пока нет завершённых дней. Закончи день на главном экране.")
-            } else {
-                game.history.reversed().forEach { outcome ->
-                    SectionCard(title = "День ${outcome.number}") {
-                        Column {
-                            LabeledValue("Шагов роста", "${outcome.earnedPoints} из 3")
-                            LabeledValue("Потрачено на нужное", Explanations.coins(outcome.spentNeeds))
-                            LabeledValue("Потрачено на желаемое", Explanations.coins(outcome.spentWants))
-                            LabeledValue("Отложено", Explanations.coins(outcome.deposited))
-                            if (outcome.stageAdvanced) {
-                                SupportingText(
-                                    text = "В этот день питомец подрос до стадии " +
-                                        "«${outcome.stageAfter.displayName}».",
-                                    modifier = Modifier.padding(top = 4.dp),
-                                )
-                            }
-                        }
-                    }
+                    SupportingText(
+                        if (toSurprise != null) "До сюрприза в лавке — ${Explanations.tasks(toSurprise)}." else "Все сюрпризы в лавке открыты!",
+                    )
+                    PrimaryButton(text = "К заданиям →", onClick = onOpenTasks, modifier = Modifier.padding(top = 10.dp))
                 }
             }
         }
     }
 }
 
-/**
- * Строка списка с отметкой. Решено ли задание, сказано словами в начале
- * строки; знак только помогает увидеть это сразу.
- */
+/** Подпись и полоса прогресса к стадии. */
 @Composable
-private fun MarkedRow(done: Boolean, text: String) {
+private fun ProgressLine(label: String, value: Int, total: Int) {
     val colors = FinnyTheme.colors
-
-    Row(
-        modifier = Modifier.padding(vertical = 4.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Text(
-            text = if (done) "✓" else "•",
-            style = MaterialTheme.typography.titleMedium,
-            color = if (done) colors.successText else colors.onSurfaceMuted,
-            modifier = Modifier.clearAndSetSemantics { },
+    Column {
+        Text(label, style = MaterialTheme.typography.titleSmall)
+        ProgressBar(
+            fraction = value.toFloat() / total.coerceAtLeast(1),
+            color = colors.successText,
+            height = 8.dp,
+            modifier = Modifier.padding(top = 4.dp),
         )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Цепочка стадий: пройденные — с галочкой, текущая — ярко, будущие — бледно. */
+@Composable
+private fun StageChain(state: AppState, parts: PetPartsContent, current: GrowthStage) {
+    val art = rememberPixelArt()
+    val yard = remember(art) { YardColors(art) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Стадии: малыш, подросток, взрослый. Сейчас — ${current.displayName.lowercase()}"
+            },
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        GrowthStage.entries.forEach { s ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clearAndSetSemantics { }.alpha(if (s <= current) 1f else 0.35f),
+            ) {
+                Box(
+                    modifier = if (s == current) {
+                        Modifier.pixelPanel(yard.card, yard.card, yard.cardShadow, yard.outline, 2).padding(4.dp)
+                    } else {
+                        Modifier.padding(4.dp)
+                    },
+                ) {
+                    ProfilePet(state, parts, size = 72.dp, stage = s)
+                }
+                Text(
+                    text = (if (s < current) "✓ " else "") + s.displayName,
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (s != GrowthStage.ADULT) Spacer(modifier = Modifier.width(4.dp))
+        }
     }
 }

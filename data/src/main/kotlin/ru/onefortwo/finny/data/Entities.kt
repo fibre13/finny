@@ -107,6 +107,13 @@ data class ProfileEntity(
     /** Напоминания, отложенные кнопкой «Не сейчас»: «номер дня:код|код». */
     @ColumnInfo(defaultValue = "")
     val dismissedReminders: String = "",
+
+    /**
+     * ТЕСТ 3: состояние сезона, банки, события, сюрпризы за задания —
+     * одной строкой JSON. Пустая строка — значения по умолчанию.
+     */
+    @ColumnInfo(defaultValue = "")
+    val extras: String = "",
 ) {
     companion object {
         /** Профиль в приложении один, поэтому ключ фиксирован. */

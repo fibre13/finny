@@ -38,6 +38,7 @@ import ru.onefortwo.finny.content.TaskTopic
 import ru.onefortwo.finny.ui.common.ScreenScaffold
 import ru.onefortwo.finny.ui.common.SupportingText
 import ru.onefortwo.finny.ui.common.rememberPixelArt
+import ru.onefortwo.finny.ui.state.Explanations
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -61,10 +62,13 @@ fun TasksScreen(
     onOpenTask: (String) -> Unit,
     onBack: (() -> Unit)? = null,
     recoveryFirst: Boolean = false,
+    /** ТЕСТ 3: сколько заданий решено всего и сколько до следующего сюрприза. */
+    solved: Int? = null,
+    toSurprise: Int? = null,
 ) {
     val sections = TaskQueue.sections(tasks, completedIds)
     val regular = sections.fresh + sections.solved
-    val solved = regular.count { it.id in completedIds }
+    val solvedInRound = regular.count { it.id in completedIds }
     val art = rememberPixelArt()
     val colors = remember(art) { YardColors(art) }
 
@@ -74,12 +78,28 @@ fun TasksScreen(
         onBack = onBack,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Stars(colors = colors, solved = solved, total = regular.size)
+            Stars(colors = colors, solved = solvedInRound, total = regular.size)
+            if (solved != null) {
+                // ТЕСТ 3: монет за задания нет — каждые три открывают сюрприз в лавке.
+                Text(
+                    text = "Решено заданий: $solved. " + if (toSurprise != null) {
+                        "До сюрприза в лавке — ${Explanations.tasks(toSurprise)}."
+                    } else {
+                        "Все сюрпризы открыты!"
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             if (recoveryFirst) {
                 sections.recovery.forEach { TaskRow(art, colors, it, highlight = true) { onOpenTask(it.id) } }
             }
-            regular.forEach { task -> TaskRow(art, colors, task, highlight = false) { onOpenTask(task.id) } }
+            // Решённые — в конце, с кнопкой «Повтор»: числа в них будут другие.
+            regular.forEach { task ->
+                TaskRow(art, colors, task, highlight = false, repeat = task.id in completedIds) { onOpenTask(task.id) }
+            }
             if (!recoveryFirst) {
                 sections.recovery.forEach { TaskRow(art, colors, it, highlight = false) { onOpenTask(it.id) } }
             }
@@ -139,15 +159,29 @@ private fun Star(fill: Color, outline: Color) {
  * «Начать →» стоит под названием: рядом с ним слова рвались посередине.
  */
 @Composable
-private fun TaskRow(art: PixelArt, colors: YardColors, task: TaskContent, highlight: Boolean, onOpen: () -> Unit) {
+private fun TaskRow(
+    art: PixelArt,
+    colors: YardColors,
+    task: TaskContent,
+    highlight: Boolean,
+    repeat: Boolean = false,
+    onOpen: () -> Unit,
+) {
     val large = LocalDensity.current.fontScale >= LARGE_FONT
     val start: @Composable () -> Unit = {
+        // Повтор — жёлтая кнопка с тёмным текстом: светлый текст на жёлтом не читался бы.
         Text(
-            text = "Начать →",
+            text = if (repeat) "Повтор ↻" else "Начать →",
             style = MaterialTheme.typography.labelLarge,
-            color = colors.card,
+            color = if (repeat) colors.outline else colors.card,
             modifier = Modifier
-                .pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
+                .then(
+                    if (repeat) {
+                        Modifier.pixelPanel(colors.coin, colors.paper, colors.paperShadow, colors.outline, 2)
+                    } else {
+                        Modifier.pixelPanel(colors.green, colors.greenLight, colors.greenDark, colors.outline, 2)
+                    },
+                )
                 .padding(horizontal = 10.dp, vertical = 8.dp),
         )
     }
@@ -164,7 +198,7 @@ private fun TaskRow(art: PixelArt, colors: YardColors, task: TaskContent, highli
             )
             .clickable(role = Role.Button, onClick = onOpen)
             .semantics(mergeDescendants = true) {
-                contentDescription = "${task.title}, ${task.topic.displayName}. Начать"
+                contentDescription = "${task.title}, ${task.topic.displayName}. " + if (repeat) "Повтор" else "Начать"
             }
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {

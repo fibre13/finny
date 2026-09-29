@@ -18,6 +18,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextDecoration
+import ru.onefortwo.finny.ui.common.rememberPixelArt
 import ru.onefortwo.finny.content.GlossaryEntry
 import ru.onefortwo.finny.ui.common.CardSpacing
 import ru.onefortwo.finny.ui.common.CardTone
@@ -36,6 +43,8 @@ fun GlossaryScreen(
     onBack: () -> Unit,
     /** Слова, впервые встреченные в игре и ещё не прочитанные: отмечены «Новое». */
     newTerms: Set<String> = emptySet(),
+    /** ТЕСТ 3: «План» и «Факт» ведут на экран плана. */
+    onOpenLink: (String) -> Unit = {},
 ) {
     ScreenScaffold(
         eyebrow = "Финансовые слова — просто",
@@ -43,15 +52,10 @@ fun GlossaryScreen(
         onBack = onBack,
     ) {
         Column {
-            SectionCard(tone = CardTone.Coin) {
-                Text(
-                    text = "Короткие объяснения слов, которые встречаются в игре.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                entries.forEach { entry -> GlossaryRow(entry, isNew = entry.term in newTerms) }
+                entries.forEach { entry ->
+                    GlossaryRow(entry, isNew = entry.term in newTerms, onOpenLink = onOpenLink)
+                }
             }
             Spacer(modifier = Modifier.padding(bottom = CardSpacing))
         }
@@ -64,9 +68,10 @@ fun GlossaryScreen(
  * в игре, отмечено плашкой «Новое» — словом, а не только цветом.
  */
 @Composable
-private fun GlossaryRow(entry: GlossaryEntry, isNew: Boolean = false) {
+private fun GlossaryRow(entry: GlossaryEntry, isNew: Boolean = false, onOpenLink: (String) -> Unit = {}) {
     val colors = FinnyTheme.colors
     val shape = MaterialTheme.shapes.medium
+    val art = rememberPixelArt()
 
     Row(
         modifier = Modifier
@@ -79,12 +84,18 @@ private fun GlossaryRow(entry: GlossaryEntry, isNew: Boolean = false) {
         verticalAlignment = Alignment.Top,
     ) {
         IconTile(container = colors.appBackground) {
-            Text(
-                text = entry.term.take(1).uppercase(),
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.attentionText,
-                modifier = Modifier.clearAndSetSemantics { },
-            )
+            // ТЕСТ 3: пиксельный значок термина вместо первой буквы.
+            val icon = entry.icon
+            if (icon != null) {
+                Box(modifier = Modifier.clearAndSetSemantics { }) { Sprite(art, icon, cell = 2.dp) }
+            } else {
+                Text(
+                    text = entry.term.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colors.attentionText,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -97,6 +108,18 @@ private fun GlossaryRow(entry: GlossaryEntry, isNew: Boolean = false) {
                 modifier = Modifier.semantics { heading() },
             )
             SupportingText(entry.explanation, modifier = Modifier.padding(top = 2.dp))
+            entry.link?.let { link ->
+                Text(
+                    text = if (link == "fact") "Посмотреть план и факт →" else "Открыть план →",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.attentionText,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .clickable(role = Role.Button, onClick = { onOpenLink(link) })
+                        .wrapContentHeight(Alignment.CenterVertically),
+                )
+            }
         }
     }
 }

@@ -69,8 +69,12 @@ fun SavingsState.forecast(currentPeriodDeposit: Coins = Coins.ZERO): GoalForecas
     return GoalForecast.Periods(periods.toInt())
 }
 
-/** Ширина окна усреднения пополнений: последние три периода. */
-private const val WINDOW = 3
+/**
+ * Ширина окна усреднения пополнений. ТЕСТ 3: девять дней — три сезона:
+ * в сезоне копилка пополняется в основном в первый день, и окно в три дня
+ * давало срок в сотни дней.
+ */
+private const val WINDOW = 9
 
 /** Результат пополнения копилки. */
 sealed interface DepositResult {

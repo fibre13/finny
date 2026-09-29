@@ -232,9 +232,16 @@ fun GameState.withdraw(amount: Coins): WithdrawalResult {
  * они начисляются позже через [startNewDay]: в обычном режиме — при первом
  * входе в новые календарные сутки.
  */
-fun GameState.finishPeriod(payIncome: Boolean = true): PeriodCompletion {
-    val plan = period.plan ?: return PeriodCompletion.PlanNotConfirmed
-    if (!period.canFinish) return PeriodCompletion.NoDecision
+fun GameState.finishPeriod(
+    payIncome: Boolean = true,
+    /**
+     * ТЕСТ 3: день закрывается после событий сезона, план дня в ядре не
+     * ведётся (план — на сезон, по банкам); неутверждённый план — пустой.
+     */
+    force: Boolean = false,
+): PeriodCompletion {
+    val plan = period.plan ?: if (force) BudgetPlan.EMPTY else return PeriodCompletion.PlanNotConfirmed
+    if (!force && !period.canFinish) return PeriodCompletion.NoDecision
 
     val spentNeeds = period.spent(BudgetCategory.NEEDS)
     val spentWants = period.spent(BudgetCategory.WANTS)

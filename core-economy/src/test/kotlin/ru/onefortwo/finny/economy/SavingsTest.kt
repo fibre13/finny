@@ -98,16 +98,16 @@ class SavingsTest {
     }
 
     @Test
-    fun `усреднение учитывает только последние три периода`() {
+    fun `усреднение учитывает только последние девять периодов — три сезона`() {
         val state = withGoal.copy(
             savings = withGoal.savings.copy(
                 saved = Coins(30),
-                // Первое крупное пополнение должно выпасть из окна усреднения.
-                depositsByPeriod = listOf(Coins(90), Coins(10), Coins(10), Coins(10)),
+                // ТЕСТ 3: первое крупное пополнение должно выпасть из окна усреднения.
+                depositsByPeriod = listOf(Coins(90)) + List(9) { Coins(10) },
             ),
         )
 
-        // Осталось 30 при среднем 10 за последние три периода.
+        // Осталось 30 при среднем 10 за последние девять периодов.
         assertEquals(GoalForecast.Periods(3), state.goalForecast())
     }
 

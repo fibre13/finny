@@ -189,7 +189,10 @@ fun GiftScreen(onOpen: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(modifier = Modifier.widthIn(max = ONBOARDING_MAX_WIDTH).fillMaxWidth()) {
-                Spacer(modifier = Modifier.height(40.dp))
+                // Точки шагов сверху, как на шагах 2 и 3 знакомства.
+                Spacer(modifier = Modifier.height(16.dp))
+                StepDots(current = 0, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Поздравляем!",
                     style = MaterialTheme.typography.headlineMedium,
@@ -247,8 +250,6 @@ fun GiftScreen(onOpen: () -> Unit) {
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                StepDots(current = 0, modifier = Modifier.align(Alignment.CenterHorizontally))
-                Spacer(modifier = Modifier.height(12.dp))
                 PixelButton(text = "Открыть подарок", onClick = ::open, pulse = true)
                 Spacer(modifier = Modifier.height(16.dp))
             }

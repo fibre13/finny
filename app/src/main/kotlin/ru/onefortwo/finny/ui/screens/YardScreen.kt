@@ -1,5 +1,10 @@
 package ru.onefortwo.finny.ui.screens
 
+import ru.onefortwo.finny.content.EventContent
+import ru.onefortwo.finny.content.ShopItemContent
+import ru.onefortwo.finny.economy.GrowthStage
+import ru.onefortwo.finny.ui.state.Season
+import androidx.compose.foundation.layout.wrapContentHeight
 import ru.onefortwo.finny.content.Accessories
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutCubic
@@ -294,6 +299,17 @@ fun YardScreen(
     onOpenTask: (() -> Unit)? = null,
     /** «Не сейчас» у напоминания двора. */
     onDismissReminder: (Reminder) -> Unit = {},
+    /** ТЕСТ 3: событие дня, ждущее решения, и событие, по которому показан итог. */
+    pendingEvent: EventContent? = null,
+    resultEvent: EventContent? = null,
+    onAnswerEvent: (Boolean) -> Unit = {},
+    onCloseEvent: (Boolean) -> Unit = {},
+    onConfirmSavings: () -> Unit = {},
+    onCancelSavings: () -> Unit = {},
+    surprise: ShopItemContent? = null,
+    onDismissSurprise: () -> Unit = {},
+    onMissedShown: () -> Unit = {},
+    onPlay: () -> Unit = {},
 ) {
     val profile = state.profile ?: return
     val game = state.game
@@ -366,14 +382,12 @@ fun YardScreen(
     }
 
     val dayFinished = state.isDayFinished(today)
+    // ТЕСТ 3: день закрывается после событий дня.
     val reason = when {
-        dayFinished -> "Закончить день можно завтра."
-        // Пока идут шаги первого дня, причина не зовёт в другой раздел:
-        // куда идти, говорит подсказка.
-        guide != null && guide.number > 0 && guide.target != GuideTarget.FINISH &&
-            !game.period.canFinish -> "Откроется, когда дела дня будут сделаны."
-        !game.period.isPlanConfirmed -> "Сначала составь план."
-        !game.period.canFinish -> "Сначала купи или отложи монеты."
+        dayFinished -> "Уложить спать можно завтра."
+        state.game.savings.goal == null && !state.extras.planned -> "Сначала выбери мечту и составь план."
+        !state.extras.planned -> "Сначала разложи монеты по банкам в «Плане»."
+        !state.dayEventsDone -> "Сначала реши события дня."
         else -> null
     }
 
@@ -400,6 +414,12 @@ fun YardScreen(
             snoring = true
             delay(1600)
             onFinishPeriod()
+            // ТЕСТ 3: экрана итогов дня нет — двор остаётся, и питомец
+            // возвращается в центр сам, а не при возвращении на экран.
+            snoring = false
+            hop.snapTo(Offset.Zero)
+            petAlpha.snapTo(1f)
+            busy = false
         }
     }
 
@@ -489,7 +509,7 @@ fun YardScreen(
                 ) {
                     // Отметка «!» — только когда подсказки нет: иначе на плане
                     // два призыва сразу.
-                    val planMissing = !game.period.isPlanConfirmed && !dayFinished && guide == null
+                    val planMissing = !state.extras.planned && !dayFinished && guide == null
                     YardObject(
                         art, colors, "yard_plan", "План",
                         description = "План на день",
@@ -576,6 +596,22 @@ fun YardScreen(
                 if (dayFinished) {
                     SleepPlate(colors = colors, petName = profile.petName)
                 } else {
+                    // ТЕСТ 3: после дел дня — «Поиграть» или «Уложить спать».
+                    if (reason == null && state.extras.playedDay != game.period.number) {
+                        Text(
+                            text = "Поиграть",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.outline,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                                .heightIn(min = MinTouchTarget)
+                                .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
+                                .clickable(role = Role.Button, onClick = onPlay)
+                                .wrapContentHeight(Alignment.CenterVertically),
+                        )
+                    }
                     FinishDayButton(
                         colors = colors,
                         reason = reason,
@@ -603,6 +639,7 @@ fun YardScreen(
                     colors = colors,
                     // Пока питомец спит, идёт ещё прошлый день: новый начнётся завтра.
                     day = if (dayFinished) game.period.number - 1 else game.period.number,
+                    stage = game.stage,
                     demo = state.isDemo,
                     petName = profile.petName,
                     balance = game.balance.amount,
@@ -670,6 +707,37 @@ fun YardScreen(
             ArrivalDialog(art = art, message = arrival, onDismiss = onArrivalShown)
         }
 
+        // ТЕСТ 3: событие дня — окном поверх двора, чуть погодя после
+        // возвращения: сначала ребёнок видит двор. Закрыть до ответа нельзя.
+        var eventReady by remember { mutableStateOf(false) }
+        LaunchedEffect(pendingEvent?.id, arrival == null) {
+            eventReady = false
+            if (pendingEvent != null && arrival == null) {
+                delay(EVENT_DELAY_MS)
+                eventReady = true
+            }
+        }
+        val shownEvent = resultEvent ?: pendingEvent?.takeIf { eventReady && arrival == null && !dayFinished }
+        if (shownEvent != null) {
+            EventDialog(
+                state = state,
+                parts = parts,
+                event = shownEvent,
+                result = state.eventResult,
+                onAnswer = onAnswerEvent,
+                onClose = onCloseEvent,
+            )
+        }
+        state.savingsAsk?.let { ask ->
+            if (ask.eventId != null) SavingsAskDialog(ask, onConfirm = onConfirmSavings, onCancel = onCancelSavings)
+        }
+        if (surprise != null && arrival == null && shownEvent == null) {
+            SurpriseDialog(surprise, state.extras.tasksSolved, profile.petName, onDismissSurprise)
+        }
+        if (state.extras.missed && arrival == null && shownEvent == null) {
+            MissedDialog(state, parts, onMissedShown)
+        }
+
         val message = state.message
         if (message != null) {
             Box(
@@ -683,6 +751,9 @@ fun YardScreen(
         }
     }
 }
+
+/** ТЕСТ 3: пауза перед окном события — сначала виден двор. */
+private const val EVENT_DELAY_MS = 1200L
 
 /** Желание питомца в облачке: сначала еда, потом игра; довольному — ничего. */
 private fun desireOf(care: StatLevel, joy: StatLevel): String? = when {
@@ -698,6 +769,7 @@ private fun Header(
     day: Int,
     demo: Boolean,
     petName: String,
+    stage: GrowthStage = GrowthStage.BABY,
     balance: Int,
     onOpenProgress: () -> Unit,
     onOpenHelp: () -> Unit,
@@ -717,14 +789,16 @@ private fun Header(
                 .pixelPanel(colors.card, colors.card, colors.cardShadow, colors.outline, 2)
                 .clickable(role = Role.Button, onClick = onOpenProgress)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "Мой прогресс. День $day${if (demo) ", демо" else ""}, $petName"
+                    contentDescription = "Мой прогресс. Сезон ${Season.seasonOf(day)}, день ${Season.dayOf(day)}" +
+                        (if (demo) ", демо" else "") + ", $petName, ${stage.displayName.lowercase()}"
                 }
                 .padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "День $day" + if (demo) " · демо" else "",
+                    // Режим «демо» назван водяным знаком и для TalkBack; в строке — только сезон и день.
+                    text = "Сезон ${Season.seasonOf(day)} · день ${Season.dayOf(day)}",
                     style = MaterialTheme.typography.labelMedium,
                     color = FinnyTheme.colors.onSurfaceMuted,
                 )
@@ -735,6 +809,13 @@ private fun Header(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.semantics { heading() },
                 )
+                // ТЕСТ 3: ступень роста — три деления, пройденные залиты.
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 2.dp)) {
+                    GrowthStage.entries.forEach { s ->
+                        val fill = if (s <= stage) colors.green else colors.cardLight
+                        Box(modifier = Modifier.size(width = 16.dp, height = 6.dp).pixelPanel(fill, fill, fill, colors.outline))
+                    }
+                }
             }
             Spacer(modifier = Modifier.width(8.dp))
             Sprite(art, "yard_icon_progress")
@@ -1195,7 +1276,7 @@ private fun FinishDayButton(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "Закончить день",
+                text = "Уложить спать",
                 style = MaterialTheme.typography.titleLarge,
                 color = if (enabled) colors.card else colors.outline,
             )

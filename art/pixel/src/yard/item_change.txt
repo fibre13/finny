@@ -1,0 +1,18 @@
+# 16 16
+# pivot 0 0
+.......u........
+.....uuuuuu.....
+.....uuuuuuuu...
+.......u...uuu..
+......KKKK..uu..
+.....KYYYYK..uu.
+....KYyyYYYK..u.
+uu..KYyYYYYK..uu
+uu.KYYYYYYYYK.uu
+uu..KYYYYYYK..uu
+.u..KYYYYYOK..u.
+.uu..KYYYOK..uu.
+..uu..KKKK..uu..
+..uuu......uuu..
+...uuuuuuuuuu...
+.....uuuuuu.....

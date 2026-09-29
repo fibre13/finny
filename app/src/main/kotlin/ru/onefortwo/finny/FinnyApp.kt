@@ -74,6 +74,8 @@ private object Routes {
     const val GLOSSARY = "glossary"
     const val ADULT = "adult"
     const val WARDROBE = "wardrobe"
+    const val SEASON_RESULT = "season_result"
+    const val GROWTH = "growth"
 }
 
 /** Задание восстановления после неудачного дня (ТЗ 2.5.9); есть на обоих уровнях. */
@@ -211,6 +213,13 @@ private fun AppNavHost(
                 viewModel.startNewDayIfDue()
                 viewModel.greetIfPending()
             }
+            // ТЕСТ 3: итоги сезона и праздник роста открываются сами.
+            LaunchedEffect(state.extras.seasonDone, state.game.stage, state.extras.growthShown) {
+                when {
+                    state.game.stage > state.extras.growthShown -> navController.navigate(Routes.GROWTH)
+                    state.extras.seasonDone -> navController.navigate(Routes.SEASON_RESULT)
+                }
+            }
 
             // Главная — двор питомца; разделы открываются предметами.
             YardScreen(
@@ -222,6 +231,16 @@ private fun AppNavHost(
                 onArrivalShown = viewModel::dismissArrival,
                 onOpenTask = activeTask?.let { task -> { navController.navigate("${Routes.TASK}/${task.id}") } },
                 onDismissReminder = viewModel::dismissReminder,
+                pendingEvent = viewModel.pendingEvent(state),
+                resultEvent = state.eventResult?.let { r -> content.events().firstOrNull { it.id == r.eventId } },
+                onAnswerEvent = viewModel::answerEvent,
+                onCloseEvent = viewModel::closeEventResult,
+                onConfirmSavings = viewModel::confirmSavingsAsk,
+                onCancelSavings = viewModel::cancelSavingsAsk,
+                surprise = state.extras.surprise?.let { id -> content.shopItems().firstOrNull { it.id == id } },
+                onDismissSurprise = viewModel::dismissSurprise,
+                onMissedShown = viewModel::missedShown,
+                onPlay = viewModel::play,
                 speech = speech,
                 onSpeechShown = viewModel::speechShown,
                 goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
@@ -238,16 +257,16 @@ private fun AppNavHost(
                 onOpenProgress = { navController.navigate(Routes.HISTORY) },
                 onOpenHelp = { navController.navigate(Routes.HELP) },
                 onOpenAdult = { navController.navigate(Routes.ADULT) },
-                onFinishPeriod = {
-                    viewModel.finishPeriod()
-                    navController.navigate(Routes.RESULT)
-                },
+                // ТЕСТ 3: итоги — только в конце сезона; их откроет эффект выше.
+                onFinishPeriod = { viewModel.finishPeriod() },
             )
         }
 
         composable(Routes.PLAN) {
             PlanScreen(
                 game = state.game,
+                extras = state.extras,
+                free = state.freeCoins,
                 goalTitle = state.game.savings.goal?.let { goal ->
                     content.goals().firstOrNull { it.id == goal.id }?.title
                 },
@@ -271,17 +290,27 @@ private fun AppNavHost(
 
         composable(Routes.SHOP) {
             ShopScreen(
-                items = content.shopItems(),
+                items = ru.onefortwo.finny.ui.state.Season.visibleItems(content.shopItems(), state.extras),
+                jars = if (state.extras.planned) state.extras.needsJar to state.extras.wantsJar else null,
                 petName = state.profile?.petName ?: "Финни",
                 pet = state.game.pet,
                 balance = balance,
                 todayPurchases = state.game.period.purchases,
-                planConfirmed = state.game.period.isPlanConfirmed,
+                planConfirmed = state.extras.planned,
                 message = state.message,
                 onDismissMessage = viewModel::dismissMessage,
                 onBuy = viewModel::buy,
                 onBack = { navController.popBackStack() },
             )
+            state.savingsAsk?.let { ask ->
+                if (ask.itemId != null) {
+                    ru.onefortwo.finny.ui.screens.SavingsAskDialog(
+                        ask,
+                        onConfirm = viewModel::confirmSavingsAsk,
+                        onCancel = viewModel::cancelSavingsAsk,
+                    )
+                }
+            }
         }
 
         composable(Routes.TASKS) {
@@ -292,7 +321,14 @@ private fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 // После неудачного дня задание помощи — сверху.
                 recoveryFirst = state.lastOutcome?.isSetback == true,
+                solved = state.extras.tasksSolved,
+                toSurprise = ru.onefortwo.finny.ui.state.Season.tasksToNextSurprise(content.shopItems(), state.extras),
             )
+            state.extras.surprise?.let { id ->
+                content.shopItems().firstOrNull { it.id == id }?.let { item ->
+                    ru.onefortwo.finny.ui.screens.SurpriseDialog(item, state.extras.tasksSolved, petName, viewModel::dismissSurprise)
+                }
+            }
         }
 
         composable("${Routes.TASK}/{taskId}") { entry ->
@@ -303,7 +339,10 @@ private fun AppNavHost(
             // Android пересоздаёт экран, обычная память композиции теряется,
             // а введённый ответ и результат восстанавливаются — без зерна
             // они относились бы уже к другому условию.
-            val seed = rememberSaveable(taskId) { Random.nextLong() }
+            // ТЕСТ 3: задания с циферблатом при повторе — те же значения и тот же циферблат.
+            val seed = rememberSaveable(taskId) {
+                if (content.task(taskId ?: "")?.topic == ru.onefortwo.finny.content.TaskTopic.TIME) (taskId ?: "").hashCode().toLong() else Random.nextLong()
+            }
             val task = remember(taskId, seed) {
                 taskId?.let { content.task(it)?.withNumbers(Random(seed))?.named(petName) }
             }
@@ -359,6 +398,32 @@ private fun AppNavHost(
                 profile = state.profile,
                 parts = content.petParts(),
                 afterClaim = state.achievedGoalIds.isNotEmpty(),
+                onOpenPlan = { navController.navigate(Routes.PLAN) },
+            )
+        }
+
+        composable(Routes.SEASON_RESULT) {
+            ru.onefortwo.finny.ui.screens.SeasonResultScreen(
+                state = state,
+                parts = content.petParts(),
+                goal = state.game.savings.goal?.let { g -> content.goals().firstOrNull { it.id == g.id } },
+                onTransfer = viewModel::transferLeftover,
+                onPlay = viewModel::play,
+                onSleep = {
+                    viewModel.closeSeason()
+                    navController.popBackStack(Routes.MAIN, inclusive = false)
+                },
+            )
+        }
+
+        composable(Routes.GROWTH) {
+            ru.onefortwo.finny.ui.screens.GrowthCelebrationScreen(
+                state = state,
+                parts = content.petParts(),
+                onDone = {
+                    viewModel.growthCelebrated()
+                    navController.popBackStack()
+                },
             )
         }
 
@@ -394,6 +459,10 @@ private fun AppNavHost(
             }
 
             HistoryScreen(
+                state = state,
+                parts = content.petParts(),
+                toSurprise = ru.onefortwo.finny.ui.state.Season.tasksToNextSurprise(content.shopItems(), state.extras),
+                onOpenTasks = { navController.navigate(Routes.TASKS) },
                 game = state.game,
                 petName = state.profile?.petName ?: "Финни",
                 balance = balance,
@@ -430,7 +499,14 @@ private fun AppNavHost(
             val fresh = rememberSaveable { ArrayList(state.newTerms) }
             LaunchedEffect(Unit) { viewModel.markTermsRead() }
             GlossaryScreen(
-                entries = content.glossary().map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
+                entries = content.glossary()
+                    .filter { !it.hardOnly || state.difficulty == Difficulty.HARDER }
+                    .map { it.copy(explanation = it.explanation.replace("{name}", petName)) },
+                onOpenLink = { link ->
+                    when (link) {
+                        "plan", "fact" -> navController.navigate(Routes.PLAN)
+                    }
+                },
                 newTerms = fresh.toSet(),
                 onBack = { navController.popBackStack() },
             )
@@ -518,11 +594,11 @@ private fun TaskPet(state: AppState, parts: PetPartsContent, happy: Boolean) {
         stage = state.game.stage,
         care = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
         joy = if (happy) StatLevel.HIGH else StatLevel.MEDIUM,
-        size = 120.dp,
+        size = 96.dp,
         caption = false,
         plain = true,
         reaction = if (happy) PetReaction(PetReactions.PLAY, id = 1L) else null,
-        modifier = Modifier.width(120.dp),
+        modifier = Modifier.width(96.dp),
     )
 }
 

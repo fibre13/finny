@@ -1,0 +1,18 @@
+# 16 16
+# pivot 0 0
+................
+.......KK..KKK..
+.......KtKKggEK.
+...KKKKKtKKKKK..
+..KRRRRRRRRRRK..
+.KRcnRRRRRRRRrK.
+.KRcRRRRRRRRRrK.
+.KRnRRRRRRRRRrK.
+.KRRRRRRRRRRRrK.
+.KRRRRRRRRRRrrK.
+.KRRRRRRRRRRrrK.
+..KRRRRRRRRrrK..
+..KrRRRRRRrrrK..
+...KrrrKKrrrK...
+....KKK..KKK....
+................

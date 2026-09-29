@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Тест 3: ставится рядом с основной сборкой (суффикс .test3) и отличается названием. -->
+<resources>
+    <string name="app_name">Финни · тест 3</string>
+</resources>

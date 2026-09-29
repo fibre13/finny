@@ -4,6 +4,8 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    // ТЕСТ 3: состояние сезона хранится одной строкой JSON.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // Ключ подписи и пароли хранятся вне репозитория в keystore.properties
@@ -44,7 +46,9 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
+            // ТЕСТ 3: ставится рядом с основной сборкой и прежними тестами.
+            applicationIdSuffix = ".test3"
+            versionNameSuffix = "-тест3"
         }
         release {
             // Обфускация отключена: ТЗ 7.2 требует полный исходный код без обфускации.
@@ -112,6 +116,7 @@ dependencies {
     implementation(project(":core-economy"))
     implementation(project(":content"))
     implementation(project(":data"))
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
