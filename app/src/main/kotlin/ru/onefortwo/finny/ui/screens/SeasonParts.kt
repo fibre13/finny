@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -404,26 +406,39 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
     val art = rememberPixelArt()
     val colors = remember(art) { YardColors(art) }
     val motion = motionAllowed()
-    val frame = if (motion) {
+    // Покачивание лапки: плавно влево-вправо, неторопливо — полторы секунды на взмах.
+    val tilt = if (motion) {
         val wave = rememberInfiniteTransition(label = "wave")
         val value by wave.animateFloat(
-            initialValue = 0f,
+            initialValue = -1f,
             targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
+            animationSpec = infiniteRepeatable(tween(750, easing = LinearEasing), RepeatMode.Reverse),
             label = "paw",
         )
-        if (value < 0.5f) 0 else 1
+        value * 18f
     } else {
-        0
+        0f
     }
+    val fur = parts.colors.firstOrNull { it.id == state.profile?.appearance?.colorId }?.hex
+        ?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+        ?: Color(0xFFE8913A)
     FinnyDialog(
         title = "На сегодня всё!",
         onDismiss = onClose,
         content = {
-            // Лапка поднята у плеча питомца и качается влево-вправо.
+            // Лапка того же окраса поднята у левого плеча (хвост у питомцев справа) и качается.
             Box {
                 ProfilePet(state, parts, 140.dp)
-                Sprite(art, "paw_wave_$frame", Modifier.offset(x = 84.dp, y = 46.dp), cell = 4.dp)
+                WavingPaw(
+                    fur = fur,
+                    outline = colors.outline,
+                    modifier = Modifier
+                        .offset(x = 18.dp, y = 52.dp)
+                        .graphicsLayer {
+                            rotationZ = -12f + tilt
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                        },
+                )
             }
             SpeechBubble(colors, PetVoice.of(state.game.stage, "Пока-пока! Увидимся завтра!"), modifier = Modifier.padding(top = 2.dp), tailUp = true, tailStart = 56.dp)
             Text(
@@ -434,6 +449,42 @@ internal fun TimeUpDialog(state: AppState, parts: PetPartsContent, onClose: () -
         },
         actions = { PrimaryButton(text = "Пока-пока!", onClick = onClose) },
     )
+}
+
+/** Поднятая лапка: пальчики, подушечки и лапа окраса питомца; клетка 4 dp, как у фигуры. */
+private val PAW = listOf(
+    ".K.K.K.",
+    "KFKFKFK",
+    "KFFFFFK",
+    "KFpFpFK",
+    "KFFpFFK",
+    "KFFFFFK",
+    ".KFFfK.",
+    ".KFFfK.",
+    ".KFFfK.",
+    ".KFFfK.",
+    ".KFFfK.",
+)
+
+@Composable
+private fun WavingPaw(fur: Color, outline: Color, modifier: Modifier = Modifier) {
+    val shade = Color(fur.red * 0.8f, fur.green * 0.8f, fur.blue * 0.8f, 1f)
+    val pad = Color(0xFFE88BB0)
+    Canvas(modifier = modifier.size(28.dp, 44.dp).clearAndSetSemantics { }) {
+        val c = size.width / PAW[0].length
+        PAW.forEachIndexed { y, row ->
+            row.forEachIndexed { x, ch ->
+                val color = when (ch) {
+                    'K' -> outline
+                    'F' -> fur
+                    'f' -> shade
+                    'p' -> pad
+                    else -> null
+                } ?: return@forEachIndexed
+                drawRect(color, Offset(x * c, y * c), Size(c + 0.5f, c + 0.5f))
+            }
+        }
+    }
 }
 
 /** Что говорит питомец, когда ребёнок вернулся после пропущенного сезона. */
