@@ -480,8 +480,13 @@ class GameViewModel(
         // Раскладываются все свободные монеты и то, что лежит в банках.
         val available = current.freeCoins + x.needsJar + x.wantsJar
         if (needs < 0 || wants < 0 || savings < 0 || needs + wants + savings != available) {
+            val left = available - needs - wants - savings
             showProblem(
-                "Разложи все монеты по банкам: осталось ${Explanations.coins(available - needs - wants - savings)}.",
+                if (left >= 0) {
+                    "Разложи все монеты по банкам: осталось ${Explanations.coins(left)}."
+                } else {
+                    "Разложи все монеты по банкам: в плане на ${Explanations.coinsAccusative(-left)} больше, чем есть."
+                },
                 null,
             )
             return false
