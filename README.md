@@ -71,7 +71,7 @@ adb version     # Android Debug Bridge 1.0.41
 ./gradlew.bat test
 ```
 
-Результат на версии 0.9.0 по отчётам JUnit (`*/build/test-results/**/*.xml`, коммит `76efeb5`): 304 теста, отказов 0, ошибок 0, пропущено 0; по модулям — `core-economy` 66, `content` 85, `app` 153.
+Результат на версии 0.9.0 по отчётам JUnit (`*/build/test-results/**/*.xml`, коммит `f1d223e`): 304 теста, отказов 0, ошибок 0, пропущено 0; по модулям — `core-economy` 66, `content` 85, `app` 153.
 
 Релизная сборка:
 
