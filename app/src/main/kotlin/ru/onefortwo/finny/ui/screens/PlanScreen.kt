@@ -123,10 +123,10 @@ fun PlanScreen(
                     bottomSpacing = 0.dp,
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        val (needsNote, wantsNote) = Season.borrowNotes(extras)
-                        PlanFactRow(BudgetCategory.NEEDS, extras.plannedNeeds, extras.spentNeeds, palette.needs, needsNote)
-                        PlanFactRow(BudgetCategory.WANTS, extras.plannedWants, extras.spentWants, palette.wants, wantsNote)
-                        PlanFactRow(BudgetCategory.SAVINGS, extras.plannedSavings, extras.deposited, palette.savings)
+                        val notes = Season.borrowNotes(extras)
+                        PlanFactRow(BudgetCategory.NEEDS, extras.plannedNeeds, extras.spentNeeds, palette.needs, notes.needs)
+                        PlanFactRow(BudgetCategory.WANTS, extras.plannedWants, extras.spentWants, palette.wants, notes.wants)
+                        PlanFactRow(BudgetCategory.SAVINGS, extras.plannedSavings, extras.deposited, palette.savings, notes.savings)
                     }
                 }
                 SectionCard(

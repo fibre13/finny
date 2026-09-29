@@ -594,6 +594,7 @@ class GameViewModel(
         spentNeeds = x.spentNeeds + if (category == ItemCategory.NEEDS) payment.price else 0,
         spentWants = x.spentWants + if (category == ItemCategory.WANTS) payment.price else 0,
         wantsToNeeds = x.wantsToNeeds + if (category == ItemCategory.NEEDS) payment.fromWants else 0,
+        savingsToNeeds = x.savingsToNeeds + if (category == ItemCategory.NEEDS) payment.fromSavings else 0,
     )
 
     /** «Взять из копилки» подтверждено: покупка или событие завершаются. */

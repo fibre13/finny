@@ -54,6 +54,8 @@ data class SeasonExtras(
     val deposited: Int = 0,
     /** Сколько монет из банка «Хочу» ушло на нужное, когда в «Нужном» не хватило. */
     val wantsToNeeds: Int = 0,
+    /** Сколько монет взято из копилки на нужное, когда в банках не хватило. */
+    val savingsToNeeds: Int = 0,
 
     /** События дня [eventsDay]; решено первых [answered]. */
     val eventsDay: Int = 0,
@@ -114,17 +116,27 @@ data class Payment(
 
 object Season {
 
-    /** Пояснения к строкам «Нужное» и «Хочу», если «Хочу» доплачивал за нужное. */
-    fun borrowNotes(x: SeasonExtras): Pair<String?, String?> {
-        val borrowed = x.wantsToNeeds
-        if (borrowed <= 0) return null to null
+    /** Пояснения к строкам «Нужное», «Хочу» и «Копим на мечту», если на нужное брали из других банков. */
+    data class BorrowNotes(val needs: String?, val wants: String?, val savings: String?)
+
+    fun borrowNotes(x: SeasonExtras): BorrowNotes {
+        val fromWants = x.wantsToNeeds
+        val fromSavings = x.savingsToNeeds
+        if (fromWants <= 0 && fromSavings <= 0) return BorrowNotes(null, null, null)
         val over = x.spentNeeds - x.plannedNeeds
-        val needs = if (over > 0) "Потрачено больше плана на ${Explanations.coinsAccusative(over)} — " +
-            "из банка «Хочу» взято ${Explanations.coins(borrowed)}." else null
+        val sources = listOfNotNull(
+            if (fromWants > 0) "из банка «Хочу» взято ${Explanations.coins(fromWants)}" else null,
+            if (fromSavings > 0) "из копилки — ${Explanations.coins(fromSavings)}" else null,
+        ).joinToString(", ")
+        val needs = if (over > 0) "Потрачено больше плана на ${Explanations.coinsAccusative(over)}: $sources." else null
         val unspent = (x.plannedWants - x.spentWants).coerceAtLeast(0)
-        val wants = "Не потрачено на желаемое: ${Explanations.coins(unspent)}, из них " +
-            "${Explanations.coins(borrowed)} ушли на нужное."
-        return needs to wants
+        val wants = if (fromWants > 0) {
+            "Не потрачено на желаемое: ${Explanations.coins(unspent)}, из них ${Explanations.coins(fromWants)} ушли на нужное."
+        } else {
+            null
+        }
+        val savings = if (fromSavings > 0) "Из копилки на нужное взято ${Explanations.coins(fromSavings)}." else null
+        return BorrowNotes(needs, wants, savings)
     }
 
     /** Номер сезона игрового дня [period]. */

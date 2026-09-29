@@ -381,10 +381,10 @@ fun SeasonResultScreen(
                 bottomSpacing = 0.dp,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    val (needsNote, wantsNote) = Season.borrowNotes(x)
-                    PlanFactRow(BudgetCategory.NEEDS, x.plannedNeeds, x.spentNeeds, palette.needs, needsNote)
-                    PlanFactRow(BudgetCategory.WANTS, x.plannedWants, x.spentWants, palette.wants, wantsNote)
-                    PlanFactRow(BudgetCategory.SAVINGS, x.plannedSavings, x.deposited, palette.savings)
+                    val notes = Season.borrowNotes(x)
+                    PlanFactRow(BudgetCategory.NEEDS, x.plannedNeeds, x.spentNeeds, palette.needs, notes.needs)
+                    PlanFactRow(BudgetCategory.WANTS, x.plannedWants, x.spentWants, palette.wants, notes.wants)
+                    PlanFactRow(BudgetCategory.SAVINGS, x.plannedSavings, x.deposited, palette.savings, notes.savings)
                 }
             }
             SectionCard(
