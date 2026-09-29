@@ -23,7 +23,9 @@ import ru.onefortwo.finny.content.TaskContent
 import ru.onefortwo.finny.content.withNumbers
 import ru.onefortwo.finny.economy.GrowthStage
 import ru.onefortwo.finny.economy.Difficulty
+import ru.onefortwo.finny.ui.state.Explanations
 import ru.onefortwo.finny.ui.state.GameViewModel
+import ru.onefortwo.finny.ui.state.Season
 
 /**
  * Сквозная проверка действий пользователя через слой состояния.
@@ -37,6 +39,10 @@ import ru.onefortwo.finny.ui.state.GameViewModel
  * поэтому эмулятор не требуется.
  */
 class GameViewModelTest {
+
+    /** Выход при нехватке всех монет — тот же в лавке и в событиях. */
+    private val SHORTAGE_NEXT = "Дождись начала следующего сезона — тебе начислят новые монеты. " +
+        "А чтобы ожидание не было скучным — поиграй с питомцем"
 
     private val content = ContentRepository(
         AssetSource { name -> File("../content/src/main/assets/$name").readText() },
@@ -117,7 +123,7 @@ class GameViewModelTest {
         assertFalse(accepted)
         assertFalse(state.extras.planned)
         assertTrue(state.message!!.isProblem)
-        assertTrue(state.message!!.text.contains("Разложи все монеты по банкам"))
+        assertEquals("Разложи все монеты: в плане на 10 монет больше, чем есть", state.message!!.text)
         assertEquals(50, state.game.balance.amount)
         assertEquals(0, state.extras.needsJar + state.extras.wantsJar)
     }
@@ -177,38 +183,52 @@ class GameViewModelTest {
     }
 
     @Test
-    fun `нехватка в банке объясняет, откуда платят, и предлагает выход`() {
+    fun `нехватка в банке покрывается другим банком, копилка — только с вопросом, без монет — объяснение и выход`() {
         val model = viewModel()
         model.chooseGoal("scooter")
         model.confirmPlan(needs = 30, wants = 5, savings = 15)
 
-        // Желаемое — только из банка «Хочу»: там 5 монет, мячик стоит 12,
-        // хотя в «Нужном» монеты есть.
+        // «Нужное» и «Хочу» берутся суммарно: мячик стоит 12, в «Хочу» 5 монет —
+        // остальные 7 берутся из «Нужного», покупка проходит без вопросов.
         model.buy("ball")
 
         var state = model.state.value
-        val message = state.message!!
-        assertTrue(message.isProblem)
-        assertTrue(message.text.contains("В банке «Хочу» не хватает"))
-        assertNotNull(message.nextStep)
-        assertEquals(30, state.extras.needsJar)
-        assertEquals(5, state.extras.wantsJar)
-        assertEquals(35, state.game.balance.amount)
+        assertFalse(state.message!!.isProblem)
+        assertNull(state.savingsAsk)
+        assertTrue("ball" in state.extras.owned)
+        assertEquals(0, state.extras.wantsJar)
+        assertEquals(23, state.extras.needsJar)
+        assertEquals(23, state.game.balance.amount)
+        assertEquals(12, state.extras.spentWants)
+        assertEquals(15, state.game.savings.saved.amount)
 
         // Нужное при пустых банках не списывается молча: сначала вопрос о копилке.
-        repeat(3) { model.buy("food") }
+        repeat(2) { model.buy("food") }
         model.buy("food")
         state = model.state.value
         val ask = state.savingsAsk
         assertNotNull("Нет вопроса о копилке", ask)
-        assertEquals(5, ask!!.payment.fromSavings)
+        assertEquals(3, ask!!.payment.fromNeeds)
+        assertEquals(7, ask.payment.fromSavings)
         assertEquals(15, state.game.savings.saved.amount)
         // «Не брать» — копилка и банки не меняются.
         model.cancelSavingsAsk()
         state = model.state.value
         assertNull(state.savingsAsk)
         assertEquals(15, state.game.savings.saved.amount)
-        assertEquals(5, state.extras.wantsJar + state.extras.needsJar)
+        assertEquals(3, state.extras.wantsJar + state.extras.needsJar)
+
+        // Не хватает даже вместе с копилкой: названы все монеты и цена, выход — ждать нового сезона.
+        val tent = content.shopItems().first { it.id == "tent" }
+        model.buy("tent")
+        state = model.state.value
+        val message = state.message!!
+        assertTrue(message.isProblem)
+        assertEquals("Не хватает монет. У тебя всего 18 монет, а «${tent.title}» стоит 25 монет", message.text)
+        assertEquals(SHORTAGE_NEXT, message.nextStep)
+        assertNull(state.savingsAsk)
+        assertEquals(3, state.game.balance.amount)
+        assertEquals(15, state.game.savings.saved.amount)
     }
 
     /** Задание с вводом числа и уже подставленными числами. */
@@ -284,7 +304,8 @@ class GameViewModelTest {
         assertEquals(before, model.state.value.game.balance.amount)
         val message = model.state.value.message!!
         assertEquals("Задание засчитано. Решено заданий: 1.", message.text)
-        assertTrue(message.nextStep!!.contains("До сюрприза в лавке"))
+        val left = Season.tasksToNextSurprise(content.shopItems(), model.state.value.extras, "cat")!!
+        assertEquals("До новых товаров в лавке — ${Explanations.tasks(left)}.", message.nextStep)
         assertEquals(1, model.state.value.extras.tasksSolved)
     }
 
@@ -532,7 +553,7 @@ class GameViewModelTest {
     }
 
     @Test
-    fun `нехватка монет на нужное не отнимает прогресс и предлагает спланировать лучше`() {
+    fun `нехватка монет на нужное не отнимает прогресс и предлагает дождаться нового сезона`() {
         val model = viewModel()
         model.confirmPlan(needs = 35, wants = 15, savings = 0)
 
@@ -545,8 +566,9 @@ class GameViewModelTest {
         model.buy("food")
         val message = model.state.value.message!!
         assertTrue(message.isProblem)
-        assertTrue(message.text.contains("Не хватает монет"))
-        assertEquals("Давай в следующем сезоне спланируем лучше?", message.nextStep)
+        val food = content.shopItems().first { it.id == "food" }
+        assertEquals("Не хватает монет. У тебя всего 0 монет, а «${food.title}» стоит 10 монет", message.text)
+        assertEquals(SHORTAGE_NEXT, message.nextStep)
 
         // Затратное событие дня без монет — отказ по нехватке с подсказкой.
         val event = model.pendingEvent()!!
@@ -555,7 +577,10 @@ class GameViewModelTest {
         val result = model.state.value.eventResult!!
         assertTrue(result.shortage)
         assertFalse(result.accepted)
-        assertNotNull(result.hint)
+        assertEquals(
+            "Не хватает монет. У тебя всего 0 монет, а это стоит ${Explanations.coins(event.price)}. $SHORTAGE_NEXT",
+            result.hint,
+        )
         model.closeEventResult(false)
 
         // Прогресс на месте, путь восстановления — помощь питомцу.

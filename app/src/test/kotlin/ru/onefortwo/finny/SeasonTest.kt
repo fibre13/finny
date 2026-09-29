@@ -172,15 +172,59 @@ class SeasonTest {
     }
 
     @Test
-    fun `нужное берётся из «Нужного», потом из «Хочу», потом из копилки, желаемое — только из «Хочу»`() {
+    fun `нужное берётся из «Нужного», потом из «Хочу», желаемое — из «Хочу», потом из «Нужного», копилка — последней`() {
         val x = SeasonExtras(planned = true, needsJar = 4, wantsJar = 3)
         val needs = Season.payment(10, ItemCategory.NEEDS, balance = 7, saved = 20, x = x)
+        assertEquals(0, needs.fromFree)
         assertEquals(4, needs.fromNeeds)
         assertEquals(3, needs.fromWants)
         assertEquals(3, needs.fromSavings)
         assertTrue(needs.needsSavings)
-        val wants = Season.payment(5, ItemCategory.WANTS, balance = 7, saved = 20, x = x)
-        assertTrue(wants.impossible)
+        assertFalse(needs.impossible)
+        // Желаемое — сначала «Хочу», затем «Нужное», затем копилка с подтверждением.
+        val wants = Season.payment(10, ItemCategory.WANTS, balance = 7, saved = 20, x = x)
+        assertEquals(3, wants.fromWants)
+        assertEquals(4, wants.fromNeeds)
+        assertEquals(3, wants.fromSavings)
+        assertTrue(wants.needsSavings)
+        assertFalse(wants.impossible)
+        // Хватает банков — копилка не трогается и вопроса нет.
+        val small = Season.payment(5, ItemCategory.WANTS, balance = 7, saved = 20, x = x)
+        assertEquals(3, small.fromWants)
+        assertEquals(2, small.fromNeeds)
+        assertEquals(0, small.fromSavings)
+        assertFalse(small.needsSavings)
+        // Свободные монеты идут первыми.
+        val withFree = Season.payment(5, ItemCategory.NEEDS, balance = 9, saved = 0, x = x)
+        assertEquals(2, withFree.fromFree)
+        assertEquals(3, withFree.fromNeeds)
+        // Невозможно — только если не хватает всех монет вместе с копилкой, для нужного и для желаемого.
+        for (category in ItemCategory.values()) {
+            assertFalse(Season.payment(27, category, balance = 7, saved = 20, x = x).impossible)
+            val over = Season.payment(28, category, balance = 7, saved = 20, x = x)
+            assertTrue(over.impossible)
+            assertFalse(over.needsSavings)
+        }
+    }
+
+    @Test
+    fun `желаемое при пустом «Хочу» оплачивается из «Нужного» без копилки`() {
+        val model = model()
+        assertTrue(model.confirmPlan(35, 0, 15))
+        model.buy("ball")
+        val state = model.state.value
+        assertNull(state.savingsAsk)
+        assertFalse(state.message!!.isProblem)
+        assertTrue("ball" in state.extras.owned)
+        assertEquals(23, state.extras.needsJar)
+        assertEquals(0, state.extras.wantsJar)
+        assertEquals(23, state.game.balance.amount)
+        assertEquals(15, state.game.savings.saved.amount)
+        assertEquals(12, state.extras.spentWants)
+        assertEquals(0, state.extras.spentNeeds)
+        // Заём на желаемое не записывается как заём «Хочу» на нужное.
+        assertEquals(0, state.extras.wantsToNeeds)
+        assertEquals(0, state.extras.savingsToNeeds)
     }
 
     @Test
@@ -404,18 +448,18 @@ class SeasonTest {
     fun `итоги называют, откуда взяты монеты на нужное сверх плана`() {
         val x = SeasonExtras(plannedNeeds = 20, spentNeeds = 42, plannedWants = 15, spentWants = 0, plannedSavings = 15, deposited = 8, wantsToNeeds = 15, savingsToNeeds = 7)
         val notes = Season.borrowNotes(x)
-        assertEquals("Потрачено больше плана на 22 монеты: из банка «Хочу» взято 15 монет, из копилки — 7 монет.", notes.needs)
-        assertEquals("Из банка «Хочу» на нужное ушло 15 монет.", notes.wants)
-        assertEquals("Из копилки на нужное взято 7 монет.", notes.savings)
+        assertEquals("Потрачено больше плана на 22 монеты: взято из «Хочу» 15 монет, из копилки — 7 монет.", notes.needs)
+        assertEquals("Из «Хочу» на нужное ушло 15 монет", notes.wants)
+        assertEquals("Из копилки на нужное взято 7 монет", notes.savings)
         // Перерасход, покрытый ещё и свободными монетами (подарок, награда): названы все источники.
         val mixed = Season.borrowNotes(
             SeasonExtras(plannedNeeds = 20, spentNeeds = 59, plannedWants = 15, spentWants = 12, wantsToNeeds = 13, savingsToNeeds = 6),
         )
         assertEquals(
-            "Потрачено больше плана на 39 монет: из банка «Хочу» взято 13 монет, из копилки — 6 монет, из свободных монет — 20 монет.",
+            "Потрачено больше плана на 39 монет: взято из «Хочу» 13 монет, из копилки — 6 монет, из свободных монет — 20 монет.",
             mixed.needs,
         )
-        assertEquals("Из банка «Хочу» на нужное ушло 13 монет.", mixed.wants)
+        assertEquals("Из «Хочу» на нужное ушло 13 монет", mixed.wants)
         assertEquals(Season.BorrowNotes(null, null, null), Season.borrowNotes(SeasonExtras(plannedNeeds = 20, spentNeeds = 10)))
     }
 

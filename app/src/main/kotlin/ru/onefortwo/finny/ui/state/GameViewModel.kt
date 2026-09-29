@@ -497,7 +497,7 @@ class GameViewModel(
         }
         if (savings > 0 && current.game.savings.goal == null) {
             showProblem(
-                "Чтобы откладывать в копилку, нужно выбрать цель.",
+                "Чтобы отложить в копилку, сначала выбери цель",
                 "Нажми «Выбрать цель» — введённые суммы сохранятся.",
             )
             return false
@@ -547,7 +547,7 @@ class GameViewModel(
         when {
             payment.impossible -> showProblem(
                 "Не хватает монет. У тебя всего ${Explanations.coins(current.game.balance.amount + current.game.savings.saved.amount)}, " +
-                    "а «${item.title}» стоит ${item.price}",
+                    "а «${item.title}» стоит ${Explanations.coins(item.price)}",
                 SHORTAGE_NEXT,
             )
 

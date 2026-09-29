@@ -58,6 +58,8 @@ import ru.onefortwo.finny.economy.PlanConfirmation
 import ru.onefortwo.finny.economy.chooseGoal
 import ru.onefortwo.finny.economy.buy
 import ru.onefortwo.finny.economy.confirmPlan
+import ru.onefortwo.finny.economy.DepositResult
+import ru.onefortwo.finny.economy.deposit
 import ru.onefortwo.finny.economy.finishPeriod
 import ru.onefortwo.finny.economy.previewWithdrawal
 import ru.onefortwo.finny.economy.StatLevel
@@ -168,10 +170,10 @@ class ScreenRenderTest {
         compose.onNodeWithText("Попроще").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("Финни")
         compose.onNodeWithText("Далее").performClick()
-        // Финал: имя питомца и «Начать игру».
-        compose.onNodeWithText("Привет!").assertExists()
-        compose.onNodeWithText("Финни").assertExists()
-        assertFits("Начать игру")
+        // Финал: питомец представляется в облачке по имени, отдельной строки с именем нет, кнопка «Давай играть».
+        compose.onNodeWithText("Привет-привет! Я — Финни! Рад видеть тебя").assertExists()
+        compose.onNodeWithText("Финни").assertDoesNotExist()
+        assertFits("Давай играть")
     }
 
     @Test
@@ -271,8 +273,8 @@ class ScreenRenderTest {
 
         // Остатка нет, но без цели копилка не принимается: причина — вместо остатка.
         compose.onNodeWithText("Осталось распределить", substring = true).assertDoesNotExist()
-        compose.onNodeWithText("Чтобы отложить в копилку, сначала выбери цель.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Цель не выбрана.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Чтобы отложить в копилку, сначала выбери цель").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Цель не выбрана").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
     }
 
@@ -291,17 +293,17 @@ class ScreenRenderTest {
         }
 
         repeat(4) { compose.onNodeWithContentDescription("Нужное: прибавить 5").performScrollTo().performClick() }
-        // Сумма банка выводится один раз — на его карточке; остаток — крупной строкой.
+        // Сумма банка выводится один раз — на его карточке; остаток — крупной строкой под тремя блоками.
         compose.onAllNodesWithText("20 монет").assertCountEquals(1)
-        compose.onNodeWithText("Осталось распределить: 30 монет").assertIsDisplayed()
+        compose.onNodeWithText("Осталось распределить: 30 монет").performScrollTo().assertIsDisplayed()
 
         free = 10
         compose.waitForIdle()
 
         compose.onAllNodesWithText("20 монет").assertCountEquals(0)
         compose.onAllNodesWithText("10 монет").assertCountEquals(1)
-        compose.onNodeWithText("Распредели 10 монет по банкам.").assertIsDisplayed()
-        compose.onNodeWithText("Всё распределено!").assertIsDisplayed()
+        compose.onNodeWithText("Распредели 10 монет").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Всё распределено!").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -356,7 +358,7 @@ class ScreenRenderTest {
             compose.onNodeWithContentDescription("Копим на мечту: прибавить 1").performScrollTo().performClick()
         }
 
-        compose.onNodeWithText("Все монеты распределены.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Все монеты распределены").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
         assertEquals(TaskAnswer.Allocation(needs = 5, wants = 1, savings = 4), answer)
     }
@@ -611,11 +613,13 @@ class ScreenRenderTest {
     @Test
     fun `копилка без блоков «Отложить» и «Взять» — пополнение через план сезона`() {
         val goal = content.goals().first { it.id == "scooter" }.toDomain()
-        var planOpened = false
+        val empty = GameState.newProfile().chooseGoal(goal)
+        var game by mutableStateOf(empty)
+        var planOpened = 0
         compose.setContent {
             FinnyTheme {
                 SavingsScreen(
-                    game = GameState.newProfile().chooseGoal(goal),
+                    game = game,
                     goals = content.goals(),
                     message = null,
                     onDismissMessage = {},
@@ -624,19 +628,33 @@ class ScreenRenderTest {
                     onPreviewWithdrawal = { GameState.newProfile().previewWithdrawal(Coins(0)) },
                     onWithdraw = {},
                     onBack = {},
-                    onOpenPlan = { planOpened = true },
+                    onOpenPlan = { planOpened++ },
                 )
             }
         }
 
         // Пополнение — в плане сезона: блока «Отложить» на экране копилки нет,
-        // есть ссылка «Изменить →» к плану.
+        // ссылки «Изменить →» тоже; главная кнопка ведёт в план.
         compose.onNode(hasSetTextAction()).assertDoesNotExist()
         compose.onNodeWithText("Отложить в копилку").assertDoesNotExist()
-        // Копилка пуста: забирать нечего — кнопки «Забрать» нет.
+        compose.onNodeWithText("Изменить →").assertDoesNotExist()
+        // Копилка пуста: забирать нечего — кнопки «Забрать» нет, главная кнопка — «Распределить монеты».
+        compose.onNodeWithText("Копилка пока пустая").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Забрать монеты на покупки").assertDoesNotExist()
-        compose.onNodeWithText("Изменить →").performScrollTo().performClick()
-        assertTrue("Переход к плану не сработал", planOpened)
+        compose.onNodeWithText("Отложить ещё").assertDoesNotExist()
+        compose.onNodeWithText("Распределить монеты").performScrollTo().performClick()
+        assertEquals("Переход к плану не сработал", 1, planOpened)
+        // Вторичная кнопка — смена цели.
+        compose.onNodeWithText("Изменить цель").performScrollTo().assertIsDisplayed()
+
+        // С накоплениями главная кнопка — «Отложить ещё», она тоже ведёт в план.
+        game = (empty.deposit(Coins(15)) as DepositResult.Success).state
+        compose.waitForIdle()
+        compose.onNodeWithText("Копилка пока пустая").assertDoesNotExist()
+        compose.onNodeWithText("Распределить монеты").assertDoesNotExist()
+        compose.onNodeWithText("Отложить ещё").performScrollTo().performClick()
+        assertEquals("Переход к плану не сработал", 2, planOpened)
+        compose.onNodeWithText("Изменить цель").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -710,11 +728,11 @@ class ScreenRenderTest {
         compose.onNodeWithText("Ответить").performScrollTo().performClick()
 
         // Монет нет — задание приближает сюрприз в лавке, строки о награде монетами нет.
-        compose.onNodeWithText("Засчитано — сюрприз в лавке ближе!").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Засчитано — скоро в лавке появится что-то новое!").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Награда за задание", substring = true).assertDoesNotExist()
         // Одна карточка следующего задания; кнопки «Готово» нет — возврат «Назад».
         compose.onNodeWithText(next.title).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Начать следующее →").performScrollTo().performClick()
+        compose.onNodeWithText("Начать →").performScrollTo().performClick()
         assertTrue("Переход к следующему заданию не сработал", nextOpened)
         compose.onNodeWithText("Готово").assertDoesNotExist()
     }
@@ -1003,6 +1021,13 @@ class ScreenRenderTest {
         compose.onNodeWithText("Сначала", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Уложить спать").performClick()
         compose.mainClock.advanceTimeBy(500)
+        // Сначала окно подтверждения: прощания ещё нет, день не закрыт.
+        compose.onNodeWithText("Уложить Финни спать?").assertExists()
+        compose.onNodeWithText("Пока! Приходи завтра — я буду ждать!").assertDoesNotExist()
+        assertFalse("день закончился без подтверждения", finished)
+        compose.onNodeWithText("Да, уложить спать").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithText("Уложить Финни спать?").assertDoesNotExist()
         compose.onNodeWithText("Пока! Приходи завтра — я буду ждать!").assertExists()
         assertFalse("день закончился раньше прощания", finished)
         compose.mainClock.advanceTimeBy(6000)
@@ -1102,7 +1127,7 @@ class ScreenRenderTest {
 
     @Test
     @Config(qualifiers = "w360dp-h800dp")
-    fun `у неактивной кнопки «Уложить спать» есть причина текстом, пока не решены события дня`() {
+    fun `кнопки «Уложить спать» нет, пока не выбрана мечта, не составлен план и не решены события дня`() {
         val goal = content.goals().first { it.id == "scooter" }.toDomain()
         var state by mutableStateOf(AppState(isLoaded = true, profile = profile, game = GameState.newProfile()))
         var finished = false
@@ -1118,9 +1143,16 @@ class ScreenRenderTest {
                 }
             }
         }
-        // Без мечты и плана.
-        compose.onNodeWithText("Сначала выбери мечту и составь план.").assertIsDisplayed()
-        compose.onNodeWithText("Уложить спать").assertIsNotEnabled()
+        // Без мечты и плана: ни кнопки, ни причины текстом — что делать, говорит облачко подсказки.
+        compose.onNodeWithText("Уложить спать").assertDoesNotExist()
+        compose.onNodeWithText("Играть").assertDoesNotExist()
+        compose.onNodeWithText("Сначала", substring = true).assertDoesNotExist()
+
+        // Мечта выбрана, план не составлен.
+        state = state.copy(game = GameState(balance = Coins(50)).chooseGoal(goal))
+        compose.waitForIdle()
+        compose.onNodeWithText("Уложить спать").assertDoesNotExist()
+        compose.onNodeWithText("Сначала", substring = true).assertDoesNotExist()
 
         // План составлен, решено одно событие из трёх.
         state = state.copy(
@@ -1128,16 +1160,57 @@ class ScreenRenderTest {
             extras = seasonDayDone.copy(answered = 1),
         )
         compose.waitForIdle()
-        compose.onNodeWithText("Сначала реши события дня.").assertIsDisplayed()
-        compose.onNodeWithText("Уложить спать").assertIsNotEnabled().performClick()
+        compose.onNodeWithText("Уложить спать").assertDoesNotExist()
+        compose.onNodeWithText("Играть").assertDoesNotExist()
+        compose.onNodeWithText("Сначала", substring = true).assertDoesNotExist()
         assertFalse("день закончился до решения событий", finished)
 
-        // События решены — причины нет, кнопка доступна.
+        // События решены — есть «Играть» и «Уложить спать»; «Уложить спать» открывает подтверждение.
         state = state.copy(extras = seasonDayDone)
         compose.waitForIdle()
-        compose.onNodeWithText("Сначала", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Играть").assertIsDisplayed()
         compose.onNodeWithText("Уложить спать").assertIsEnabled().performClick()
+        compose.onNodeWithText("Уложить Финни спать?").assertIsDisplayed()
+        assertFalse("день закончился без подтверждения", finished)
+        compose.onNodeWithText("Да, уложить спать").performClick()
         assertTrue(finished)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `окно «Уложить спать» без «Да» день не закрывает`() {
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        val state = AppState(
+            isLoaded = true, profile = profile, game = GameState(balance = Coins(25)).chooseGoal(goal),
+            extras = seasonDayDone,
+        )
+        var finished = 0
+        compose.setContent {
+            CompositionLocalProvider(LocalMotionEnabled provides false) {
+                FinnyTheme {
+                    YardScreen(
+                        state = state, parts = content.petParts(), activeTask = null, goal = null, today = "2026-09-26",
+                        onDismissMessage = {}, onOpenPlan = {}, onOpenShop = {}, onOpenSavings = {},
+                        onOpenGlossary = {}, onOpenTasks = {}, onOpenPet = {}, onOpenProgress = {},
+                        onOpenHelp = {}, onOpenAdult = {}, onFinishPeriod = { finished++ },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Уложить Финни спать?").assertDoesNotExist()
+        compose.onNodeWithText("Уложить спать").performClick()
+        compose.onNodeWithText("Уложить Финни спать?").assertIsDisplayed()
+        compose.onNodeWithText("Да, уложить спать").assertIsDisplayed()
+        // «Не сейчас» — окно закрывается, день продолжается, кнопка на месте.
+        compose.onNodeWithText("Не сейчас").performClick()
+        compose.onNodeWithText("Уложить Финни спать?").assertDoesNotExist()
+        assertEquals("день закрылся без «Да»", 0, finished)
+        compose.onNodeWithText("Уложить спать").assertIsDisplayed()
+        // Повторно — и «Да»: день закрывается один раз.
+        compose.onNodeWithText("Уложить спать").performClick()
+        compose.onNodeWithText("Да, уложить спать").performClick()
+        compose.onNodeWithText("Уложить Финни спать?").assertDoesNotExist()
+        assertEquals(1, finished)
     }
 
     /** Первый день сезона: план составлен, все три события дня решены. */
@@ -1149,7 +1222,12 @@ class ScreenRenderTest {
     @Test
     @Config(qualifiers = "w360dp-h640dp")
     fun `на низком телефоне кнопка «Уложить спать» видна без прокрутки`() {
-        val state = AppState(isLoaded = true, profile = profile, game = GameState.newProfile())
+        // Кнопка есть только после дел дня: мечта выбрана, план составлен, события решены.
+        val goal = content.goals().first { it.id == "scooter" }.toDomain()
+        val state = AppState(
+            isLoaded = true, profile = profile, game = GameState(balance = Coins(25)).chooseGoal(goal),
+            extras = seasonDayDone,
+        )
         compose.setContent {
             FinnyTheme {
                 YardScreen(
@@ -1160,9 +1238,9 @@ class ScreenRenderTest {
                 )
             }
         }
-        // Кнопка закреплена внизу, вне прокрутки двора; под ней — причина недоступности.
+        // Кнопка закреплена внизу, вне прокрутки двора; над ней — «Играть».
         compose.onNodeWithText("Уложить спать").assertIsDisplayed()
-        compose.onNodeWithText("Сначала выбери мечту и составь план.").assertIsDisplayed()
+        compose.onNodeWithText("Играть").assertIsDisplayed()
         val bottom = compose.onNodeWithText("Уложить спать").fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("кнопка ниже экрана: $bottom", bottom <= 640 * compose.density.density + 1)
     }

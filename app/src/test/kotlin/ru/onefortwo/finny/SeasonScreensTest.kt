@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -36,6 +37,7 @@ import ru.onefortwo.finny.content.effectFor
 import ru.onefortwo.finny.data.FinnyDatabase
 import ru.onefortwo.finny.data.GameRepository
 import ru.onefortwo.finny.data.SavedGame
+import ru.onefortwo.finny.economy.BudgetCategory
 import ru.onefortwo.finny.economy.Coins
 import ru.onefortwo.finny.economy.DepositResult
 import ru.onefortwo.finny.economy.Difficulty
@@ -96,7 +98,18 @@ class SeasonScreensTest {
             }
         }
         compose.onNodeWithText("Итоги сезона").assertIsDisplayed()
-        compose.onNodeWithText("16 из 20").assertIsDisplayed()
+        // План и факт — полосами на карточке «Мой бюджет», без строк «16 из 20».
+        compose.onNodeWithText("Мой бюджет").assertIsDisplayed()
+        compose.onNodeWithText("16 из 20").assertDoesNotExist()
+        compose.onNodeWithContentDescription(
+            "${BudgetCategory.NEEDS.displayName}: план 20 монет, факт 16 монет, меньше плана",
+        ).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            "${BudgetCategory.WANTS.displayName}: план 15 монет, факт 7 монет, меньше плана",
+        ).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            "${BudgetCategory.SAVINGS.displayName}: план 15 монет, факт 15 монет, точно по плану",
+        ).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Да, в копилку").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Уложить спать").performScrollTo().performClick()
         compose.mainClock.advanceTimeBy(2000)
@@ -154,8 +167,10 @@ class SeasonScreensTest {
         compose.setContent {
             FinnyTheme { PlanScreen(game = GameState(balance = Coins(50)), onConfirm = { _, _, _ -> }, onBack = {}, extras = SeasonExtras(), free = 50) }
         }
-        compose.onNodeWithText("Осталось распределить: 50 монет").assertIsDisplayed()
-        compose.onNodeWithText("Распредели 50 монет по банкам.").assertIsDisplayed()
+        // «Распредели …» — вверху, остаток — внизу, под тремя блоками.
+        compose.onNodeWithText("Распредели 50 монет").assertIsDisplayed()
+        compose.onNodeWithText("Осталось распределить: 50 монет").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Утвердить план").performScrollTo().assertIsNotEnabled()
     }
 
     // --- Новое в 0.9.0 ------------------------------------------------------
