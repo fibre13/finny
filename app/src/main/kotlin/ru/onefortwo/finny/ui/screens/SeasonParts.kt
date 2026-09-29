@@ -480,10 +480,12 @@ fun GrowthCelebrationScreen(state: AppState, parts: PetPartsContent, onDone: () 
     var scene by rememberSaveable { mutableIntStateOf(0) }
     val stage = state.game.stage
     val previous = if (stage == GrowthStage.ADULT) GrowthStage.TEEN else GrowthStage.BABY
-    val grow = remember { Animatable(0f) }
+    // Движения выключены в разделе для взрослого — питомец сразу большой и не прыгает.
+    val motion = motionAllowed()
+    val grow = remember { Animatable(if (motion) 0f else 1f) }
     var jumps by remember { mutableLongStateOf(1L) }
     LaunchedEffect(scene) {
-        if (scene == 1) {
+        if (scene == 1 && motion) {
             grow.snapTo(0f)
             grow.animateTo(1f, tween(1200))
         }
@@ -535,7 +537,7 @@ fun GrowthCelebrationScreen(state: AppState, parts: PetPartsContent, onDone: () 
                                 parts = parts,
                                 size = 170.dp,
                                 stage = if (scene == 0) previous else stage,
-                                reaction = PetReaction(PetReactions.PLAY, id = jumps),
+                                reaction = if (motion) PetReaction(PetReactions.PLAY, id = jumps) else null,
                             )
                         }
                         if (scene >= 1) {
