@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.core.graphics.toColorInt
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.width
@@ -465,17 +466,29 @@ private fun WavingPaw(art: ru.onefortwo.finny.content.PixelArt, state: AppState,
     Canvas(modifier = modifier.clearAndSetSemantics { }) {
         val cell = size.width / art.petSize
         val px = cell * scale
-        // Основание лапки — у левого плеча, чуть ниже шеи.
-        val baseX = (neck.x - 11 * scale) * cell
+        // Основание лапки — на груди у левого края туловища, чуть ниже шеи: лапа
+        // выходит из тела и поднимается рядом с головой. Край туловища берётся
+        // из самой фигуры: первая непрозрачная клетка строки под шеей.
+        val body = art.sprite("${species}_${stage.name.lowercase()}_0")
+        val row = (neck.y + 2).coerceIn(0, (body?.height ?: 1) - 1)
+        val edge = body?.let { sprite ->
+            (0 until sprite.width).firstOrNull { x -> sprite.pixels[row * sprite.width + x] >= 0 }
+        } ?: (neck.x - 10)
+        val baseX = (edge + 1) * cell
         val baseY = (neck.y + 3) * cell
+        // Лапа отведена наружу сдвигом рядов: чем выше ряд, тем левее — кисть
+        // оказывается рядом с головой, а не перед мордочкой; во втором кадре
+        // наклон меньше — взмах. Сдвиг по клеткам, чтобы пиксели не размывались.
+        val lean = if (frame == 0) 2.5f else 4f
         for (y in 0 until sprite.height) {
+            val shift = ((sprite.height - 1 - y) / lean).toInt() * px
             for (x in 0 until sprite.width) {
                 val index = sprite.pixels[y * sprite.width + x]
                 if (index < 0) continue
                 val color = if (index == furChar) fur else Color(art.colors[index])
                 drawRect(
                     color,
-                    Offset(baseX + (x - sprite.pivotX) * px, baseY + (y - sprite.pivotY) * px),
+                    Offset(baseX + (x - sprite.pivotX) * px - shift, baseY + (y - sprite.pivotY) * px),
                     Size(px + 0.5f, px + 0.5f),
                 )
             }
